@@ -18,8 +18,8 @@ export function Stepper({ current }: { current: 0 | 1 | 2 }) {
               <li className="flex shrink-0 items-center gap-2">
                 <span
                   className={[
-                    "flex size-7 shrink-0 items-center justify-center rounded-full",
-                    "text-sm font-semibold",
+                    "grid size-7 shrink-0 place-items-center rounded-full",
+                    "text-sm leading-none font-semibold",
                     done
                       ? "bg-navy text-white"
                       : active
@@ -28,7 +28,9 @@ export function Stepper({ current }: { current: 0 | 1 | 2 }) {
                   ].join(" ")}
                   aria-hidden="true"
                 >
-                  {done ? <Check className="size-4" /> : index + 1}
+                  <span className="flex size-4 items-center justify-center">
+                    {done ? <Check className="size-4" /> : index + 1}
+                  </span>
                 </span>
                 <span
                   className={[
