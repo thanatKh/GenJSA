@@ -81,8 +81,13 @@ export function GeneratingPanel() {
           className="size-5 shrink-0 animate-spin text-navy"
           aria-hidden="true"
         />
-        <p className="text-navy font-medium" aria-live="polite">
-          {STAGES[stage]}
+        {/* aria-live lives on the <p>, reading the real text node — the
+            shimmer span's ::before duplicate (index.css) is decoration only,
+            not something a screen reader needs to see or announce twice. */}
+        <p className="font-medium" aria-live="polite">
+          <span className="t-shimmer-label" data-text={STAGES[stage]}>
+            {STAGES[stage]}
+          </span>
         </p>
       </div>
 

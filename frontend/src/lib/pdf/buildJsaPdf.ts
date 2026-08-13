@@ -18,6 +18,7 @@ import { jsPDF } from "jspdf";
 import logoUrl from "../../assets/logo.png";
 import type { JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
+import { pdfFileName } from "./fileName";
 import { FONT_NAME, registerThaiFont } from "./fonts";
 import {
   FALLBACK_DOCUMENT,
@@ -280,33 +281,14 @@ export async function buildJsaPdf(
     y += activityH;
 
     const infoH = fieldLineH + mmToPt(1);
-    // Content-aware split instead of a fixed ratio. A Thai date is short and
-    // effectively fixed-length ("13 สิงหาคม 2569"), while a supervisor's name
-    // varies a lot — so the date box gets only what it needs plus a little
-    // breathing room, and every remaining point of slack goes to the name.
-    // (Splitting the slack proportionally, as this did before, kept handing
-    // the date box space it could never use while long names stayed cramped.)
-    // Falls back to an even 50/50 only when the two can't both fit at natural
-    // size, where the name wraps rather than overflows.
-    setFont("bold", L.font.header_label_pt);
-    const supervisorLabelW = doc.getTextWidth(`${D.labels.supervisor}:`) + mmToPt(1.5);
-    const dateLabelW = doc.getTextWidth(`${D.labels.analysis_date}:`) + mmToPt(1.5);
-    setFont("normal", L.font.header_label_pt);
-    const supervisorValueW = doc.getTextWidth(jsa.header.supervisor || "");
-    const dateValueW = doc.getTextWidth(formatThaiDate(jsa.header.analysis_date));
-
-    const supervisorNaturalW = supervisorLabelW + supervisorValueW + pad * 2;
-    const dateNaturalW = dateLabelW + dateValueW + pad * 2;
-    const naturalTotal = supervisorNaturalW + dateNaturalW;
-
-    // Enough that the date never looks shrink-wrapped against its border,
-    // without giving it space the name could use
-    const dateSlack = mmToPt(5);
-    const splitW =
-      naturalTotal <= contentW
-        ? // Never let the slack itself push the name into wrapping
-          Math.max(supervisorNaturalW, contentW - (dateNaturalW + dateSlack))
-        : contentW * 0.5;
+    // The date box's left edge lines up with the table's own third column
+    // (มาตรการป้องกัน/ควบคุม, colX[2]) instead of being sized off the field
+    // text — that way one continuous vertical line runs from the header
+    // fields straight down through the table below it, rather than the two
+    // boundaries drifting apart depending on how long the supervisor's name
+    // happens to be. colW[2] (33.3% of contentW by default) comfortably
+    // fits a Thai date's label + value with room to spare.
+    const splitW = colX[2] - mL;
     doc.rect(mL, y, splitW, infoH);
     doc.rect(mL + splitW, y, contentW - splitW, infoH);
     drawField(D.labels.supervisor, jsa.header.supervisor, mL, splitW, y, infoH);
@@ -540,15 +522,6 @@ export async function buildJsaPdf(
   doc.setProperties({ title: pdfFileName(jsa) });
 
   return doc.output("blob");
-}
-
-/** Suggested filename, embedded as PDF metadata for the native viewer to use */
-export function pdfFileName(jsa: JsaDocument): string {
-  const safe = jsa.header.work_activity
-    .replace(/[\\/:*?"<>|]/g, "")
-    .trim()
-    .slice(0, 60);
-  return `JSA-${safe || "document"}-${jsa.header.analysis_date}.pdf`;
 }
 
 type Logo = { data: string; ratio: number };

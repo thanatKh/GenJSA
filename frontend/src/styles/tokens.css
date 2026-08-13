@@ -112,16 +112,27 @@
   --blur-medium: 3px;
   --blur-large: 8px;
 
-  /* skeleton loader pulse (transitions.dev #14) — GeneratingPanel waits on the
-     LLM for 10-60s with no progress to report, so the pulse has to keep going
-     for the whole wait: a finite count freezes the skeleton into a dead grey
-     block for most of it, which reads as a hung page.
-     The duration sits outside the --duration-* scale on purpose. Those are for
-     state transitions; this is an ambient loop, and at transition speed it
-     flickers rather than breathes. */
-  --skel-pulse-dur: 1600ms;
-  --skel-pulse-count: infinite;
-  --skel-pulse-min: 0.5;
+  /* skeleton loader shimmer (transitions.dev #14, adapted with the #15 band-
+     sweep technique instead of a plain opacity pulse) — a highlight band
+     sweeps across each bar, and a matching sweep runs over the stage label
+     text below it. GeneratingPanel waits on the LLM for 1-3 minutes with no
+     progress to report, so both loop for the whole wait: a finite count
+     would freeze into a dead, static state for most of it, which reads as a
+     hung page. The durations sit outside the --duration-* scale on purpose —
+     those are for state transitions; this is an ambient loop, and at
+     transition speed it flickers rather than sweeps. */
+  --skel-shimmer-dur: 1600ms;
+  --skel-shimmer-color: rgba(255, 255, 255, 0.65);
+
+  /* Base stays --text-muted (always legible on its own) with --brand-navy as
+     the passing highlight — same pairing transitions.dev's own shimmer-text
+     example uses (muted base, darker/bolder highlight sweeping through), and
+     both colors are already cleared for text here. Not --brand-cyan: the
+     contrast note above rules that out as a text color even transiently. */
+  --label-shimmer-dur: 2000ms;
+  --label-shimmer-band: 400%;
+  --label-shimmer-base: var(--text-muted);
+  --label-shimmer-highlight: var(--brand-navy);
 
   /* undo toast (transitions.dev #22) — step/hazard delete in EditorStep */
   --toast-open: var(--duration-medium);

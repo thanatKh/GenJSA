@@ -162,8 +162,8 @@ class PdfTable(BaseModel):
 
 
 class PdfLogo(BaseModel):
-    max_height_mm: float = 14
-    max_width_mm: float = 40
+    max_height_mm: float = 11
+    max_width_mm: float = 32
 
 
 class PdfFooter(BaseModel):

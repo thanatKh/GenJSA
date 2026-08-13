@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils"
 
-// animate-t-skel-pulse replaces the generated animate-pulse (index.css) — same
-// looping idea (transitions.dev #14) but on GenJSA's own motion tokens, so the
-// pulse timing is tunable from styles/tokens.css alongside everything else.
+// t-skel-shimmer replaces the generated animate-pulse (index.css) — a
+// band-sweep (transitions.dev #14/#15) on GenJSA's own motion tokens, so the
+// sweep timing/color is tunable from styles/tokens.css alongside everything
+// else, instead of a plain opacity pulse.
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-t-skel-pulse rounded-md bg-line-strong", className)}
+      className={cn("t-skel-shimmer rounded-md bg-line-strong", className)}
       {...props}
     />
   )

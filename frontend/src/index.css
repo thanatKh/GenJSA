@@ -114,60 +114,112 @@ h3 {
   }
 }
 
-/* Skeleton loader pulse (transitions.dev #14, see components/ui/skeleton.tsx).
-   Loops for the whole generation wait — see the token comment in
-   styles/tokens.css for why it isn't finite. The reduced-motion block above
-   already forces animation-iteration-count: 1, so this stays accessible. */
-@keyframes t-skel-pulse {
-  0%,
+/* Skeleton loader shimmer (transitions.dev #14, adapted: a band-sweep instead
+   of a plain opacity pulse — see components/ui/skeleton.tsx). Loops for the
+   whole generation wait — see the token comment in styles/tokens.css for why
+   it isn't finite. overflow: hidden clips the sweep to the bar's own rounded
+   corners, so it never spills outside the shape it's decorating. The
+   reduced-motion block above already forces a near-instant single pass that
+   settles on a plain, unhighlighted bar, so this stays accessible with no
+   separate override. */
+.t-skel-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.t-skel-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skel-shimmer-color) 50%,
+    transparent 100%
+  );
+  animation: t-skel-shimmer-sweep var(--skel-shimmer-dur) var(--ease-linear)
+    infinite;
+}
+@keyframes t-skel-shimmer-sweep {
   100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: var(--skel-pulse-min);
+    transform: translateX(100%);
   }
 }
 
-.animate-t-skel-pulse {
-  animation: t-skel-pulse var(--skel-pulse-dur) var(--ease-in-out)
-    var(--skel-pulse-count);
+/* Shimmer text (transitions.dev #15) — the stage label next to the spinner
+   in GeneratingPanel ("กำลังทำความเข้าใจงาน…" etc). The real text is always
+   painted in --label-shimmer-base (muted, legible on its own); ::before
+   duplicates it via content: attr(data-text) and masks a moving
+   --label-shimmer-highlight band onto the same glyphs via
+   background-clip: text, so a screen reader only ever sees the one real
+   string underneath — the duplicate is decoration, not content. Pure CSS. */
+.t-shimmer-label {
+  position: relative;
+  display: inline-block;
+  color: var(--label-shimmer-base);
+}
+.t-shimmer-label::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--label-shimmer-highlight) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: var(--label-shimmer-band) 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: t-shimmer-label-sweep var(--label-shimmer-dur) var(--ease-linear)
+    infinite;
+}
+@keyframes t-shimmer-label-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
 }
 
-/* History row (transitions.dev #25 hover lift) — the rows on step 1 are the
-   only "open this thing" targets on the page, so they get an explicit hover
-   affordance: a tinted ground, a small nudge toward the direction travel goes,
-   and a chevron that slides in. Hover-out is quicker than hover-in so the row
+/* History row (transitions.dev #25 hover lift, simplified) — the rows on
+   step 1 are the only "open this thing" targets on the page, so they get an
+   explicit hover affordance. Color only, deliberately: an earlier version
+   also nudged the row sideways on hover/press, which shifted the row's own
+   text and read as jittery rather than responsive — dropped in favor of a
+   plain tinted background. Hover-out is quicker than hover-in so the row
    doesn't feel sticky when the pointer sweeps across the list. */
 .t-history-row {
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    transform var(--duration-quick) var(--ease-out);
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
 .t-history-row:hover {
   /* navy-soft, not surface-raised: the page ground is already white, so the
      tint has to come from the brand ramp to be visible at all */
   background-color: var(--brand-navy-soft);
-  transform: translateX(var(--distance-micro));
   transition-duration: var(--duration-fast);
 }
 .t-history-row:active {
-  transform: translateX(var(--distance-micro)) scale(var(--scale-tiny));
+  background-color: var(--brand-navy-soft);
   transition-duration: var(--duration-micro);
 }
 
 /* The chevron only means "this opens" once you're pointing at it — showing it
-   on every row at rest would just be visual noise down the whole list */
+   on every row at rest would just be visual noise down the whole list. Fades
+   in place, no slide — same "color/opacity, not motion" rule as the row above. */
 .t-history-chevron {
   opacity: 0;
-  transform: translateX(calc(var(--distance-micro) * -1));
-  transition:
-    opacity var(--duration-quick) var(--ease-out),
-    transform var(--duration-quick) var(--ease-out);
+  transition: opacity var(--duration-quick) var(--ease-out);
 }
 .t-history-row:hover .t-history-chevron,
 .t-history-row:focus-visible .t-history-chevron {
   opacity: 1;
-  transform: translateX(0);
 }
 
 /* Undo toast (transitions.dev #22) — used by EditorStep after a step/hazard

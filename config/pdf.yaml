@@ -41,9 +41,11 @@ table:
   avoid_row_split: true
 
 logo:
-  # Original: 84.49 x 56.42 pt — the real logo's aspect ratio is 1.90, so we fix the height and derive width from it
-  max_height_mm: 14
-  max_width_mm: 40
+  # The real logo's aspect ratio is 1.90, so we fix the height and derive
+  # width from it — max_width_mm is just a safety cap, well above what 1.90
+  # ratio actually produces at this height, and isn't the binding constraint
+  max_height_mm: 11
+  max_width_mm: 32
 
 footer:
   show_page_number: true

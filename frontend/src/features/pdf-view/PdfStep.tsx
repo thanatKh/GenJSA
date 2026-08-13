@@ -7,12 +7,28 @@
  * button is an <a target="_blank"> pointing at a blob URL that's already
  * ready — clicking a real link is never blocked as a popup (unlike
  * window.open called after an await, which mobile Safari will block).
+ *
+ * On iOS Safari specifically: a PDF opened from a blob: URL (as opposed to a
+ * real network URL) renders without the native viewer's own toolbar — no
+ * share/save icon at all, confirmed against a real device. There's no fix for
+ * that view itself; the workaround is a second button, right here, that calls
+ * the Web Share API directly with the file. That opens the OS share sheet
+ * (Save to Files, AirDrop, Messages, ...) without depending on whatever
+ * chrome the browser decided to draw around the blob.
  */
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, CircleCheck, FilePlus2, FileText, LoaderCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleCheck,
+  FilePlus2,
+  FileText,
+  LoaderCircle,
+  Share2,
+} from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
+import { pdfFileName } from "../../lib/pdf/fileName";
 import { formatThaiDate } from "../../lib/thaidate";
 import type { JsaDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
@@ -29,7 +45,9 @@ export function PdfStep({
   onNewJsa: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -50,6 +68,7 @@ export function PdfStep({
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
+        setFile(new File([blob], pdfFileName(doc), { type: "application/pdf" }));
       } catch {
         if (!cancelled) {
           setError(
@@ -71,6 +90,37 @@ export function PdfStep({
     (total, step) => total + step.hazards.length,
     0,
   );
+
+  // Feature-detect rather than sniff the platform — canShare({files}) is
+  // false on desktop browsers and on the older Safari/Chrome versions that
+  // support navigator.share for text/links only, so this only surfaces where
+  // it actually works (iOS Safari 15+, most mobile Chrome).
+  const canShareFile =
+    !!file &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] });
+
+  const handleShare = async () => {
+    if (!file) return;
+    setSharing(true);
+    try {
+      // Called synchronously off the click, before any await, so the
+      // browser's user-activation check (required to open the share sheet)
+      // still sees this as a direct response to the tap.
+      await navigator.share({ files: [file], title: pdfFileName(doc) });
+    } catch (caught) {
+      // AbortError = the user closed the share sheet without picking
+      // anything — that's a normal outcome, not a failure to report
+      if (!(caught instanceof Error && caught.name === "AbortError")) {
+        setError(
+          "แชร์ไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
+        );
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
     <section>
@@ -144,6 +194,29 @@ export function PdfStep({
             {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
           </Button>
         )}
+
+        {/* Only rendered where navigator.canShare({files}) actually works —
+            mainly iOS Safari, where the blob PDF view above has no save/share
+            icon of its own (see the file header comment). Calls the OS share
+            sheet directly instead of a `download` attribute: it's an explicit,
+            user-chosen action via a dedicated button, not a silent auto-save,
+            so it doesn't run into the "no auto-download" concern noted below. */}
+        {canShareFile ? (
+          <div>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handleShare}
+              loading={sharing}
+            >
+              <Share2 className="size-5" aria-hidden="true" />
+              แชร์ / บันทึกไฟล์ PDF
+            </Button>
+            <p className="mt-1.5 text-center text-sm text-muted">
+              ใช้ปุ่มนี้หากหน้าเอกสาร PDF ที่เปิดไม่มีปุ่มบันทึกหรือแชร์ในตัว
+            </p>
+          </div>
+        ) : null}
 
         {/* No confirm here, unlike EditorStep's "เริ่มใหม่": by this point the
             document is already saved to the history list on step 1, so starting

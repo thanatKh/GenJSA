@@ -24,5 +24,12 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    // Default (500) flags the main chunk even at its normal size (~170KB
+    // gzipped — React, form validation, Radix UI, motion). The genuinely
+    // heavy PDF-rendering libraries (jsPDF/html2canvas/dompurify) are already
+    // isolated into their own lazily-loaded chunk via the dynamic import in
+    // PdfStep.tsx, so this is just raising the threshold past the app shell's
+    // real size rather than masking an actual code-splitting gap.
+    chunkSizeWarningLimit: 600,
   },
 });

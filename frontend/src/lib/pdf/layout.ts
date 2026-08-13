@@ -95,7 +95,7 @@ export const FALLBACK_LAYOUT: PdfLayout = {
     repeat_header_each_page: true,
     avoid_row_split: true,
   },
-  logo: { max_height_mm: 14, max_width_mm: 40 },
+  logo: { max_height_mm: 11, max_width_mm: 32 },
   footer: {
     show_page_number: true,
     page_number_format: "หน้า {page} / {total}",
