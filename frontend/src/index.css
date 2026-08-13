@@ -180,12 +180,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         normal 1.75 body line-height — 1.75 x 16px = 28px, which alone is
         most of what was pushing the box past 44px. */
 input[type="date"] {
+  /* THE key line: without appearance:none iOS keeps rendering this as a
+     native date widget, and a native widget sizes itself from its own
+     intrinsic metrics — overriding h-11 and even w-full, so the field comes
+     out both taller and wider than the text inputs beside it. Desktop
+     Chrome/WebKit ignore those intrinsic metrics and just honour the CSS
+     box, which is why this only ever misrendered on the phone. Turning the
+     widget off makes it a plain styled box, so the shared Input classes
+     (h-11 / w-full / px-3.5 / py-2.5) finally apply as written. */
+  -webkit-appearance: none;
+  appearance: none;
+
   position: relative;
+  box-sizing: border-box;
+  /* min-width:0 stops the native min-content width (sized from the date
+     format string) from acting as a floor and pushing the box wider */
+  min-width: 0;
   height: 2.75rem; /* 44px, matches h-11 */
   max-height: 2.75rem;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
 }
 
 input[type="date"]::-webkit-datetime-edit,
@@ -207,15 +219,16 @@ input[type="date"]::-webkit-datetime-edit-year-field {
    centering its own content replaces that lost centering explicitly,
    rather than relying on WebKit's internal (and inconsistent) default. */
 input[type="date"]::-webkit-date-and-time-value {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
   text-align: left;
   margin: 0;
   padding: 0;
-  height: 100%;
-  max-height: 100%;
-  line-height: normal;
+  /* Centre the value in the content box the same way a text input's own
+     value centres: fill the content box's exact height with line-height,
+     rather than relying on WebKit's internal margins (which had to be
+     zeroed above to stop the box growing). Derived, not magic:
+     44px height - 2px borders - 20px vertical padding = 22px. */
+  line-height: calc(2.75rem - 2px - 1.25rem);
+  height: calc(2.75rem - 2px - 1.25rem);
 }
 
 /* shadcn init generates its own :root/.dark blocks with a neutral grayscale
