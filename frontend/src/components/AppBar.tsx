@@ -114,10 +114,6 @@ export function AppBar({
             ระบบนี้ไม่เก็บข้อมูล JSA ไว้บนเซิร์ฟเวอร์ —
             ปิดแท็บแล้วข้อมูลจะหายไป
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="size-2 rounded-full bg-cyan" aria-hidden="true" />
-            <span className="text-ink">พร้อมใช้งาน</span>
-          </div>
         </AboutSection>
 
         <AboutSection icon={FileText} title="เกี่ยวกับระบบนี้">
@@ -137,6 +133,13 @@ export function AppBar({
                 {CONTACT_EMAIL}
               </a>
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <span
+                className="size-2 rounded-full bg-[var(--success)]"
+                aria-hidden="true"
+              />
+              <span className="text-ink">พร้อมใช้งาน</span>
+            </div>
           </div>
         </AboutSection>
       </InfoDialog>

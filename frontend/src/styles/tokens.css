@@ -41,6 +41,8 @@
   --warning-text: #92400e;
   --warning-soft: #fffbeb;
   --warning-border: #fde68a;
+  /* Success (system-status indicator only, e.g. AppBar's "พร้อมใช้งาน" dot) */
+  --success: #16a34a;
 
   /* focus ring — cyan is fine here since it's a line, not text */
   --ring: #00aeef;
