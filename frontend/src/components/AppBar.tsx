@@ -120,7 +120,7 @@ export function AppBar({
           </div>
         </AboutSection>
 
-        <AboutSection icon={FileText} title="เกี่ยวกับเอกสารนี้">
+        <AboutSection icon={FileText} title="เกี่ยวกับระบบนี้">
           <div className="space-y-1">
             {documentMeta ? (
               <p>

@@ -80,7 +80,7 @@ export function InputStep({
         วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
       </h1>
       <p className="mt-1.5 text-muted">
-        เล่าให้ฟังว่าจะทำงานอะไร แล้วระบบจะร่าง JSA ให้ตรวจทาน
+        อธิบายว่าจะทำงานอะไร แล้วระบบจะร่าง JSA ให้ตรวจทาน
       </p>
 
       {busy ? (
@@ -108,7 +108,7 @@ export function InputStep({
               {...register("work_description")}
             />
             <p id="work_description_hint" className="mt-1.5 text-sm text-muted">
-              ยิ่งเล่าละเอียด JSA ยิ่งตรงกับงานจริง
+              ยิ่งอธิบายละเอียด JSA ยิ่งตรงกับงานจริง
               ถ้ามีขั้นตอนในใจอยู่แล้วก็เขียนมาได้เลย
             </p>
             <FieldError>{errors.work_description?.message}</FieldError>

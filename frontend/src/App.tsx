@@ -17,7 +17,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
-  const [footer, setFooter] = useState<string>("");
   const [config, setConfig] = useState<PublicConfig | null>(null);
 
   // If a draft JSA is left over (refresh mid-flow), jump straight back to the editor step
@@ -34,13 +33,11 @@ export default function App() {
   }, [stage, doc]);
 
   useEffect(() => {
-    // One config powers both the app name/footer display and PDF drawing (layout values from config/pdf.yaml)
+    // One config powers both the app name display and PDF drawing (layout values from config/pdf.yaml)
     void fetchPublicConfig().then((loaded) => {
       if (!loaded) return;
       setConfig(loaded);
       setAppName(loaded.appName);
-      const parts = [loaded.company.department, loaded.company.name].filter(Boolean);
-      setFooter(parts.join(" · "));
     });
   }, []);
 
@@ -111,12 +108,6 @@ export default function App() {
           </div>
         ) : null}
       </main>
-
-      <footer className="border-t border-line px-4 py-4">
-        <p className="mx-auto max-w-[60rem] text-sm text-muted">
-          {footer}
-        </p>
-      </footer>
     </div>
   );
 }
