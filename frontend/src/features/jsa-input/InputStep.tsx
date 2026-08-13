@@ -31,10 +31,12 @@ const PLACEHOLDER =
 
 export function InputStep({
   onGenerate,
+  onSkipToManual,
   busy,
   error,
 }: {
   onGenerate: (values: InputForm) => void;
+  onSkipToManual: (values: Pick<InputForm, "supervisor" | "analysis_date">) => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -46,6 +48,8 @@ export function InputStep({
     watch,
     setValue,
     reset,
+    trigger,
+    getValues,
     formState: { errors },
   } = useForm<InputForm>({
     resolver: zodResolver(inputFormSchema),
@@ -72,6 +76,16 @@ export function InputStep({
     inputDraft.clear();
     setConfirmReset(false);
     document.getElementById("supervisor")?.focus();
+  };
+
+  // Manual entry skips the AI draft entirely, so only the two header fields
+  // (not work_description, which only matters for the AI prompt) need to
+  // validate — a separate, narrower check from the full-form submit above.
+  const skipToManual = async () => {
+    const valid = await trigger(["supervisor", "analysis_date"]);
+    if (!valid) return;
+    const { supervisor, analysis_date } = getValues();
+    onSkipToManual({ supervisor, analysis_date });
   };
 
   return (
@@ -160,6 +174,19 @@ export function InputStep({
               ล้างฟอร์ม
             </Button>
           </div>
+
+          {/* Explicit opt-in for users who'd rather type every field
+              themselves than review an AI draft — not a stepper shortcut,
+              since that would imply step 2/3 are always freely reachable.
+              Only supervisor/date are required here; work_description isn't
+              validated because it's only ever used to prompt the AI. */}
+          <button
+            type="button"
+            onClick={skipToManual}
+            className="justify-self-center text-sm text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+          >
+            ข้ามขั้นตอนนี้ กรอกแบบฟอร์ม JSA เองทั้งหมด
+          </button>
         </form>
       )}
 

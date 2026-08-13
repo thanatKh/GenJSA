@@ -9,6 +9,19 @@ import { ApiError, fetchPublicConfig, generateJsa, type PublicConfig } from "./l
 import type { InputForm, JsaDocument } from "./lib/schema";
 import { clearAllDrafts, docDraft } from "./store";
 
+// A blank starting point for users who skip the AI draft and fill the JSA
+// in by hand — one empty step with one empty hazard, matching the shape
+// EditorStep's own "เพิ่มขั้นตอน"/"เพิ่มอันตราย" actions add.
+function buildBlankDocument(
+  values: Pick<InputForm, "supervisor" | "analysis_date">,
+): JsaDocument {
+  return {
+    header: { work_activity: "", ...values },
+    steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] }],
+    assumptions: [],
+  };
+}
+
 type Stage = 0 | 1 | 2;
 
 export default function App() {
@@ -62,6 +75,16 @@ export default function App() {
     }
   };
 
+  const handleSkipToManual = (
+    values: Pick<InputForm, "supervisor" | "analysis_date">,
+  ) => {
+    const blank = buildBlankDocument(values);
+    setDoc(blank);
+    docDraft.save(blank);
+    setStage(1);
+    window.scrollTo({ top: 0 });
+  };
+
   const startOver = () => {
     setDoc(null);
     setError(null);
@@ -88,7 +111,12 @@ export default function App() {
 
         {stage === 0 ? (
           <div className="mx-auto max-w-[45rem]">
-            <InputStep onGenerate={handleGenerate} busy={busy} error={error} />
+            <InputStep
+              onGenerate={handleGenerate}
+              onSkipToManual={handleSkipToManual}
+              busy={busy}
+              error={error}
+            />
           </div>
         ) : null}
 

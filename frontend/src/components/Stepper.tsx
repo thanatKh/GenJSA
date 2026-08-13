@@ -76,14 +76,19 @@ export function Stepper({ current }: { current: 0 | 1 | 2 }) {
           const active = index === current;
           return (
             <Fragment key={label}>
-              <li className="flex shrink-0 items-center gap-2">
+              <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
                 <StepCircle n={index + 1} done={done} filled={done || active} />
+                {/* All three labels always shown — hiding inactive ones made
+                    step 1 (active, with its label) much wider than steps 2/3
+                    (bare circles), which pushed the flex-1 connector lines'
+                    midpoints off-center from what the eye expects, making
+                    circle 2 look mis-centered even though the flex math was
+                    technically correct. Equal-width items keep the circles
+                    landing at true equal thirds of the track. */}
                 <span
                   className={[
-                    "whitespace-nowrap text-sm",
+                    "truncate text-xs sm:text-sm",
                     active ? "font-semibold text-navy" : "text-muted",
-                    // Step labels take up room on mobile — show only the active one
-                    active ? "inline" : "hidden sm:inline",
                   ].join(" ")}
                   aria-current={active ? "step" : undefined}
                 >
@@ -93,7 +98,7 @@ export function Stepper({ current }: { current: 0 | 1 | 2 }) {
               {index < STEPS.length - 1 ? (
                 <li
                   className={[
-                    "mx-1.5 h-px flex-1 sm:mx-3",
+                    "mx-1 h-px flex-1 sm:mx-3",
                     index < current ? "bg-navy" : "bg-line",
                   ].join(" ")}
                   aria-hidden="true"
