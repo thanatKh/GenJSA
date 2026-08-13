@@ -33,6 +33,9 @@ class JsaHeader(BaseModel):
     work_activity: str = Field(min_length=1, max_length=500)
     supervisor: str = Field(min_length=1, max_length=200)
     analysis_date: date
+    # Printed as "ผู้วิเคราะห์ <name>" at the end of the last PDF page.
+    # Optional — left blank, the PDF falls back to the supervisor's name.
+    analyst: str = Field(default="", max_length=200)
 
 
 class JsaDocument(BaseModel):
@@ -66,6 +69,7 @@ class GenerateRequest(BaseModel):
     supervisor: str = Field(min_length=1, max_length=200)
     analysis_date: date
     work_description: str = Field(min_length=10, max_length=5000)
+    analyst: str = Field(default="", max_length=200)
 
 
 class AiJsaPayload(BaseModel):

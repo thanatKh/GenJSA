@@ -112,11 +112,15 @@
   --blur-medium: 3px;
   --blur-large: 8px;
 
-  /* skeleton loader pulse (transitions.dev #14) — runs a finite number of
-     times instead of looping forever, since GeneratingPanel's skeleton is
-     swapped out for real content once the AI responds, not cross-faded */
-  --skel-pulse-dur: var(--duration-slow);
-  --skel-pulse-count: 3;
+  /* skeleton loader pulse (transitions.dev #14) — GeneratingPanel waits on the
+     LLM for 10-60s with no progress to report, so the pulse has to keep going
+     for the whole wait: a finite count freezes the skeleton into a dead grey
+     block for most of it, which reads as a hung page.
+     The duration sits outside the --duration-* scale on purpose. Those are for
+     state transitions; this is an ambient loop, and at transition speed it
+     flickers rather than breathes. */
+  --skel-pulse-dur: 1600ms;
+  --skel-pulse-count: infinite;
   --skel-pulse-min: 0.5;
 
   /* undo toast (transitions.dev #22) — step/hazard delete in EditorStep */

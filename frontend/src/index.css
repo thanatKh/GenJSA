@@ -114,9 +114,10 @@ h3 {
   }
 }
 
-/* Skeleton loader pulse (transitions.dev #14, see components/ui/skeleton.tsx)
-   — runs --skel-pulse-count times then stops, instead of Tailwind's
-   animate-pulse which loops forever while the AI is still generating */
+/* Skeleton loader pulse (transitions.dev #14, see components/ui/skeleton.tsx).
+   Loops for the whole generation wait — see the token comment in
+   styles/tokens.css for why it isn't finite. The reduced-motion block above
+   already forces animation-iteration-count: 1, so this stays accessible. */
 @keyframes t-skel-pulse {
   0%,
   100% {
@@ -128,8 +129,45 @@ h3 {
 }
 
 .animate-t-skel-pulse {
-  animation: t-skel-pulse var(--skel-pulse-dur) var(--ease-linear)
+  animation: t-skel-pulse var(--skel-pulse-dur) var(--ease-in-out)
     var(--skel-pulse-count);
+}
+
+/* History row (transitions.dev #25 hover lift) — the rows on step 1 are the
+   only "open this thing" targets on the page, so they get an explicit hover
+   affordance: a tinted ground, a small nudge toward the direction travel goes,
+   and a chevron that slides in. Hover-out is quicker than hover-in so the row
+   doesn't feel sticky when the pointer sweeps across the list. */
+.t-history-row {
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    transform var(--duration-quick) var(--ease-out);
+}
+.t-history-row:hover {
+  /* navy-soft, not surface-raised: the page ground is already white, so the
+     tint has to come from the brand ramp to be visible at all */
+  background-color: var(--brand-navy-soft);
+  transform: translateX(var(--distance-micro));
+  transition-duration: var(--duration-fast);
+}
+.t-history-row:active {
+  transform: translateX(var(--distance-micro)) scale(var(--scale-tiny));
+  transition-duration: var(--duration-micro);
+}
+
+/* The chevron only means "this opens" once you're pointing at it — showing it
+   on every row at rest would just be visual noise down the whole list */
+.t-history-chevron {
+  opacity: 0;
+  transform: translateX(calc(var(--distance-micro) * -1));
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    transform var(--duration-quick) var(--ease-out);
+}
+.t-history-row:hover .t-history-chevron,
+.t-history-row:focus-visible .t-history-chevron {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 /* Undo toast (transitions.dev #22) — used by EditorStep after a step/hazard

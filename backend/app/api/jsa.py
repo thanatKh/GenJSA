@@ -59,6 +59,7 @@ async def public_config() -> dict:
             "table": pdf.table.model_dump(),
             "logo": pdf.logo.model_dump(),
             "footer": pdf.footer.model_dump(),
+            "signature": pdf.signature.model_dump(),
         },
     }
 

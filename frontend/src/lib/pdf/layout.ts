@@ -41,6 +41,7 @@ export type PdfLayout = {
     page_number_format: string;
     show_company: boolean;
   };
+  signature: { show: boolean; gap_above_mm: number; label_pt: number };
 };
 
 export type DocumentMeta = {
@@ -48,7 +49,12 @@ export type DocumentMeta = {
   footerText: string;
   titleTh: string;
   titleEn: string;
-  labels: { work_activity: string; supervisor: string; analysis_date: string };
+  labels: {
+    work_activity: string;
+    supervisor: string;
+    analysis_date: string;
+    analyst: string;
+  };
   columns: {
     procedure: string;
     procedure_hint: string;
@@ -84,7 +90,7 @@ export const FALLBACK_LAYOUT: PdfLayout = {
     header_fill: "#FCD5B4",
     border_color: "#000000",
     border_width_pt: 0.75,
-    outer_border_width_pt: 1.5,
+    outer_border_width_pt: 0.75,
     cell_padding_mm: 1.5,
     repeat_header_each_page: true,
     avoid_row_split: true,
@@ -95,6 +101,7 @@ export const FALLBACK_LAYOUT: PdfLayout = {
     page_number_format: "หน้า {page} / {total}",
     show_company: true,
   },
+  signature: { show: true, gap_above_mm: 8, label_pt: 14 },
 };
 
 export const FALLBACK_DOCUMENT: DocumentMeta = {
@@ -106,6 +113,7 @@ export const FALLBACK_DOCUMENT: DocumentMeta = {
     work_activity: "งาน/กิจกรรม",
     supervisor: "ชื่อหัวหน้างาน",
     analysis_date: "วันที่วิเคราะห์",
+    analyst: "ผู้วิเคราะห์",
   },
   columns: {
     procedure: "ขั้นตอนการทำงาน",

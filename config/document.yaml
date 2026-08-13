@@ -14,6 +14,8 @@ document:
     work_activity: "งาน/กิจกรรม"
     supervisor: "ชื่อหัวหน้างาน"
     analysis_date: "วันที่วิเคราะห์"
+    # Sign-off line printed below the table on the last page
+    analyst: "ผู้วิเคราะห์"
 
   # Table column names — per the original form
   columns:

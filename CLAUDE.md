@@ -18,10 +18,19 @@ Enter work details  →  AI drafts JSA  →  Review and edit  →  Open PDF
 These constraints shape almost every implementation decision here — check
 against them before adding anything:
 
-- **No database, no login, no history, no file storage.**
-- **No JSA content persistence** — data lives in memory only for the
-  duration of one request, then it's gone. The frontend keeps drafts only in
-  `sessionStorage` (tab-scoped, gone on tab close; see `frontend/src/store.ts`).
+- **No database, no login, no server-side storage.**
+- **No JSA content persistence on the server** — data lives in memory only
+  for the duration of one request, then it's gone. Nothing is ever written
+  server-side, and nothing crosses back to the backend once a document is
+  returned.
+- **Browser-local history is the one deliberate exception** — finished
+  documents (never PDFs) are kept in `localStorage` by
+  `frontend/src/history.ts`: this browser on this PC, 180-day expiry,
+  deletable per-entry or all at once, never uploaded. It exists so a user can
+  reopen yesterday's JSA instead of regenerating it. In-progress drafts stay
+  tab-scoped in `sessionStorage` (`frontend/src/store.ts`), and
+  `clearAllDrafts()` must never touch history. If this looks like a bug, it
+  isn't — read `history.ts`'s header comment before "fixing" it.
 - **No content logging** — logs capture error/status only, never work
   descriptions or AI responses. `uvicorn.access` logging is explicitly
   disabled in `backend/app/main.py`. When touching logging calls, log
@@ -123,12 +132,14 @@ browser — never the model name or API key.
 Three-step wizard driven by `App.tsx`'s `stage` state (0/1/2):
 
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
+- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Clicking one loads it into `EditorStep`.
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
 - `features/pdf-view/PdfStep.tsx` — renders/downloads the PDF.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/jsa.py` by hand (keep both in sync when the shape changes).
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engine (jsPDF). `buildJsaPdf.ts` measures text, wraps lines, computes row heights, and paginates by hand since jsPDF has no HTML/CSS layout engine. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
-- `store.ts` — sessionStorage-backed drafts (see persistence principle above).
+- `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
+- `history.ts` — localStorage-backed history of finished documents, per-PC and 180-day capped (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
 
 In dev, Vite proxies `/api` and `/health` to `127.0.0.1:8000` (`vite.config.ts`).
 In prod, FastAPI serves `frontend/dist` directly and mounts the SPA fallback
@@ -170,9 +181,11 @@ first, then hand-merge.
 | Form number / effective-date text | `config/document.yaml` |
 | Header field labels / column names | `config/document.yaml` |
 | PDF font size / margins / header color | `config/pdf.yaml` |
+| Analyst line at the end of the PDF | `config/pdf.yaml` → `signature` (wording: `config/document.yaml` → `labels.analyst`) |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | How the AI thinks / what it must not do | `prompts/jsa-generate.md` |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` |
+| History retention / entry cap | `frontend/src/history.ts` → `RETENTION_DAYS` / `MAX_ENTRIES` |
 | Request size / rate limit / CORS | `config/app.yaml` |
 
 ## Fonts

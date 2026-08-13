@@ -1,6 +1,8 @@
 /* Step 1 — Input
  *
- * Only 3 fields per the requirement: supervisor name / analysis date / work description.
+ * Three required fields per the requirement: supervisor name / analysis date /
+ * work description, plus the optional analyst name printed under the PDF's
+ * ผู้วิเคราะห์ sign-off line.
  * No fields for company / location / equipment — if important, the user can write them into the description.
  */
 
@@ -24,6 +26,13 @@ import { todayIso } from "../../lib/thaidate";
 import { inputDraft } from "../../store";
 import { GeneratingPanel } from "./GeneratingPanel";
 
+const EMPTY_FORM = (): InputForm => ({
+  supervisor: "",
+  analyst: "",
+  analysis_date: todayIso(),
+  work_description: "",
+});
+
 const PLACEHOLDER =
   "เช่น เปลี่ยน mechanical seal ของ LPG Pump P-101 ที่ Tank Farm " +
   "ต้อง isolate ปั๊ม ระบายความดันและ drain product ก่อนเริ่มงาน " +
@@ -36,7 +45,9 @@ export function InputStep({
   error,
 }: {
   onGenerate: (values: InputForm) => void;
-  onSkipToManual: (values: Pick<InputForm, "supervisor" | "analysis_date">) => void;
+  onSkipToManual: (
+    values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
+  ) => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -53,12 +64,9 @@ export function InputStep({
     formState: { errors },
   } = useForm<InputForm>({
     resolver: zodResolver(inputFormSchema),
-    defaultValues:
-      inputDraft.load() ?? {
-        supervisor: "",
-        analysis_date: todayIso(),
-        work_description: "",
-      },
+    // Spread over the empty form, not instead of it — a draft saved before a
+    // field existed would otherwise leave that input uncontrolled
+    defaultValues: { ...EMPTY_FORM(), ...inputDraft.load() },
   });
 
   const values = watch();
@@ -69,10 +77,12 @@ export function InputStep({
   }, [values]);
 
   const isEmpty =
-    !values.supervisor?.trim() && !values.work_description?.trim();
+    !values.supervisor?.trim() &&
+    !values.analyst?.trim() &&
+    !values.work_description?.trim();
 
   const applyReset = () => {
-    reset({ supervisor: "", analysis_date: todayIso(), work_description: "" });
+    reset(EMPTY_FORM());
     inputDraft.clear();
     setConfirmReset(false);
     document.getElementById("supervisor")?.focus();
@@ -82,10 +92,10 @@ export function InputStep({
   // (not work_description, which only matters for the AI prompt) need to
   // validate — a separate, narrower check from the full-form submit above.
   const skipToManual = async () => {
-    const valid = await trigger(["supervisor", "analysis_date"]);
+    const valid = await trigger(["supervisor", "analysis_date", "analyst"]);
     if (!valid) return;
-    const { supervisor, analysis_date } = getValues();
-    onSkipToManual({ supervisor, analysis_date });
+    const { supervisor, analysis_date, analyst } = getValues();
+    onSkipToManual({ supervisor, analysis_date, analyst });
   };
 
   return (
@@ -154,6 +164,17 @@ export function InputStep({
               {...register("supervisor")}
             />
             <FieldError>{errors.supervisor?.message}</FieldError>
+          </div>
+
+          <div>
+            <Label htmlFor="analyst">ผู้วิเคราะห์</Label>
+            <Input
+              id="analyst"
+              autoComplete="name"
+              aria-invalid={!!errors.analyst}
+              {...register("analyst")}
+            />
+            <FieldError>{errors.analyst?.message}</FieldError>
           </div>
 
           {error ? <Alert>{error}</Alert> : null}

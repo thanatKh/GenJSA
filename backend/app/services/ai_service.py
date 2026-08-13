@@ -94,6 +94,7 @@ async def generate_jsa(
                 work_activity=payload.work_activity.strip(),
                 supervisor=request.supervisor.strip(),
                 analysis_date=request.analysis_date,
+                analyst=request.analyst.strip(),
             ),
             steps=payload.steps,
             assumptions=payload.assumptions,

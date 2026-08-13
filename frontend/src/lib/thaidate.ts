@@ -29,12 +29,16 @@ export function formatThaiDate(iso: string): string {
   return `${day} ${THAI_MONTHS[month - 1]} ${year + BUDDHIST_OFFSET}`;
 }
 
-/** Today in ISO format, using the user's local device time (not toISOString, which would be UTC) */
+/** A Date in ISO format, using the user's local time (not toISOString, which would be UTC) */
+export function isoFromDate(date: Date): string {
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Today in ISO format */
 export function todayIso(): string {
-  const now = new Date();
-  const month = `${now.getMonth() + 1}`.padStart(2, "0");
-  const day = `${now.getDate()}`.padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  return isoFromDate(new Date());
 }
 
 function parseIsoDate(

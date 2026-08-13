@@ -280,13 +280,14 @@ export async function buildJsaPdf(
     y += activityH;
 
     const infoH = fieldLineH + mmToPt(1);
-    // Content-aware split instead of a fixed ratio: a Thai date is short and
-    // roughly fixed-length, but a supervisor's name varies a lot — a fixed
-    // 45/55 split left the date box with excess empty space while longer
-    // names felt cramped. Give each field exactly what it naturally needs
-    // (label + value, unwrapped) and split any leftover space proportionally;
-    // only fall back to an even 50/50 if both together can't fit at natural
-    // size (long name + long date), same as before that just wraps instead.
+    // Content-aware split instead of a fixed ratio. A Thai date is short and
+    // effectively fixed-length ("13 สิงหาคม 2569"), while a supervisor's name
+    // varies a lot — so the date box gets only what it needs plus a little
+    // breathing room, and every remaining point of slack goes to the name.
+    // (Splitting the slack proportionally, as this did before, kept handing
+    // the date box space it could never use while long names stayed cramped.)
+    // Falls back to an even 50/50 only when the two can't both fit at natural
+    // size, where the name wraps rather than overflows.
     setFont("bold", L.font.header_label_pt);
     const supervisorLabelW = doc.getTextWidth(`${D.labels.supervisor}:`) + mmToPt(1.5);
     const dateLabelW = doc.getTextWidth(`${D.labels.analysis_date}:`) + mmToPt(1.5);
@@ -298,9 +299,13 @@ export async function buildJsaPdf(
     const dateNaturalW = dateLabelW + dateValueW + pad * 2;
     const naturalTotal = supervisorNaturalW + dateNaturalW;
 
+    // Enough that the date never looks shrink-wrapped against its border,
+    // without giving it space the name could use
+    const dateSlack = mmToPt(5);
     const splitW =
       naturalTotal <= contentW
-        ? supervisorNaturalW + (contentW - naturalTotal) * (supervisorNaturalW / naturalTotal)
+        ? // Never let the slack itself push the name into wrapping
+          Math.max(supervisorNaturalW, contentW - (dateNaturalW + dateSlack))
         : contentW * 0.5;
     doc.rect(mL, y, splitW, infoH);
     doc.rect(mL + splitW, y, contentW - splitW, infoH);
@@ -426,6 +431,46 @@ export async function buildJsaPdf(
         y = startNewPage();
       }
     }
+  }
+
+  // ---------------------------------------------------------- analyst line --
+  // "ผู้วิเคราะห์ <name>" below the table on the last page. Drawn BEFORE the
+  // outer-frame pass so it sits outside the table's border.
+  //
+  // The analyst field is optional; when it's blank the supervisor is the one
+  // who did the analysis, so their name is used. (supervisor is required, so
+  // in practice this always resolves to something.)
+  //
+  // Fall back per-section, not just per-config: PublicConfig is an unchecked
+  // cast (see lib/api.ts), so a backend older than this field would leave it
+  // undefined and take the whole PDF down.
+  const sig = L.signature ?? FALLBACK_LAYOUT.signature;
+  const analystName = jsa.header.analyst?.trim() || jsa.header.supervisor?.trim();
+
+  if (sig.show && analystName) {
+    const labelDrop = sig.label_pt * L.font.line_height * 0.74;
+
+    if (bodyBottom - y < mmToPt(sig.gap_above_mm) + labelDrop) {
+      // Deliberately a bare addPage, not startNewPage() — that would redraw the
+      // whole title bar and column headers for a one-line page. Nothing is
+      // pushed to pageFrames either: an entry with top === bottom makes the frame
+      // pass below stroke a zero-height rect, i.e. a stray horizontal line.
+      doc.addPage();
+      y = mT;
+    }
+
+    // Bold label, normal name — the same treatment the header fields get
+    // (see drawField above), so the document reads consistently
+    const label = D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst;
+    const baseline = y + mmToPt(sig.gap_above_mm) + labelDrop;
+    doc.setTextColor(0, 0, 0);
+
+    setFont("bold", sig.label_pt);
+    doc.text(label, mL, baseline);
+    const labelW = doc.getTextWidth(label) + mmToPt(1.5);
+
+    setFont("normal", sig.label_pt);
+    doc.text(analystName, mL + labelW, baseline);
   }
 
   // Thick outer table border, one crisp frame per page — drawn after all rows so it stays

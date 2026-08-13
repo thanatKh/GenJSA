@@ -4,16 +4,20 @@
  * never be lost because of an API error." If the AI fails, the network
  * drops, or the user accidentally refreshes, what they typed must survive.
  *
- * Why sessionStorage and not localStorage: it's scoped to the tab and
- * disappears when the tab closes. This matches the "no JSA data persistence"
- * principle — nothing lingers on the device across sessions, and nothing is
- * ever sent to a server to be stored.
+ * Why sessionStorage and not localStorage: a draft is scratch state for one
+ * pass through the wizard, so it's scoped to the tab and disappears when the
+ * tab closes. Nothing here is ever sent to a server to be stored.
+ *
+ * Finished documents are a different matter and live in history.ts
+ * (localStorage, this PC only) — that's the deliberate exception, not a
+ * contradiction of this file.
  */
 
 import type { InputForm, JsaDocument } from "./lib/schema";
 
 const INPUT_KEY = "genjsa.draft.input";
 const DOC_KEY = "genjsa.draft.doc";
+const HISTORY_ID_KEY = "genjsa.draft.historyId";
 
 function read<T>(key: string): T | null {
   try {
@@ -53,7 +57,18 @@ export const docDraft = {
   clear: () => remove(DOC_KEY),
 };
 
+/* Which history.ts entry the in-progress document belongs to. Kept here so a
+ * mid-flow refresh — which App.tsx rehydrates straight back into the editor —
+ * keeps updating that entry instead of forking a duplicate. */
+export const currentHistoryId = {
+  load: () => read<string>(HISTORY_ID_KEY),
+  save: (value: string) => write(HISTORY_ID_KEY, value),
+  clear: () => remove(HISTORY_ID_KEY),
+};
+
+/** Clears the in-progress draft only. History (history.ts) is untouched by design. */
 export function clearAllDrafts(): void {
   inputDraft.clear();
   docDraft.clear();
+  currentHistoryId.clear();
 }

@@ -104,6 +104,7 @@ class DocLabels(BaseModel):
     work_activity: str = "งาน/กิจกรรม"
     supervisor: str = "ชื่อหัวหน้างาน"
     analysis_date: str = "วันที่วิเคราะห์"
+    analyst: str = "ผู้วิเคราะห์"
 
 
 class DocColumns(BaseModel):
@@ -171,12 +172,22 @@ class PdfFooter(BaseModel):
     show_company: bool = True
 
 
+class PdfSignature(BaseModel):
+    """The analyst line below the table on the last page (see config/pdf.yaml).
+    The label wording itself lives in document.yaml's labels.analyst."""
+
+    show: bool = True
+    gap_above_mm: float = 8
+    label_pt: float = 14
+
+
 class PdfConfig(BaseModel):
     page: PdfPage = Field(default_factory=PdfPage)
     font: PdfFont = Field(default_factory=PdfFont)
     table: PdfTable = Field(default_factory=PdfTable)
     logo: PdfLogo = Field(default_factory=PdfLogo)
     footer: PdfFooter = Field(default_factory=PdfFooter)
+    signature: PdfSignature = Field(default_factory=PdfSignature)
 
 
 # --------------------------------------------------------------------------- #

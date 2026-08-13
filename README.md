@@ -12,8 +12,9 @@ Enter work details  →  AI drafts JSA  →  Review and edit  →  Open PDF
 
 | Principle | Meaning |
 |---|---|
-| **No database** | No DB, no login, no history, no file storage |
-| **No JSA content persistence** | Data lives in memory only for the duration of one request, then it's gone |
+| **No database** | No DB, no login, no server-side storage |
+| **No JSA content persistence on the server** | Data lives in memory only for the duration of one request, then it's gone |
+| **History stays on your PC** | Finished JSAs (not PDFs) are kept in this browser's `localStorage` for 180 days, deletable at any time, never uploaded |
 | **No content logging** | Logs capture only error/status level — never work descriptions or JSA content |
 | **AI drafts, humans review** | No automated review system — the supervisor reviews and is responsible |
 | **Config, not code, changes behavior** | No admin UI — everything changeable lives in `config/` |

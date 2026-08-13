@@ -50,3 +50,11 @@ footer:
   page_number_format: "หน้า {page} / {total}"
   # Company/department name, right-aligned, opposite the form code (the original only has the form code, left-aligned)
   show_company: true
+
+# "ผู้วิเคราะห์ <name>" printed below the table on the last page, outside the
+# border. When no analyst was entered, the supervisor's name is used.
+# The label wording lives in config/document.yaml (document.labels.analyst).
+signature:
+  show: true
+  gap_above_mm: 8   # space between the table bottom and the line
+  label_pt: 14

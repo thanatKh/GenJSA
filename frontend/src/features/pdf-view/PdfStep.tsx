@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, CircleCheck, FileText, LoaderCircle } from "lucide-react";
+import { ArrowLeft, CircleCheck, FilePlus2, FileText, LoaderCircle } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
 import { formatThaiDate } from "../../lib/thaidate";
@@ -21,10 +21,12 @@ export function PdfStep({
   doc,
   config,
   onBack,
+  onNewJsa,
 }: {
   doc: JsaDocument;
   config: PublicConfig | null;
   onBack: () => void;
+  onNewJsa: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +144,14 @@ export function PdfStep({
             {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
           </Button>
         )}
+
+        {/* No confirm here, unlike EditorStep's "เริ่มใหม่": by this point the
+            document is already saved to the history list on step 1, so starting
+            a new JSA costs the user nothing they can't get back in one click. */}
+        <Button variant="outline" onClick={onNewJsa}>
+          <FilePlus2 className="size-4" aria-hidden="true" />
+          สร้าง JSA ใหม่
+        </Button>
 
         <Button variant="ghost" onClick={onBack}>
           <ArrowLeft className="size-4" aria-hidden="true" />
