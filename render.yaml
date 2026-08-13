@@ -9,10 +9,10 @@ services:
     dockerfilePath: ./Dockerfile
     # Singapore is closest to Thailand — lowest latency for field workers
     region: singapore
-    # PDF is built client-side — the backend has no Chromium, so it's light; free tier's 512MB is plenty.
-    # Trade-off: free tier spins down after 15 min idle, so the first request after a lull
-    # cold-starts (~30-60s) — acceptable here since there's no background work to keep warm anyway.
-    plan: free
+    # PDF is built client-side — the backend has no Chromium, so it's light; starter (512MB) is plenty.
+    # On starter (not free) so the instance stays always-on — no 30-60s cold-start
+    # wake-up delay for field workers opening the app.
+    plan: starter
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
