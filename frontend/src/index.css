@@ -184,6 +184,8 @@ input[type="date"] {
   height: 2.75rem; /* 44px, matches h-11 */
   max-height: 2.75rem;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
 }
 
 input[type="date"]::-webkit-datetime-edit,
@@ -198,10 +200,16 @@ input[type="date"]::-webkit-datetime-edit-year-field {
 }
 
 /* -webkit-date-and-time-value is the outer wrapper around the whole edit
-   widget above — iOS centers its content by default; force left-align,
-   remove its own margin/padding, and cap its height so it can't be the
-   thing forcing the outer <input> taller. */
+   widget above. iOS previously vertically centered it using its own
+   internal margins — removing those margins (needed to stop the box from
+   growing past 44px) left the text pinned to the top instead, since
+   nothing was left to center it. Making this wrapper a flex container and
+   centering its own content replaces that lost centering explicitly,
+   rather than relying on WebKit's internal (and inconsistent) default. */
 input[type="date"]::-webkit-date-and-time-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   text-align: left;
   margin: 0;
   padding: 0;
