@@ -170,11 +170,15 @@ input[type="date"] {
   position: relative;
 }
 
-/* iOS Safari renders the date field's value through its own
-   -webkit-datetime-edit pseudo-elements, which don't reliably inherit the
-   input's font-size — left unset, the date text renders visibly larger than
-   a normal text input's placeholder/value, breaking visual alignment
-   between fields. Pin it to match. */
+/* iOS Safari renders the date field's value through its own internal
+   -webkit-datetime-edit widget, which — left alone — doesn't reliably
+   inherit the input's font-size, line-height, or padding: it sizes/centers
+   itself against iOS's own default metrics instead of the box model we set
+   on the <input>. That's what makes a date field look mismatched (bigger
+   text, off-center, uneven padding) against a plain text input on iPhone
+   even though the same CSS renders identically on desktop Chrome, since
+   desktop Chrome's date widget does inherit these properties normally.
+   Pin every layer of the widget so it's forced to match. */
 input[type="date"]::-webkit-datetime-edit,
 input[type="date"]::-webkit-datetime-edit-fields-wrapper,
 input[type="date"]::-webkit-datetime-edit-text,
@@ -182,6 +186,18 @@ input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
   font-size: 1rem;
+  line-height: var(--leading-body);
+  padding: 0;
+}
+
+/* -webkit-date-and-time-value is the outer wrapper around the whole edit
+   widget above — iOS centers its content by default; force left-align and
+   remove its own top/bottom padding so it doesn't add a second, competing
+   vertical offset on top of the <input>'s own py-2.5. */
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
 }
 
 /* shadcn init generates its own :root/.dark blocks with a neutral grayscale

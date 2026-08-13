@@ -37,7 +37,9 @@ export function ThaiDatePicker({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
-        className="pr-11 [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:text-base"
+        // Date-widget font/alignment/padding fixes live centrally in
+        // index.css alongside the input[type="date"] rules — see there
+        className="pr-11"
       />
       <CalendarDays
         className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-muted"
