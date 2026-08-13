@@ -1,0 +1,23 @@
+# GenJSA — official document definition
+# This is not a "setting" — it's official document data. Only change it when the company issues a new revision.
+# Reference: references/F-ปธบ.-1202_R01.pdf
+
+document:
+  form_code: "F-ปธบ.-1202"
+  # Footer text per the original form (bottom-left corner, outside the border)
+  footer_text: "ประกาศใช้ครั้งที่ 1"
+  title_th: "การวิเคราะห์งานเพื่อความปลอดภัย"
+  title_en: "(Job Safety Analysis : JSA)"
+
+  # Header field labels — must match the original form; don't reword these on your own
+  labels:
+    work_activity: "งาน/กิจกรรม"
+    supervisor: "ชื่อหัวหน้างาน"
+    analysis_date: "วันที่วิเคราะห์"
+
+  # Table column names — per the original form
+  columns:
+    procedure: "ขั้นตอนการทำงาน"
+    procedure_hint: "(ระบุทุกขั้นตอน)"
+    hazard: "อันตรายที่อาจเกิดขึ้น"
+    control: "มาตรการป้องกัน/ควบคุม"

@@ -1,0 +1,32 @@
+# GenJSA — JSA generation policy
+# These values are injected into the prompt (prompts/jsa-generate.md) at render time
+# Adjust here to change AI behavior without touching code or the prompt file
+
+generation:
+  # task = top-level work steps | must never be a work instruction like "loosen bolt #1"
+  detail_level: "task"
+  language: "th"
+  # A guideline for the AI, not a hard software limit — complex jobs can have more
+  steps_typical_min: 3
+  steps_typical_max: 12
+  # Above this count, the AI adds an assumption suggesting the job be split into multiple JSAs (doesn't block the user)
+  steps_suggest_split_above: 20
+  # Users can specify their own steps in work_description — the AI must follow them
+  respect_user_defined_steps: true
+  # Reasonable number of hazards per step
+  hazards_per_step_min: 1
+  hazards_per_step_max: 4
+
+# Topics the AI must "consider while drafting" when relevant to the work
+# Note: this is not a review system — there is no AI-based JSA review anymore
+# Verification is the job of the supervisor/reviewer, who is a human
+consider_when_relevant:
+  - "อุปกรณ์ป้องกันส่วนบุคคล (PPE)"
+  - "การตัดแยกพลังงานและล็อกป้องกัน (Isolation / LOTO)"
+  - "การตรวจวัดก๊าซ (Gas Testing)"
+  - "การทำงานบนที่สูง"
+  - "การทำงานในที่อับอากาศ"
+  - "งานที่เกิดประกายไฟหรือความร้อน (Hot Work)"
+  - "การเปิดแนวท่อหรือระบบที่มีสารเคมี (Line Breaking)"
+  - "งานยกและเครื่องจักรกลหนัก"
+  - "การเตรียมพร้อมกรณีฉุกเฉิน"

@@ -1,0 +1,14 @@
+# GenJSA backend
+# PDF สร้างฝั่ง client (jsPDF) — backend ไม่ต้องมี Chromium/Playwright
+
+fastapi~=0.141
+uvicorn[standard]~=0.52
+pydantic~=2.13
+jinja2~=3.1
+httpx~=0.28
+pyyaml~=6.0
+python-dotenv~=1.2
+
+# dev / test
+pytest~=9.1
+pytest-asyncio~=1.3

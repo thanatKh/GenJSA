@@ -1,0 +1,10 @@
+# GenJSA — document owner
+# To change the logo: overwrite assets/logo.png with a new file (no need to edit this file)
+
+company:
+  name_en: "PTT Oil and Retail Business Public Company Limited"
+  name_th: "บริษัท ปตท. น้ำมันและการค้าปลีก จำกัด (มหาชน)"
+  department_en: "Engineering and Maintenance Department"
+  # If left blank, the system falls back to department_en
+  department_th: "ฝ่ายวิศวกรรมและซ่อมบำรุง"
+  logo: "assets/logo.png"

@@ -1,0 +1,52 @@
+# GenJSA — PDF layout settings
+# These values are sent to the browser via GET /api/config/public, and jsPDF
+# (frontend/src/lib/pdf/) uses them to draw the document — adjust font size /
+# margins / colors here without touching code on either the backend or frontend
+
+page:
+  size: "A4"
+  orientation: "portrait"
+  # Original form: 7.8mm left / 10.1mm right (asymmetric because it was exported from Excel)
+  # Here we make it symmetric — easier to read and fits every printer
+  margin_top_mm: 12
+  margin_bottom_mm: 14
+  margin_left_mm: 12
+  margin_right_mm: 12
+
+font:
+  family: "TH Sarabun New"
+  # TH Sarabun runs larger than CordiaNew at the same pt size, so we scale down from the original's 16
+  body_pt: 14
+  header_label_pt: 16
+  table_header_pt: 14
+  title_th_pt: 20
+  title_en_pt: 18
+  footer_pt: 9
+  # Thai has two-tier stacked vowels/tone marks — below 1.45 in the table they start to collide
+  line_height: 1.5
+
+table:
+  # Column proportions from the original form: 189.53 / 172.22 / 177.05 pt
+  column_widths_percent: [35.0, 31.7, 33.3]
+  header_fill: "#FCD5B4"
+  border_color: "#000000"
+  border_width_pt: 0.75
+  # Same weight as border_width_pt — a uniform grid reads cleaner than a
+  # thicker outer frame standing out against the rest of the table
+  outer_border_width_pt: 0.75
+  cell_padding_mm: 1.5
+  # Repeat the table header on every page
+  repeat_header_each_page: true
+  # Avoid splitting a single step across a page break; if a step is very long, allow it to split anyway rather than leave a blank page
+  avoid_row_split: true
+
+logo:
+  # Original: 84.49 x 56.42 pt — the real logo's aspect ratio is 1.90, so we fix the height and derive width from it
+  max_height_mm: 14
+  max_width_mm: 40
+
+footer:
+  show_page_number: true
+  page_number_format: "หน้า {page} / {total}"
+  # Company/department name, right-aligned, opposite the form code (the original only has the form code, left-aligned)
+  show_company: true

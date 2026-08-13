@@ -1,0 +1,20 @@
+# secrets — must never go into the image
+.env
+.env.local
+
+.git
+.gitignore
+node_modules
+frontend/node_modules
+frontend/dist
+backend/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+
+# Reference documents and design files don't need to ship to production (keeps the image smaller)
+references/
+*.txt
+!backend/requirements.txt
+
+.DS_Store

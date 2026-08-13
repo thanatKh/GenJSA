@@ -1,0 +1,20 @@
+# GenJSA — Render Blueprint
+# This file can be committed to git — no secrets live in it
+# Secrets are set in the Render Dashboard -> Environment only
+
+services:
+  - type: web
+    name: genjsa
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Singapore is closest to Thailand — lowest latency for field workers
+    region: singapore
+    # PDF is built client-side — the backend has no Chromium, so it's light; free tier's 512MB is plenty.
+    # Trade-off: free tier spins down after 15 min idle, so the first request after a lull
+    # cold-starts (~30-60s) — acceptable here since there's no background work to keep warm anyway.
+    plan: free
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: THAILLM_API_KEY
+        sync: false # Set in the Dashboard — never store in the repo

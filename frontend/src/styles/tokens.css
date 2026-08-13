@@ -1,0 +1,127 @@
+/* GenJSA — design tokens
+ *
+ * Brand colors sampled from the real OR logo (assets/logo.png)
+ * Never hard-code color values in components — go through a token via a Tailwind utility
+ *
+ * Contrast constraints that must be respected:
+ *   --brand-cyan (#00AEEF) on white gets ~2.1:1 contrast → cannot be used as text color
+ *     Only usable for borders / backgrounds / icons / focus rings
+ *   --brand-red (#EC1C24) gets ~4.4:1 (just under AA) → error text uses
+ *     --danger-text (#B3121B) instead; #EC1C24 itself is fine for icons/borders/backgrounds
+ */
+
+:root {
+  /* brand */
+  --brand-navy: #0047ab;
+  --brand-navy-hover: #003c91;
+  --brand-navy-soft: #f0f4fa;
+  --brand-cyan: #00aeef;
+  --brand-cyan-soft: #f0faff;
+  --brand-red: #ec1c24;
+
+  /* surface */
+  --surface: #ffffff;
+  --surface-raised: #f7f8fa;
+  --border: #e3e6eb;
+  --border-strong: #c9cfd8;
+
+  /* text */
+  --text: #16181d;
+  --text-muted: #5b6472;
+  --text-inverse: #ffffff;
+
+  /* state */
+  --danger: #ec1c24;
+  --danger-text: #b3121b;
+  --danger-soft: #fef2f2;
+  /* Warning (verify-this, not an error) — used only for the AI assumptions
+     callout in EditorStep, distinct from --danger so it doesn't read as a
+     validation failure. #92400e on #fffbeb clears AA for body text. */
+  --warning: #d97706;
+  --warning-text: #92400e;
+  --warning-soft: #fffbeb;
+  --warning-border: #fde68a;
+
+  /* focus ring — cyan is fine here since it's a line, not text */
+  --ring: #00aeef;
+
+  /* typography */
+  --font-display: "Google Sans", "Google Sans Text", system-ui, sans-serif;
+  --font-sans: "Google Sans Text", "Google Sans", system-ui, sans-serif;
+  /* app bar title only — see AppBar.tsx */
+  --font-title: "Google Sans", "Google Sans Text", system-ui, sans-serif;
+
+  /* Thai has two-tier stacked vowels/tone marks — below 1.7 in body text, marks collide with the line above */
+  --leading-body: 1.75;
+  --leading-heading: 1.35;
+
+  --radius: 10px;
+  /* --radius-sm/md/lg/xl/... come from index.css's @theme inline block —
+     shadcn derives that whole scale from --radius above */
+
+  /* shadcn/Radix-facing semantic names — aliased onto the brand tokens above
+     so shadcn-generated components (bg-primary, text-muted-foreground, etc.)
+     resolve to the exact same colors already used by hand-rolled components.
+     Never given their own literal values here — see the header comment. */
+  --background: var(--surface);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--brand-navy);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-raised);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--surface-raised);
+  --accent-foreground: var(--text);
+  /* Filled destructive buttons (white-on-red) clear AA contrast even though
+     raw --brand-red text-on-white doesn't — see the contrast note above */
+  --destructive: var(--brand-red);
+  --destructive-foreground: var(--text-inverse);
+  --input: var(--border-strong);
+
+  /* motion — transitions.dev token scale (see .claude/skills/transitions-polish) */
+  --duration-stagger: 40ms;
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: ease-in-out;
+  --ease-out: ease-out;
+  --ease-linear: linear;
+  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --ease-bounce-strong: cubic-bezier(0.34, 3.85, 0.64, 1);
+  --distance-micro: 4px;
+  --distance-small: 6px;
+  --distance-base: 8px;
+  --distance-medium: 12px;
+  --distance-large: 30px;
+  --scale-large: 0.96;
+  --scale-medium: 0.97;
+  --scale-small: 0.98;
+  --scale-tiny: 0.99;
+  --blur-small: 2px;
+  --blur-medium: 3px;
+  --blur-large: 8px;
+
+  /* skeleton loader pulse (transitions.dev #14) — runs a finite number of
+     times instead of looping forever, since GeneratingPanel's skeleton is
+     swapped out for real content once the AI responds, not cross-faded */
+  --skel-pulse-dur: var(--duration-slow);
+  --skel-pulse-count: 3;
+  --skel-pulse-min: 0.5;
+
+  /* undo toast (transitions.dev #22) — step/hazard delete in EditorStep */
+  --toast-open: var(--duration-medium);
+  --toast-close: var(--duration-quick);
+  --toast-distance: var(--distance-base);
+  --toast-blur: var(--blur-small);
+  --toast-scale: var(--scale-medium);
+  --toast-ease: var(--ease-smooth-out);
+}

@@ -1,0 +1,23 @@
+# GenJSA — application runtime settings
+# Edit this file and redeploy — no code changes needed
+
+app:
+  name: "GenJSA"
+
+limits:
+  # Max length of the "work description" field (characters) — guards against bloated payloads and long prompt injection
+  work_description_max_chars: 5000
+  supervisor_max_chars: 200
+  # Max request body size for /api/jsa/generate (bytes)
+  max_request_bytes: 262144
+
+rate_limit:
+  # In-memory per IP — no Redis, since this system must not add infrastructure
+  enabled: true
+  generate_per_minute: 6
+
+cors:
+  # dev: vite dev server. prod: FastAPI serves static files itself, so it's same-origin and needs nothing here
+  allow_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"

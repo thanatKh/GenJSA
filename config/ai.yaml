@@ -1,0 +1,33 @@
+# GenJSA — AI provider settings
+# Change the model / endpoint in this one place — no code changes needed
+# The API key does NOT live in this file — it's read only from the THAILLM_API_KEY environment variable
+
+provider: "thaillm"
+
+model: "openthaigpt"
+
+api:
+  base_url: "https://thaillm.or.th/api/v1"
+  # ⚠️ Not yet confirmed against the real server — run scripts/model_bench.py to check
+  # If the path is wrong, fix the line above — just one line
+  chat_completions_path: "/chat/completions"
+  timeout_seconds: 120
+  max_tokens: 8192
+  temperature: 0.3
+
+# Ask for structured JSON if the server supports it (OpenAI-compatible)
+# If the server doesn't recognize this field and answers 400, set this to false and rely on prompt + json repair instead
+request_json_mode: true
+
+retry:
+  # Number of retries when the returned JSON fails to parse/validate
+  max_attempts: 3
+  # Delay before retrying (seconds) — avoids hitting the provider's rate limit
+  backoff_seconds: 2
+
+# Used only by scripts/model_bench.py — never exposed for the user to choose
+candidate_models:
+  - "openthaigpt"
+  - "pathumma"
+  - "typhoon"
+  - "thalle"

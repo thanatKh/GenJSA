@@ -1,0 +1,204 @@
+@import "tailwindcss";
+@import "./styles/fonts.css";
+@import "./styles/tokens.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* map tokens -> Tailwind theme (Tailwind v4 uses @theme, not tailwind.config.js) */
+@theme inline {
+  --color-navy: var(--brand-navy);
+  --color-navy-hover: var(--brand-navy-hover);
+  --color-navy-soft: var(--brand-navy-soft);
+  --color-cyan: var(--brand-cyan);
+  --color-cyan-soft: var(--brand-cyan-soft);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-title: var(--font-title);
+
+  --radius-brand: var(--radius);
+
+  --color-ring: var(--ring);
+
+  --color-input: var(--input);
+
+  --color-border: var(--border);
+
+  --color-destructive: var(--destructive);
+
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-accent: var(--accent);
+
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-secondary: var(--secondary);
+
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-primary: var(--primary);
+
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-popover: var(--popover);
+
+  --color-card-foreground: var(--card-foreground);
+
+  --color-card: var(--card);
+
+  --color-foreground: var(--foreground);
+
+  --color-background: var(--background);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+
+  --radius-md: calc(var(--radius) * 0.8);
+
+  --radius-lg: var(--radius);
+
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  --radius-3xl: calc(var(--radius) * 2.2);
+
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+html {
+  /* iOS Safari auto-zooms if inputs are smaller than 16px — set the base at 16 to avoid it */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: var(--leading-heading);
+  margin: 0;
+}
+
+/* Users who set reduced motion — disable all animation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skeleton loader pulse (transitions.dev #14, see components/ui/skeleton.tsx)
+   — runs --skel-pulse-count times then stops, instead of Tailwind's
+   animate-pulse which loops forever while the AI is still generating */
+@keyframes t-skel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: var(--skel-pulse-min);
+  }
+}
+
+.animate-t-skel-pulse {
+  animation: t-skel-pulse var(--skel-pulse-dur) var(--ease-linear)
+    var(--skel-pulse-count);
+}
+
+/* Undo toast (transitions.dev #22) — used by EditorStep after a step/hazard
+   delete. Opens on the slower clock, closes on the faster one, so arriving
+   feels deliberate and leaving feels snappy. */
+.t-toast {
+  opacity: 0;
+  transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
+  filter: blur(var(--toast-blur));
+  transition:
+    opacity var(--toast-close) var(--toast-ease),
+    transform var(--toast-close) var(--toast-ease),
+    filter var(--toast-close) var(--toast-ease);
+}
+.t-toast.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity var(--toast-open) var(--toast-ease),
+    transform var(--toast-open) var(--toast-ease),
+    filter var(--toast-open) var(--toast-ease);
+}
+
+/* Hide the browser's own calendar icon but stretch its clickable area to the
+   full field — the result is our icon showing alone (no overlap), and
+   clicking anywhere in the field opens the picker */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+input[type="date"] {
+  position: relative;
+}
+
+/* iOS Safari renders the date field's value through its own
+   -webkit-datetime-edit pseudo-elements, which don't reliably inherit the
+   input's font-size — left unset, the date text renders visibly larger than
+   a normal text input's placeholder/value, breaking visual alignment
+   between fields. Pin it to match. */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  font-size: 1rem;
+}
+
+/* shadcn init generates its own :root/.dark blocks with a neutral grayscale
+   palette here — removed entirely. The semantic tokens it expects
+   (--background, --primary, --destructive, etc.) are instead aliased onto
+   the existing brand tokens in tokens.css, so shadcn components resolve to
+   the same colors already on screen. No dark mode toggle exists, so the
+   generated .dark block would have been dead weight. */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

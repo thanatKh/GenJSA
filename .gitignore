@@ -1,0 +1,38 @@
+# Secrets — must never be committed
+.env
+.env.local
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+# Claude Code — personal/machine-local settings (permission grants etc.),
+# not meant to be shared via git; the rest of .claude/ (skills) is tracked
+.claude/settings.local.json
+
+# Duplicates of files kept under references/ and assets/
+/F-ปธบ.-1202_R01.pdf
+/RGB_OR_Full color.png
+
+# The original form is a company-controlled document — not stored in git
+# The layout values extracted from it live in config/pdf.yaml + config/document.yaml,
+# and the actual PDF drawing logic is frontend/src/lib/pdf/buildJsaPdf.ts
+# To re-check the layout against the original, place the source file at references/ locally
+/references/
+
+# Scratch
+/tmp/
+*.log
