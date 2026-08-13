@@ -108,8 +108,9 @@ export function InputStep({
               {...register("work_description")}
             />
             <p id="work_description_hint" className="mt-1.5 text-sm text-muted">
-              ยิ่งอธิบายละเอียด JSA ยิ่งตรงกับงานจริง
-              ถ้ามีขั้นตอนในใจอยู่แล้วก็เขียนมาได้เลย
+              ยิ่งระบุรายละเอียดครบถ้วน ระบบจะสามารถจัดทำ JSA
+              ได้ตรงกับลักษณะงานจริงมากยิ่งขึ้น
+              โปรดระบุขั้นตอนการปฏิบัติงานที่ทราบแล้วให้ครบถ้วน
             </p>
             <FieldError>{errors.work_description?.message}</FieldError>
           </div>
@@ -143,7 +144,7 @@ export function InputStep({
 
           {error ? <Alert>{error}</Alert> : null}
 
-          <div className="grid gap-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
             <Button type="submit" size="lg">
               <Sparkles className="size-5" aria-hidden="true" />
               สร้าง JSA
@@ -151,6 +152,7 @@ export function InputStep({
             <Button
               type="button"
               variant="ghost"
+              size="lg"
               onClick={() => setConfirmReset(true)}
               disabled={isEmpty}
             >
