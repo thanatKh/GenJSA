@@ -96,10 +96,12 @@ export function HistoryList({
           <History className="size-5 shrink-0" aria-hidden="true" />
           งานที่เคยวิเคราะห์
         </h2>
+        {/* default, not sm — this deletes up to MAX_ENTRIES saved JSAs at
+            once (more consequential than EditorStep's "เริ่มใหม่", which was
+            sized up to lg), so it shouldn't be the smallest button in the app */}
         <Button
           type="button"
           variant="ghost"
-          size="sm"
           onClick={() => setConfirmClear(true)}
         >
           ล้างประวัติทั้งหมด
@@ -179,7 +181,7 @@ export function HistoryList({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-lg"
                   onClick={() => deleteEntry(entry)}
                   aria-label={`ลบ ${entryTitle(entry)}`}
                   className="text-muted opacity-100 transition-opacity hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"

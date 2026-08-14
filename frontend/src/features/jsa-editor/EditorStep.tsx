@@ -9,9 +9,16 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { ArrowRight, Info, Plus, RotateCcw } from "lucide-react";
 
-import { Alert, Button, ConfirmDialog, Card, UndoToast } from "../../components/ui";
-import { AutoGrowTextarea } from "../../components/ui";
-import { formatThaiDate } from "../../lib/thaidate";
+import {
+  Alert,
+  AutoGrowTextarea,
+  Button,
+  ConfirmDialog,
+  Card,
+  Input,
+  UndoToast,
+} from "../../components/ui";
+import { ThaiDatePicker } from "../../components/ThaiDatePicker";
 import type { JsaDocument, JsaStep } from "../../lib/schema";
 import { docDraft } from "../../store";
 import { StepCard } from "./StepCard";
@@ -135,7 +142,13 @@ export function EditorStep({
     setPendingDelete(null);
   };
 
-  const incomplete = doc.steps.some((step) => !step.procedure.trim());
+  // Supervisor is required on step 1 (inputFormSchema.supervisor.min(1)), but
+  // that only stops it arriving here empty — once it's editable in this step
+  // too (see the header card below), nothing else was re-checking it, so a
+  // cleared field could sail through to a PDF with a blank sign-off name.
+  const missingSupervisor = !doc.header.supervisor.trim();
+  const missingSteps = doc.steps.some((step) => !step.procedure.trim());
+  const incomplete = missingSupervisor || missingSteps;
 
   return (
     <section>
@@ -164,31 +177,109 @@ export function EditorStep({
               header: { ...doc.header, work_activity: event.target.value },
             })
           }
-          className="mt-1"
+          // py-2 (not the default py-2.5) so one row lands at exactly 44px —
+          // 1 * 28px line-height + 16px padding — matching the Input fields
+          // below it (h-11) instead of sitting ~4-20px taller
+          className="mt-1 py-2"
         />
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-          <div className="flex gap-1.5">
-            <dt className="text-muted">หัวหน้างาน:</dt>
-            <dd className="font-medium text-ink">{doc.header.supervisor}</dd>
+
+        {/* Editable, not read-only <dd>s — a typo here used to mean "เริ่มใหม่"
+            and losing the whole AI draft, since this was the only place these
+            three fields could ever be fixed after step 1. ผู้วิเคราะห์ in
+            particular wasn't shown anywhere in this step before, so a mistake
+            there wasn't caught until the printed PDF. */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="supervisor" className="text-sm font-medium text-muted">
+              หัวหน้างาน<span className="ml-0.5 text-danger-text">*</span>
+            </label>
+            <Input
+              id="supervisor"
+              autoComplete="name"
+              aria-invalid={missingSupervisor}
+              value={doc.header.supervisor}
+              onChange={(event) =>
+                onChange({
+                  ...doc,
+                  header: { ...doc.header, supervisor: event.target.value },
+                })
+              }
+              className="mt-1"
+            />
           </div>
-          <div className="flex gap-1.5">
-            <dt className="text-muted">วันที่วิเคราะห์:</dt>
-            <dd className="font-medium text-ink">
-              {formatThaiDate(doc.header.analysis_date)}
-            </dd>
+          <div>
+            <label htmlFor="analysis_date" className="text-sm font-medium text-muted">
+              วันที่วิเคราะห์
+            </label>
+            <div className="mt-1">
+              <ThaiDatePicker
+                id="analysis_date"
+                value={doc.header.analysis_date}
+                onChange={(next) =>
+                  onChange({
+                    ...doc,
+                    header: { ...doc.header, analysis_date: next },
+                  })
+                }
+              />
+            </div>
           </div>
-        </dl>
+          <div>
+            <label htmlFor="analyst" className="text-sm font-medium text-muted">
+              ผู้วิเคราะห์
+            </label>
+            <Input
+              id="analyst"
+              autoComplete="name"
+              value={doc.header.analyst}
+              onChange={(event) =>
+                onChange({
+                  ...doc,
+                  header: { ...doc.header, analyst: event.target.value },
+                })
+              }
+              className="mt-1"
+            />
+          </div>
+        </div>
       </Card>
 
       {/* Column header matching the printed PDF table — desktop only, the
-          step list itself repeats these labels per-step at narrower widths */}
-      <div className="mt-4 hidden grid-cols-[35%_1fr_1fr] gap-0 px-1 text-sm font-medium text-muted lg:grid">
+          step list itself repeats these labels per-step at narrower widths.
+          Shaded and fully bordered (bg-raised, matching the hazard/controls
+          cell tint) plus lg:mt-0 on the frame below so this reads as the
+          table's own header row, not a caption floating above it — the two
+          share one border line and one rectangle. Kept as a sibling of <ul>
+          rather than its first row: the frame below is lg:overflow-hidden
+          for its rounded corners, which would clip this if it lived inside
+          it while lg:sticky. Sticky under the app bar (lg only, so always
+          past the sm breakpoint — see --appbar-h in tokens.css) so the three
+          column meanings stay visible while scrolling a long JSA. */}
+      <div className="mt-4 hidden grid-cols-[35%_1fr_1fr] gap-0 px-1 text-center text-sm font-medium text-muted lg:grid lg:grid-cols-[3rem_35%_1fr_1fr] lg:sticky lg:top-[var(--appbar-h)] lg:z-[5] lg:rounded-t-[var(--radius)] lg:border lg:border-b-0 lg:border-line lg:bg-raised lg:px-2 lg:py-2 lg:font-semibold lg:text-ink">
+        {/* Blank corner cell, Excel-style — matches StepCard.tsx's row-number gutter column */}
+        <span aria-hidden="true" />
         <span>ขั้นตอนการทำงาน</span>
         <span>อันตรายที่อาจเกิดขึ้น</span>
-        <span>มาตรการป้องกัน/ควบคุม</span>
+        <span>
+          มาตรการป้องกัน/ควบคุม
+          <span className="block text-xs font-normal text-muted/80">
+            พิมพ์หนึ่งมาตรการต่อบรรทัด
+          </span>
+        </span>
       </div>
 
-      <ul className="mt-2 grid list-none gap-3 p-0">
+      {/* Below lg: unchanged gap-separated cards. On lg: one continuous
+          table — this frame owns the border/rounding, and each StepCard
+          becomes a row inside it (see StepCard.tsx's own lg: classes).
+          lg:mt-0 butts it directly against the header row above so their
+          shared border is one line, not two with a gap between. */}
+      {/* No lg:rounded-b here — the add-step row below is the frame's actual
+          visual bottom (it owns its own rounded-b and sits flush against
+          this <ul>'s bottom border as their shared divider line). Rounding
+          this element's own bottom corners too would curve them away right
+          at that seam, leaving a gap in the add-step row's side borders
+          exactly where they're supposed to line up straight. */}
+      <ul className="mt-2 grid list-none gap-2 p-0 lg:mt-0 lg:gap-0 lg:overflow-hidden lg:border lg:border-line">
         <AnimatePresence initial={false}>
           {doc.steps.map((step, index) => (
             <StepCard
@@ -212,9 +303,13 @@ export function EditorStep({
         {liveMessage}
       </p>
 
-      <div className="mt-3">
+      {/* On lg, visually fused to the table frame above (negative margin +
+          matching side borders, rounded only at the bottom) so it reads as
+          the table's own last row rather than a detached control */}
+      <div className="mt-3 lg:mt-0 lg:-translate-y-px lg:rounded-b-[var(--radius)] lg:border lg:border-t-0 lg:border-line lg:px-2 lg:py-1.5">
         <Button
           variant="outline"
+          className="lg:h-8 lg:w-full lg:justify-start lg:border-0 lg:px-1 lg:text-sm lg:font-normal lg:text-muted lg:hover:bg-raised lg:hover:text-ink"
           onClick={() =>
             setSteps([...doc.steps, { ...EMPTY_STEP, no: doc.steps.length + 1 }])
           }
@@ -252,7 +347,11 @@ export function EditorStep({
 
       {incomplete ? (
         <p className="mt-6 text-sm text-danger-text">
-          มีขั้นตอนที่ยังไม่ได้กรอกชื่อ (ดูกรอบสีแดงด้านบน) กรุณากรอกให้ครบก่อนสร้างเอกสาร
+          {missingSupervisor && missingSteps
+            ? "กรุณากรอกชื่อหัวหน้างาน และกรอกขั้นตอนการทำงานที่ยังไม่ได้กรอกให้ครบ (ดูเครื่องหมายเตือนสีแดงด้านบน) ก่อนสร้างเอกสาร"
+            : missingSupervisor
+              ? "กรุณากรอกชื่อหัวหน้างานก่อนสร้างเอกสาร"
+              : "มีขั้นตอนที่ยังไม่ได้กรอกชื่อ (ดูเครื่องหมายเตือนสีแดงด้านบน) กรุณากรอกให้ครบก่อนสร้างเอกสาร"}
         </p>
       ) : null}
 
@@ -265,7 +364,10 @@ export function EditorStep({
           "generate PDF" are always one tap away while reviewing. */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-[60rem] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-          <Button variant="ghost" onClick={() => setConfirmRestart(true)}>
+          {/* size="lg" — matching the primary button, not the app-wide 44px
+              default, so the two don't sit at different heights in the same
+              row (ghost's low visual weight already keeps it secondary) */}
+          <Button variant="ghost" size="lg" onClick={() => setConfirmRestart(true)}>
             <RotateCcw className="size-4" aria-hidden="true" />
             เริ่มใหม่
           </Button>

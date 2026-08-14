@@ -134,7 +134,7 @@ Three-step wizard driven by `App.tsx`'s `stage` state (0/1/2):
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
 - `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Clicking one loads it into `EditorStep`.
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
-- `features/pdf-view/PdfStep.tsx` — renders/downloads the PDF.
+- `features/pdf-view/PdfStep.tsx` — builds the PDF and offers to open it, save it (desktop Chromium's native picker), or share it (mobile).
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/jsa.py` by hand (keep both in sync when the shape changes).
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engine (jsPDF). `buildJsaPdf.ts` measures text, wraps lines, computes row heights, and paginates by hand since jsPDF has no HTML/CSS layout engine. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
@@ -177,7 +177,8 @@ first, then hand-merge.
 | AI model | `config/ai.yaml` → `model` |
 | ThaiLLM endpoint / timeout / retry | `config/ai.yaml` |
 | Company name / department | `config/company.yaml` |
-| Logo | Overwrite `assets/logo.png` |
+| Logo | Overwrite `frontend/src/assets/logo.png` (the app and the PDF both import from there — `assets/logo.png` at the repo root is an unused duplicate) |
+| Tab icon (favicon) | `frontend/public/favicon.svg`, then regenerate `favicon.ico` via `scripts/build_icons.mjs` (see its header comment) |
 | Form number / effective-date text | `config/document.yaml` |
 | Header field labels / column names | `config/document.yaml` |
 | PDF font size / margins / header color | `config/pdf.yaml` |

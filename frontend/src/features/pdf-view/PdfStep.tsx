@@ -15,6 +15,18 @@
  * the Web Share API directly with the file. That opens the OS share sheet
  * (Save to Files, AirDrop, Messages, ...) without depending on whatever
  * chrome the browser decided to draw around the blob.
+ *
+ * That second button is capability-routed rather than one-size-fits-all,
+ * because desktop Chromium satisfies canShare({files}) too — and there the
+ * share sheet is the wrong answer entirely (on Windows 11 it opens the OS
+ * share flyout when all the user wanted was the file on disk). So:
+ *
+ *   showSaveFilePicker  -> "บันทึกไฟล์", a real Save-as dialog   (desktop Chromium)
+ *   canShare({files})   -> "แชร์ / บันทึกไฟล์", the OS share sheet (mobile)
+ *   neither             -> no second button                       (desktop FF/Safari)
+ *
+ * The picker is checked first precisely because desktop matches both; it is
+ * absent on Android Chrome and iOS Safari, so mobile still lands on share.
  */
 
 import { useEffect, useState } from "react";
@@ -24,6 +36,7 @@ import {
   FilePlus2,
   FileText,
   LoaderCircle,
+  Save,
   Share2,
 } from "lucide-react";
 
@@ -48,6 +61,7 @@ export function PdfStep({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -91,8 +105,19 @@ export function PdfStep({
     0,
   );
 
-  // Feature-detect rather than sniff the platform — canShare({files}) is
-  // false on desktop browsers and on the older Safari/Chrome versions that
+  // Split from canSavePicker below on purpose: this is a pure browser
+  // capability check with no dependency on `file`, so it's the same on the
+  // very first render as it is once the PDF finishes building — used only
+  // for the paragraph text, so that text never flips (and reflows the page
+  // under the user) the moment the build completes.
+  const savePickerSupported =
+    typeof window !== "undefined" && "showSaveFilePicker" in window;
+
+  // Feature-detect rather than sniff the platform. Chromium desktop only —
+  // deliberately checked before canShareFile below (see the file header).
+  const canSavePicker = !!file && savePickerSupported;
+
+  // canShare({files}) is false on the older Safari/Chrome versions that
   // support navigator.share for text/links only, so this only surfaces where
   // it actually works (iOS Safari 15+, most mobile Chrome).
   const canShareFile =
@@ -100,6 +125,38 @@ export function PdfStep({
     typeof navigator !== "undefined" &&
     typeof navigator.canShare === "function" &&
     navigator.canShare({ files: [file] });
+
+  const handleSave = async () => {
+    if (!file || !window.showSaveFilePicker) return;
+    setSaving(true);
+    try {
+      // Opened before any await, for the same user-activation reason as
+      // handleShare below. The dialog is the whole point: unlike an <a
+      // download>, the file only lands where the user chose to put it, under
+      // the name they confirmed.
+      const handle = await window.showSaveFilePicker({
+        suggestedName: pdfFileName(doc),
+        types: [
+          {
+            description: "เอกสาร PDF",
+            accept: { "application/pdf": [".pdf"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(file);
+      await writable.close();
+    } catch (caught) {
+      // AbortError = the user pressed Cancel, which is a normal outcome
+      if (!(caught instanceof Error && caught.name === "AbortError")) {
+        setError(
+          "บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleShare = async () => {
     if (!file) return;
@@ -126,8 +183,9 @@ export function PdfStep({
     <section>
       <h1 className="text-[1.75rem] font-semibold text-navy">เอกสาร JSA</h1>
       <p className="mt-1.5 text-muted">
-        กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์
-        จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์
+        {savePickerSupported
+          ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
+          : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
       </p>
 
       <Card className="mt-6">
@@ -161,76 +219,98 @@ export function PdfStep({
             </dl>
           </div>
         </div>
+
+        {/* Open/save live inside the same card as the document they act on,
+            not as a detached row below it — a divider (not a new Card) marks
+            "info" from "actions" while keeping them one visual unit. Open PDF
+            spans both columns when there's no save/share button to sit
+            beside it, so this stays exactly one row either way. */}
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
+          {url ? (
+            // ⚠️ Never add a `download` attribute here — it forces an
+            // immediate download (on mobile Chrome this saves silently to
+            // Downloads with no dialog at all), which violates the "no
+            // auto-download" requirement. Let target="_blank" open the native
+            // viewer instead, and let the user save/print/share from its menu.
+            // The save button below is not a loophole in that rule: the file
+            // picker always shows a dialog and always lets the user choose the
+            // destination, which is exactly what `download` skips.
+            // asChild merges Button's classes onto the real <a> below without
+            // introducing a <button> or JS-mediated navigation — the anchor
+            // must stay a real, directly-clickable link to avoid mobile
+            // Safari's popup blocking.
+            <Button
+              asChild
+              className={canSavePicker || canShareFile ? undefined : "col-span-2"}
+            >
+              <a href={url} target="_blank" rel="noopener">
+                <FileText className="size-4" aria-hidden="true" />
+                เปิดเอกสาร PDF
+              </a>
+            </Button>
+          ) : (
+            <Button disabled className="col-span-2">
+              {error ? null : (
+                <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+              )}
+              {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
+            </Button>
+          )}
+
+          {/* Exactly one of these two ever renders — see the routing table in
+              the file header. Both are explicit, user-chosen actions behind a
+              dedicated button, never a silent auto-save. */}
+          {canSavePicker ? (
+            <Button variant="outline" onClick={handleSave} loading={saving}>
+              <Save className="size-4" aria-hidden="true" />
+              บันทึกไฟล์
+            </Button>
+          ) : canShareFile ? (
+            <Button variant="outline" onClick={handleShare} loading={sharing}>
+              <Share2 className="size-4" aria-hidden="true" />
+              แชร์ / บันทึกไฟล์
+            </Button>
+          ) : null}
+        </div>
+
+        {/* Kept inside the card too — right under the action that would have
+            produced it, rather than floating between the card and the
+            back/new-JSA row below */}
+        {error ? (
+          <div className="mt-3">
+            <Alert>{error}</Alert>
+          </div>
+        ) : null}
       </Card>
 
-      {error ? (
-        <div className="mt-5">
-          <Alert>{error}</Alert>
-        </div>
-      ) : null}
-
-      {/* A single 2-column grid, two rows: "do something with this PDF" on
-          top, "leave this page" below — same visual weight throughout
-          instead of mixing lg/default sizes across a tall stacked column.
-          Open PDF spans both columns when Share isn't offered, so the grid
-          stays exactly two rows either way. */}
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        {url ? (
-          // ⚠️ Never add a `download` attribute here — it forces an
-          // immediate download (on mobile Chrome this saves silently to
-          // Downloads with no dialog at all), which violates the "no
-          // auto-download" requirement. Let target="_blank" open the native
-          // viewer instead, and let the user save/print/share from its menu.
-          // asChild merges Button's classes onto the real <a> below without
-          // introducing a <button> or JS-mediated navigation — the anchor
-          // must stay a real, directly-clickable link to avoid mobile
-          // Safari's popup blocking.
-          <Button asChild className={canShareFile ? undefined : "col-span-2"}>
-            <a href={url} target="_blank" rel="noopener">
-              <FileText className="size-4" aria-hidden="true" />
-              เปิดเอกสาร PDF
-            </a>
-          </Button>
-        ) : (
-          <Button disabled className="col-span-2">
-            {error ? null : (
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-            )}
-            {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
-          </Button>
-        )}
-
-        {/* Only rendered where navigator.canShare({files}) actually works —
-            mainly iOS Safari, where the blob PDF view above has no save/share
-            icon of its own (see the file header comment). Calls the OS share
-            sheet directly instead of a `download` attribute: it's an explicit,
-            user-chosen action via a dedicated button, not a silent auto-save,
-            so it doesn't run into the "no auto-download" concern noted below. */}
-        {canShareFile ? (
-          <Button variant="outline" onClick={handleShare} loading={sharing}>
-            <Share2 className="size-4" aria-hidden="true" />
-            แชร์ / บันทึกไฟล์
-          </Button>
-        ) : null}
-
-        {/* No confirm here, unlike EditorStep's "เริ่มใหม่": by this point the
-            document is already saved to the history list on step 1, so starting
-            a new JSA costs the user nothing they can't get back in one click. */}
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft className="size-4" aria-hidden="true" />
+      {/* Text links, not buttons — these leave the page rather than act on
+          the document, so they shouldn't carry the same visual weight as
+          "เปิดเอกสาร PDF"/"บันทึกไฟล์" above (matches the ข้ามขั้นตอนนี้ link
+          style already used on step 1). No confirm on either: กลับไปแก้ไข is
+          just navigation, and by this point the document is already saved to
+          the history list on step 1, so สร้าง JSA ใหม่ costs the user nothing
+          they can't get back in one click. */}
+      <div className="mt-5 flex items-center justify-center gap-4 text-sm">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+        >
+          <ArrowLeft className="size-3.5" aria-hidden="true" />
           กลับไปแก้ไข
-        </Button>
-        <Button variant="outline" onClick={onNewJsa}>
-          <FilePlus2 className="size-4" aria-hidden="true" />
+        </button>
+        <span className="text-line" aria-hidden="true">
+          ·
+        </span>
+        <button
+          type="button"
+          onClick={onNewJsa}
+          className="flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+        >
+          <FilePlus2 className="size-3.5" aria-hidden="true" />
           สร้าง JSA ใหม่
-        </Button>
+        </button>
       </div>
-
-      {canShareFile ? (
-        <p className="mt-2 text-center text-sm text-muted">
-          ใช้ปุ่ม "แชร์ / บันทึกไฟล์" หากหน้าเอกสาร PDF ที่เปิดไม่มีปุ่มบันทึกหรือแชร์ในตัว
-        </p>
-      ) : null}
     </section>
   );
 }

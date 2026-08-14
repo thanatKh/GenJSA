@@ -26,15 +26,39 @@ export class ApiError extends Error {
   }
 }
 
+// Thrown only when the caller's own signal fired — i.e. the user clicked
+// "ยกเลิก", not a timeout or a network failure. Callers should treat this as
+// a silent, expected outcome (return to the form), never show it as an error.
+export class CancelledError extends Error {
+  constructor() {
+    super("cancelled");
+    this.name = "CancelledError";
+  }
+}
+
 export type GenerateInput = {
   supervisor: string;
   analysis_date: string;
   work_description: string;
 };
 
-export async function generateJsa(input: GenerateInput): Promise<JsaDocument> {
+export async function generateJsa(
+  input: GenerateInput,
+  options?: { signal?: AbortSignal },
+): Promise<JsaDocument> {
+  const externalSignal = options?.signal;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
+  // Relay the caller's abort onto our own controller rather than passing
+  // externalSignal straight to fetch — this way one signal (ours) always
+  // drives the request, whether the abort came from the caller, the timeout
+  // above, or both, and AbortSignal.any() (not available on older Safari) is
+  // never needed.
+  const relayAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener("abort", relayAbort);
+  }
 
   let response: Response;
   try {
@@ -45,11 +69,13 @@ export async function generateJsa(input: GenerateInput): Promise<JsaDocument> {
       signal: controller.signal,
     });
   } catch {
-    // fetch rejecting = network down / server not responding / aborted on timeout —
-    // not an error the backend sent
+    // fetch rejecting = network down / server not responding / aborted on
+    // timeout or by the user — tell those apart by which signal fired
+    if (externalSignal?.aborted) throw new CancelledError();
     throw new ApiError(NETWORK_ERROR);
   } finally {
     clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", relayAbort);
   }
 
   if (!response.ok) {

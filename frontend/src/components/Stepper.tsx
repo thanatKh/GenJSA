@@ -64,7 +64,16 @@ function StepCircle({
   );
 }
 
-export function Stepper({ current }: { current: 0 | 1 | 2 }) {
+export function Stepper({
+  current,
+  onNavigate,
+}: {
+  current: 0 | 1 | 2;
+  // Completed steps only — jumping ahead to a step that has no data yet
+  // isn't offered. Preserves whatever's in progress; callers should never
+  // wire this to anything that clears the document.
+  onNavigate?: (index: 0 | 1 | 2) => void;
+}) {
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
       {/* Each step is its own natural width and the connector lines between them
@@ -77,23 +86,41 @@ export function Stepper({ current }: { current: 0 | 1 | 2 }) {
           return (
             <Fragment key={label}>
               <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
-                <StepCircle n={index + 1} done={done} filled={done || active} />
-                {/* All three labels always shown — hiding inactive ones made
-                    step 1 (active, with its label) much wider than steps 2/3
-                    (bare circles), which pushed the flex-1 connector lines'
-                    midpoints off-center from what the eye expects, making
-                    circle 2 look mis-centered even though the flex math was
-                    technically correct. Equal-width items keep the circles
-                    landing at true equal thirds of the track. */}
-                <span
-                  className={[
-                    "truncate text-xs sm:text-sm",
-                    active ? "font-semibold text-navy" : "text-muted",
-                  ].join(" ")}
-                  aria-current={active ? "step" : undefined}
-                >
-                  {label}
-                </span>
+                {done && onNavigate ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate(index as 0 | 1 | 2)}
+                    aria-label={`กลับไปขั้นตอน ${label}`}
+                    className="flex min-w-0 items-center gap-1.5 rounded-md
+                               focus-visible:outline-none focus-visible:ring-2
+                               focus-visible:ring-ring/50 sm:gap-2"
+                  >
+                    <StepCircle n={index + 1} done={done} filled={done || active} />
+                    <span className="truncate text-xs text-muted hover:text-navy sm:text-sm">
+                      {label}
+                    </span>
+                  </button>
+                ) : (
+                  <>
+                    <StepCircle n={index + 1} done={done} filled={done || active} />
+                    {/* All three labels always shown — hiding inactive ones made
+                        step 1 (active, with its label) much wider than steps 2/3
+                        (bare circles), which pushed the flex-1 connector lines'
+                        midpoints off-center from what the eye expects, making
+                        circle 2 look mis-centered even though the flex math was
+                        technically correct. Equal-width items keep the circles
+                        landing at true equal thirds of the track. */}
+                    <span
+                      className={[
+                        "truncate text-xs sm:text-sm",
+                        active ? "font-semibold text-navy" : "text-muted",
+                      ].join(" ")}
+                      aria-current={active ? "step" : undefined}
+                    >
+                      {label}
+                    </span>
+                  </>
+                )}
               </li>
               {index < STEPS.length - 1 ? (
                 <li

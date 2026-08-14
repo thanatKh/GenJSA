@@ -61,6 +61,14 @@
   /* --radius-sm/md/lg/xl/... come from index.css's @theme inline block —
      shadcn derives that whole scale from --radius above */
 
+  /* AppBar.tsx's inner row height at sm+ (sm:h-[var(--appbar-h)], read from
+     here directly — this is the only place the number lives) so EditorStep's
+     sticky column header — lg only, i.e. always past the sm breakpoint — has
+     an exact offset to sit under rather than a guess at the app bar's
+     otherwise-emergent height. Below sm, AppBar uses a plain h-14 instead;
+     nothing else depends on that value, so it doesn't need a token. */
+  --appbar-h: 64px;
+
   /* shadcn/Radix-facing semantic names — aliased onto the brand tokens above
      so shadcn-generated components (bg-primary, text-muted-foreground, etc.)
      resolve to the exact same colors already used by hand-rolled components.

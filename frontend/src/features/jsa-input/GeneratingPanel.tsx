@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
 import { SkeletonCard } from "../../components/ui";
 
 const STAGES = [
@@ -55,7 +55,7 @@ function formatRange(minSeconds: number, maxSeconds: number): string {
   return `${formatDuration(minSeconds)}–${formatDuration(maxSeconds)}`;
 }
 
-export function GeneratingPanel() {
+export function GeneratingPanel({ onCancel }: { onCancel?: () => void }) {
   const [stage, setStage] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -76,19 +76,39 @@ export function GeneratingPanel() {
 
   return (
     <section className="mt-6" aria-busy="true">
-      <div className="flex items-center gap-2.5">
-        <LoaderCircle
-          className="size-5 shrink-0 animate-spin text-navy"
-          aria-hidden="true"
-        />
-        {/* aria-live lives on the <p>, reading the real text node — the
-            shimmer span's ::before duplicate (index.css) is decoration only,
-            not something a screen reader needs to see or announce twice. */}
-        <p className="font-medium" aria-live="polite">
-          <span className="t-shimmer-label" data-text={STAGES[stage]}>
-            {STAGES[stage]}
-          </span>
-        </p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <LoaderCircle
+            className="size-5 shrink-0 animate-spin text-navy"
+            aria-hidden="true"
+          />
+          {/* aria-live lives on the <p>, reading the real text node — the
+              shimmer span's ::before duplicate (index.css) is decoration only,
+              not something a screen reader needs to see or announce twice. */}
+          <p className="font-medium" aria-live="polite">
+            <span className="t-shimmer-label" data-text={STAGES[stage]}>
+              {STAGES[stage]}
+            </span>
+          </p>
+        </div>
+
+        {onCancel ? (
+          // Plain text link (not a Button) — matches the de-emphasized
+          // secondary-action convention used elsewhere (กลับไปแก้ไข,
+          // ข้ามขั้นตอนนี้): muted + dotted underline at rest, navy on hover,
+          // so it reads as "leave this" rather than competing with the
+          // generating status for attention. No confirm dialog — aborting
+          // isn't destructive, the typed description is already saved in
+          // inputDraft regardless of whether this call ever finishes.
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex shrink-0 items-center gap-1 text-sm text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+            ยกเลิก
+          </button>
+        ) : null}
       </div>
 
       {/* No aria-live here on purpose — the seconds tick every second, and a
@@ -107,8 +127,6 @@ export function GeneratingPanel() {
       </p>
 
       <div className="mt-4 grid gap-3">
-        <SkeletonCard />
-        <SkeletonCard />
         <SkeletonCard />
       </div>
     </section>

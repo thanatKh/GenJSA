@@ -48,7 +48,12 @@ export function AppBar({
 
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5">
+      {/* Explicit height (not just py-2.5) so EditorStep's sticky column
+          header — lg only, so always past this sm: breakpoint — has a fixed
+          offset to park under instead of guessing. sm: reads --appbar-h
+          (tokens.css) directly rather than a plain h-16, so that's the one
+          place to change it — no second value to remember to update. */}
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4 sm:h-[var(--appbar-h)]">
         <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
         <div className="min-w-0">
           <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
@@ -80,7 +85,7 @@ export function AppBar({
         <AboutSection icon={Sparkles} title="สิ่งที่ระบบนี้ทำ">
           <p>
             {appName} ช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน (Job
-            Safety Analysis) ด้วยระบบ — อธิบายงานที่จะทำเป็นภาษาไทย ระบบจะร่าง
+            Safety Analysis) — อธิบายงานที่จะทำเป็นภาษาไทย ระบบจะร่าง
             JSA ให้ตรวจทานและแก้ไข ก่อนเปิดเป็นเอกสาร PDF
           </p>
         </AboutSection>
@@ -115,12 +120,11 @@ export function AppBar({
 
         <AboutSection icon={ShieldCheck} title="ความเป็นส่วนตัว">
           <div className="space-y-1">
-            <p>ระบบนี้ไม่เก็บข้อมูล JSA ไว้บนเซิร์ฟเวอร์</p>
             <p>
-              รายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
-              ถูกเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น เป็นเวลา 180 วัน
-              ไม่ถูกส่งขึ้นเซิร์ฟเวอร์ และลบได้ตลอดเวลา
-              หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
+              ระบบนี้ไม่เก็บข้อมูล JSA ไว้บนเซิร์ฟเวอร์ ยกเว้นรายการ
+              &ldquo;งานที่เคยวิเคราะห์&rdquo;
+              ที่เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น เป็นเวลา 180 วัน
+              และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
             </p>
           </div>
         </AboutSection>

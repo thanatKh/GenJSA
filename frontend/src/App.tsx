@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppBar } from "./components/AppBar";
 import { Stepper } from "./components/Stepper";
@@ -8,7 +8,13 @@ import { InputStep } from "./features/jsa-input/InputStep";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
-import { ApiError, fetchPublicConfig, generateJsa, type PublicConfig } from "./lib/api";
+import {
+  ApiError,
+  CancelledError,
+  fetchPublicConfig,
+  generateJsa,
+  type PublicConfig,
+} from "./lib/api";
 import type { InputForm, JsaDocument } from "./lib/schema";
 import { clearAllDrafts, currentHistoryId, docDraft } from "./store";
 
@@ -39,6 +45,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
   const [config, setConfig] = useState<PublicConfig | null>(null);
+  // Ref, not state: only ever read from an event handler (cancelGenerate),
+  // never rendered — a state setter here would just cause an extra re-render
+  // every generate call for no visual purpose
+  const generateController = useRef<AbortController | null>(null);
   // Which historyStore.ts entry the current document belongs to, so edits update
   // that row instead of piling up duplicates
   const [historyId, setHistoryId] = useState<string | null>(() =>
@@ -92,24 +102,37 @@ export default function App() {
   const handleGenerate = async (values: InputForm) => {
     setBusy(true);
     setError(null);
+    const controller = new AbortController();
+    generateController.current = controller;
     try {
-      const generated = await generateJsa(values);
+      const generated = await generateJsa(values, { signal: controller.signal });
       setDoc(generated);
       docDraft.save(generated);
       startHistoryEntry();
       setStage(1);
       window.scrollTo({ top: 0 });
     } catch (caught) {
-      // Form data is left untouched — never clear anything on error
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองอีกครั้ง",
-      );
+      // Cancelled by the user (see cancelGenerate) — not a failure, so no
+      // error banner; just fall through to the form as if nothing happened.
+      // Form data is otherwise left untouched on a real error too — never
+      // clear anything just because the request failed.
+      if (!(caught instanceof CancelledError)) {
+        setError(
+          caught instanceof ApiError
+            ? caught.message
+            : "เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองอีกครั้ง",
+        );
+      }
     } finally {
       setBusy(false);
+      generateController.current = null;
     }
   };
+
+  // "ยกเลิก" during GeneratingPanel — aborts the in-flight fetch so the
+  // wait actually stops, rather than just hiding it while the request (and
+  // its eventual setDoc/setStage) keeps running in the background
+  const cancelGenerate = () => generateController.current?.abort();
 
   const handleSkipToManual = (
     values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
@@ -158,13 +181,19 @@ export default function App() {
       />
 
       <main className="mx-auto w-full max-w-[60rem] flex-1 px-4 py-6 sm:py-8">
-        <Stepper current={stage} />
+        <Stepper current={stage} onNavigate={goto} />
 
         {stage === 0 ? (
           <div className="mx-auto max-w-[45rem]">
             <InputStep
               onGenerate={handleGenerate}
               onSkipToManual={handleSkipToManual}
+              // Only set when reached via the stepper's back-navigation
+              // (doc already exists then — see the effect above that jumps
+              // stage to 1 whenever a fresh mount finds a doc) — never on a
+              // genuinely fresh session, where there's nothing to cancel back to
+              onCancel={doc ? () => goto(1) : undefined}
+              onCancelGenerate={cancelGenerate}
               busy={busy}
               error={error}
             />

@@ -28,14 +28,22 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
-      // Default/lg overridden below (44px/52px) — every stock size in this
-      // preset (h-8/h-9) is well under GenJSA's 44px minimum tap target
+      // Default/lg/icon overridden below (44px/52px/44px) — every stock size
+      // in this preset (h-8/h-9/size-8) is well under GenJSA's 44px minimum
+      // tap target. icon was the one gap: default/lg got bumped when this
+      // file was first patched, but the bare icon-only size stayed at the
+      // stock 32px, so icon-only buttons needing the 44px minimum (mobile
+      // step-card controls) had to be hand-rolled as raw <button>s instead of
+      // going through this component. xs/sm/icon-xs/icon-sm/icon-lg are
+      // deliberately left at their stock (sub-44px) sizes — they're for
+      // secondary/dense contexts where the full tap-target minimum doesn't
+      // apply (see each call site's own reasoning).
       size: {
         default: "h-11 gap-2 px-4",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-13 gap-2 px-6 text-[1.0625rem]",
-        icon: "size-8",
+        icon: "size-11",
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":

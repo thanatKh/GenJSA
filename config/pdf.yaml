@@ -21,7 +21,7 @@ font:
   table_header_pt: 14
   title_th_pt: 20
   title_en_pt: 18
-  footer_pt: 9
+  footer_pt: 10
   # Thai has two-tier stacked vowels/tone marks — below 1.45 in the table they start to collide
   line_height: 1.5
 

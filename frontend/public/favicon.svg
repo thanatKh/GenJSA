@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GenJSA">
+  <!-- Navy tile = --brand-navy (#0047ab) from src/styles/tokens.css.
+       The letters stay live <text> rather than outlined paths so this file
+       needs no font tooling and stays a few hundred bytes; textLength +
+       lengthAdjust pin the block to the same width whatever system font the
+       viewer resolves, so the mark never reflows between platforms.
+       Google Sans is deliberately not referenced: it isn't installed on
+       viewers' machines, and embedding the .woff2 as a data URI in a favicon
+       is both large and unevenly supported. -->
+  <rect width="512" height="512" rx="96" fill="#0047ab"/>
+  <text x="256" y="332" textLength="392" lengthAdjust="spacingAndGlyphs"
+        text-anchor="middle" fill="#ffffff"
+        font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif"
+        font-size="208" font-weight="800" letter-spacing="-4">JSA</text>
+</svg>

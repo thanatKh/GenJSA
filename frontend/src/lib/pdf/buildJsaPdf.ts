@@ -128,10 +128,12 @@ export async function buildJsaPdf(
     lines.forEach((line, index) => {
       const baseline = top + index * lineH + baselineDrop;
       setFont(line.weight, L.font.body_pt);
+      // Marker matches the line's own weight rather than always being bold —
+      // the procedure column's "1." stays bold (its text is bold too), but
+      // อันตรายที่อาจเกิดขึ้น/มาตรการป้องกัน/ควบคุม's "1."/"1.1" numbering
+      // sits next to normal-weight text, so it stays normal as well.
       if (line.marker) {
-        doc.setFont(FONT_NAME, "bold");
         doc.text(line.marker, x, baseline);
-        doc.setFont(FONT_NAME, line.weight);
       }
       doc.text(line.text, x + line.indent, baseline, {
         maxWidth: cellW - line.indent,
@@ -248,10 +250,32 @@ export async function buildJsaPdf(
     y += barH;
 
     // --- header fields ---
+    // fieldLineH stays >= the 1.45 floor documented in config/pdf.yaml (Thai
+    // tone marks/stacked vowels start colliding below that) — lines here are
+    // drawn one at a time at this exact spacing (not jsPDF's own automatic
+    // wrap spacing, which defaults to a tighter ~1.15x and would desync from
+    // the box height reserved below).
     const fieldLineH = L.font.header_label_pt * 1.45;
+    const fieldBaselineDrop = fieldLineH * 0.74;
+
+    // One source of truth for how a field's value wraps, used both to size
+    // its box (before drawing) and to draw it (after) — previously these were
+    // two separately-computed widths that could drift out of sync, and the
+    // box height didn't account for wrapping at all for supervisor/date,
+    // so a long supervisor name would overflow straight through the row's
+    // own border into the table header below it.
+    const measureFieldLines = (label: string, value: string, width: number): string[] => {
+      setFont("bold", L.font.header_label_pt);
+      const labelW = doc.getTextWidth(`${label}:`) + mmToPt(1.5);
+      setFont("normal", L.font.header_label_pt);
+      return doc.splitTextToSize(value || "", Math.max(width - pad * 2 - labelW, 10));
+    };
+
+    const fieldRowHeight = (lines: string[]) => Math.max(lines.length, 1) * fieldLineH + mmToPt(1);
+
     const drawField = (
       label: string,
-      value: string,
+      lines: string[],
       x: number,
       width: number,
       rowY: number,
@@ -260,27 +284,26 @@ export async function buildJsaPdf(
       setFont("bold", L.font.header_label_pt);
       const labelText = `${label}:`;
       const labelW = doc.getTextWidth(labelText) + mmToPt(1.5);
-      const baseline = rowY + rowH / 2 + L.font.header_label_pt * 0.35;
-      doc.text(labelText, x + pad, baseline);
+      const blockH = Math.max(lines.length, 1) * fieldLineH;
+      const top = rowY + (rowH - blockH) / 2;
+
+      doc.text(labelText, x + pad, top + fieldBaselineDrop);
       setFont("normal", L.font.header_label_pt);
-      doc.text(value || "", x + pad + labelW, baseline, {
-        maxWidth: width - pad * 2 - labelW,
+      const valueX = x + pad + labelW;
+      const maxWidth = width - pad * 2 - labelW;
+      (lines.length ? lines : [""]).forEach((line, index) => {
+        doc.text(line, valueX, top + index * fieldLineH + fieldBaselineDrop, { maxWidth });
       });
     };
 
-    setFont("normal", L.font.header_label_pt);
-    const activityLines = doc.splitTextToSize(
-      jsa.header.work_activity,
-      contentW - pad * 2 - doc.getTextWidth(`${D.labels.work_activity}:`) - mmToPt(2),
-    );
-    const activityH = Math.max(activityLines.length, 1) * fieldLineH + mmToPt(1);
+    const activityLines = measureFieldLines(D.labels.work_activity, jsa.header.work_activity, contentW);
+    const activityH = fieldRowHeight(activityLines);
 
     doc.setLineWidth(L.table.border_width_pt);
     doc.rect(mL, y, contentW, activityH);
-    drawField(D.labels.work_activity, jsa.header.work_activity, mL, contentW, y, activityH);
+    drawField(D.labels.work_activity, activityLines, mL, contentW, y, activityH);
     y += activityH;
 
-    const infoH = fieldLineH + mmToPt(1);
     // The date box's left edge lines up with the table's own third column
     // (มาตรการป้องกัน/ควบคุม, colX[2]) instead of being sized off the field
     // text — that way one continuous vertical line runs from the header
@@ -289,17 +312,21 @@ export async function buildJsaPdf(
     // happens to be. colW[2] (33.3% of contentW by default) comfortably
     // fits a Thai date's label + value with room to spare.
     const splitW = colX[2] - mL;
-    doc.rect(mL, y, splitW, infoH);
-    doc.rect(mL + splitW, y, contentW - splitW, infoH);
-    drawField(D.labels.supervisor, jsa.header.supervisor, mL, splitW, y, infoH);
-    drawField(
+    const supervisorLines = measureFieldLines(D.labels.supervisor, jsa.header.supervisor, splitW);
+    const dateLines = measureFieldLines(
       D.labels.analysis_date,
       formatThaiDate(jsa.header.analysis_date),
-      mL + splitW,
       contentW - splitW,
-      y,
-      infoH,
     );
+    // Both cells share one row, so its height is set by whichever field
+    // needs more lines — a long supervisor name grows the whole row instead
+    // of overflowing its own box (the date cell's short value just sits
+    // centered in the extra height).
+    const infoH = Math.max(fieldRowHeight(supervisorLines), fieldRowHeight(dateLines));
+    doc.rect(mL, y, splitW, infoH);
+    doc.rect(mL + splitW, y, contentW - splitW, infoH);
+    drawField(D.labels.supervisor, supervisorLines, mL, splitW, y, infoH);
+    drawField(D.labels.analysis_date, dateLines, mL + splitW, contentW - splitW, y, infoH);
     y += infoH;
 
     // --- column headers ---
@@ -365,7 +392,21 @@ export async function buildJsaPdf(
     return height;
   };
 
-  let justStartedPage = false;
+  // Never leave fewer than this many lines stranded alone on either side of
+  // a forced mid-row page break — a lone line at the bottom of one page
+  // (orphan) or top of the next (widow) reads as a layout glitch even though
+  // nothing is technically wrong. Only engages once a row is already too
+  // long to keep together on one page (avoid_row_split handles the "keep
+  // whole" case above); this just makes an unavoidable split land cleanly.
+  const MIN_SPLIT_LINES = 2;
+
+  // True from the moment a fresh page is started until the first row-slice
+  // is actually drawn on it — a brand-new page is the most room this row
+  // will ever get, so the orphan/widow guard below has nothing to gain by
+  // deferring further once the page is already fresh. Starts true: the very
+  // first page has only the header on it at this point, same as any other
+  // freshly-started page.
+  let freshPage = true;
 
   for (const row of rows) {
     const totalLines = Math.max(...row.cells.map((c) => c.length), 1);
@@ -381,16 +422,15 @@ export async function buildJsaPdf(
         // amount of further pagination will ever fit this row — config/pdf.yaml
         // leaves less than one line height of body space per page. Stop instead
         // of looping forever.
-        if (justStartedPage) {
+        if (freshPage) {
           throw new Error(
             "PDF layout error: a page cannot fit even one line of table content — check config/pdf.yaml margins/font sizes.",
           );
         }
         y = startNewPage();
-        justStartedPage = true;
+        freshPage = true;
         continue;
       }
-      justStartedPage = false;
 
       // Don't split a row if a fresh page could fit it whole — avoids splitting a row unnecessarily
       if (
@@ -400,17 +440,39 @@ export async function buildJsaPdf(
         remaining * lineH + pad * 2 <= bodyBottom - (mT + mmToPt(60))
       ) {
         y = startNewPage();
-        justStartedPage = true;
+        freshPage = true;
         continue;
+      }
+
+      // Orphan/widow guard — a split is about to happen on this page
+      // (fits < remaining). Skipped on an already-fresh page: there's no
+      // more room to wait for, so whatever fits there is what gets drawn.
+      if (fits < remaining && !freshPage) {
+        const canSplitCleanly = remaining >= MIN_SPLIT_LINES * 2;
+        if (!canSplitCleanly || fits < MIN_SPLIT_LINES) {
+          // Either splitting anywhere would strand fewer than the minimum on
+          // one side no matter where the cut lands, or this page can't even
+          // offer the minimum right now — defer the whole rest of the row.
+          y = startNewPage();
+          freshPage = true;
+          continue;
+        }
+        if (remaining - fits < MIN_SPLIT_LINES) {
+          // Hold back enough lines that the leftover on the next page meets
+          // the minimum too, instead of stranding a lone widow line there.
+          fits = remaining - MIN_SPLIT_LINES;
+        }
       }
 
       fits = Math.min(fits, remaining);
       y += drawRowSlice(row, drawn, fits, y);
       pageFrames[pageFrames.length - 1].bottom = y;
       drawn += fits;
+      freshPage = false;
 
       if (drawn < totalLines) {
         y = startNewPage();
+        freshPage = true;
       }
     }
   }
@@ -430,9 +492,20 @@ export async function buildJsaPdf(
   const analystName = jsa.header.analyst?.trim() || jsa.header.supervisor?.trim();
 
   if (sig.show && analystName) {
-    const labelDrop = sig.label_pt * L.font.line_height * 0.74;
+    const label = D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst;
+    setFont("bold", sig.label_pt);
+    const labelW = doc.getTextWidth(label) + mmToPt(1.5);
 
-    if (bodyBottom - y < mmToPt(sig.gap_above_mm) + labelDrop) {
+    // Wrapped (not a single unbounded doc.text call) — an analyst name long
+    // enough to fill the schema's own 200-char allowance would otherwise run
+    // straight off the right edge of the page with no maxWidth to stop it.
+    const sigLineH = sig.label_pt * L.font.line_height;
+    const sigBaselineDrop = sigLineH * 0.74;
+    setFont("normal", sig.label_pt);
+    const nameLines = doc.splitTextToSize(analystName, Math.max(contentW - labelW, 10));
+    const blockH = Math.max(nameLines.length, 1) * sigLineH;
+
+    if (bodyBottom - y < mmToPt(sig.gap_above_mm) + blockH) {
       // Deliberately a bare addPage, not startNewPage() — that would redraw the
       // whole title bar and column headers for a one-line page. Nothing is
       // pushed to pageFrames either: an entry with top === bottom makes the frame
@@ -443,16 +516,18 @@ export async function buildJsaPdf(
 
     // Bold label, normal name — the same treatment the header fields get
     // (see drawField above), so the document reads consistently
-    const label = D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst;
-    const baseline = y + mmToPt(sig.gap_above_mm) + labelDrop;
+    const top = y + mmToPt(sig.gap_above_mm);
     doc.setTextColor(0, 0, 0);
 
     setFont("bold", sig.label_pt);
-    doc.text(label, mL, baseline);
-    const labelW = doc.getTextWidth(label) + mmToPt(1.5);
+    doc.text(label, mL, top + sigBaselineDrop);
 
     setFont("normal", sig.label_pt);
-    doc.text(analystName, mL + labelW, baseline);
+    nameLines.forEach((line: string, index: number) => {
+      doc.text(line, mL + labelW, top + index * sigLineH + sigBaselineDrop, {
+        maxWidth: contentW - labelW,
+      });
+    });
   }
 
   // Thick outer table border, one crisp frame per page — drawn after all rows so it stays
@@ -473,8 +548,9 @@ export async function buildJsaPdf(
   // ----------------------------------------------------------- footer pass --
   // Draw the footer last, since we need the total page count before printing "Page X / Y"
   const total = doc.getNumberOfPages();
-  const footerParts = C ? [C.department, C.name].filter(Boolean) : [];
-  const footerRight = L.footer.show_company ? footerParts.join(" · ") : "";
+  // Company name only — department dropped per request, kept only the
+  // top-level owner rather than department · owner
+  const footerRight = L.footer.show_company && C?.name ? C.name : "";
   const footerLeft = `${D.formCode} ${D.footerText}`.trim();
 
   for (let page = 1; page <= total; page += 1) {
@@ -516,9 +592,11 @@ export async function buildJsaPdf(
 
   // Set the PDF's internal /Title metadata. We deliberately don't use the
   // <a download> attribute (that forces an immediate silent save on mobile
-  // Chrome, violating the "no auto-download" requirement) — so this Title
-  // is the only way the native viewer gets a meaningful name to show/suggest
-  // instead of a random blob URL fragment.
+  // Chrome, violating the "no auto-download" requirement) — so for anyone
+  // reading the blob in the browser's own viewer, this Title is the only way
+  // it gets a meaningful name to show/suggest instead of a random blob URL
+  // fragment. (Desktop Chromium additionally gets a real Save-as dialog from
+  // PdfStep.tsx, pre-filled from the same pdfFileName().)
   doc.setProperties({ title: pdfFileName(jsa) });
 
   return doc.output("blob");

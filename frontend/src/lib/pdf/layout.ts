@@ -82,7 +82,7 @@ export const FALLBACK_LAYOUT: PdfLayout = {
     table_header_pt: 14,
     title_th_pt: 20,
     title_en_pt: 18,
-    footer_pt: 9,
+    footer_pt: 10,
     line_height: 1.5,
   },
   table: {

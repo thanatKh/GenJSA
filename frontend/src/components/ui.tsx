@@ -15,6 +15,7 @@ import {
 } from "react";
 import { TriangleAlert, Undo2 } from "lucide-react";
 
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Label as ShadcnLabel } from "./ui/label";
 import { Textarea as ShadcnTextarea } from "./ui/textarea";
@@ -110,6 +111,20 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
 
     useEffect(resize, [value, minRows, maxRows]);
 
+    // Google Sans/Google Sans Text load with font-display: swap (fonts.css)
+    // — text first paints in the fallback font, which wraps Thai differently,
+    // then the real font swaps in and can push content onto another line
+    // with nothing re-measuring the box. Without this, that extra line ends
+    // up clipped (overflow was already locked to hidden from the first,
+    // fallback-font measurement) rather than the box growing to fit it.
+    // el.scrollHeight below is read live from the DOM, not from a value
+    // closed over here, so this stays correct even if the field was edited
+    // in the meantime — safe to run just once, on mount.
+    useEffect(() => {
+      void document.fonts?.ready?.then(() => resize());
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     return (
       <ShadcnTextarea
         ref={(node) => {
@@ -123,7 +138,18 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
           onChange?.(event);
           resize();
         }}
-        className={`resize-none leading-[1.75] ${className ?? ""}`}
+        // cn(), not plain string concat — callers that need to *remove* a
+        // base style (e.g. StepCard.tsx's borderless desktop-table cells,
+        // which override rounded-lg/border/px-3.5 py-2.5 to nothing) need
+        // tailwind-merge's conflict resolution, not just class concatenation.
+        //
+        // min-h-0 overrides the generated Textarea's own min-h-16 (64px) —
+        // that's a sensible floor for its default standalone use, but this
+        // component already computes its own floor from minRows via the
+        // resize() height math above, so for minRows 1-2 callers the CSS
+        // min-height was clamping the box back up past what was asked for
+        // (a one-row field rendering ~64px tall instead of ~44px).
+        className={cn("resize-none leading-[1.75] min-h-0", className)}
         {...rest}
       />
     );
