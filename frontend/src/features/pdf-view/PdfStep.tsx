@@ -169,7 +169,12 @@ export function PdfStep({
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-2">
+      {/* A single 2-column grid, two rows: "do something with this PDF" on
+          top, "leave this page" below — same visual weight throughout
+          instead of mixing lg/default sizes across a tall stacked column.
+          Open PDF spans both columns when Share isn't offered, so the grid
+          stays exactly two rows either way. */}
+      <div className="mt-5 grid grid-cols-2 gap-2">
         {url ? (
           // ⚠️ Never add a `download` attribute here — it forces an
           // immediate download (on mobile Chrome this saves silently to
@@ -180,16 +185,16 @@ export function PdfStep({
           // introducing a <button> or JS-mediated navigation — the anchor
           // must stay a real, directly-clickable link to avoid mobile
           // Safari's popup blocking.
-          <Button asChild size="lg">
+          <Button asChild className={canShareFile ? undefined : "col-span-2"}>
             <a href={url} target="_blank" rel="noopener">
-              <FileText className="size-5" aria-hidden="true" />
+              <FileText className="size-4" aria-hidden="true" />
               เปิดเอกสาร PDF
             </a>
           </Button>
         ) : (
-          <Button size="lg" disabled>
+          <Button disabled className="col-span-2">
             {error ? null : (
-              <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
             )}
             {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
           </Button>
@@ -202,35 +207,30 @@ export function PdfStep({
             user-chosen action via a dedicated button, not a silent auto-save,
             so it doesn't run into the "no auto-download" concern noted below. */}
         {canShareFile ? (
-          <div>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={handleShare}
-              loading={sharing}
-            >
-              <Share2 className="size-5" aria-hidden="true" />
-              แชร์ / บันทึกไฟล์ PDF
-            </Button>
-            <p className="mt-1.5 text-center text-sm text-muted">
-              ใช้ปุ่มนี้หากหน้าเอกสาร PDF ที่เปิดไม่มีปุ่มบันทึกหรือแชร์ในตัว
-            </p>
-          </div>
+          <Button variant="outline" onClick={handleShare} loading={sharing}>
+            <Share2 className="size-4" aria-hidden="true" />
+            แชร์ / บันทึกไฟล์
+          </Button>
         ) : null}
 
         {/* No confirm here, unlike EditorStep's "เริ่มใหม่": by this point the
             document is already saved to the history list on step 1, so starting
             a new JSA costs the user nothing they can't get back in one click. */}
-        <Button variant="outline" onClick={onNewJsa}>
-          <FilePlus2 className="size-4" aria-hidden="true" />
-          สร้าง JSA ใหม่
-        </Button>
-
         <Button variant="ghost" onClick={onBack}>
           <ArrowLeft className="size-4" aria-hidden="true" />
           กลับไปแก้ไข
         </Button>
+        <Button variant="outline" onClick={onNewJsa}>
+          <FilePlus2 className="size-4" aria-hidden="true" />
+          สร้าง JSA ใหม่
+        </Button>
       </div>
+
+      {canShareFile ? (
+        <p className="mt-2 text-center text-sm text-muted">
+          ใช้ปุ่ม "แชร์ / บันทึกไฟล์" หากหน้าเอกสาร PDF ที่เปิดไม่มีปุ่มบันทึกหรือแชร์ในตัว
+        </p>
+      ) : null}
     </section>
   );
 }
