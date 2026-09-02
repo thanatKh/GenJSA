@@ -363,7 +363,11 @@ export function EditorStep({
           way down every time; keeping them pinned means "restart" and
           "generate PDF" are always one tap away while reviewing. */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-[60rem] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+        {/* max-w-[var(--page-max-w)] — same shared bound as AppBar/<main> (see
+            tokens.css) so these buttons line up with the table's own edges
+            above them; this bar is `fixed`, so it sits outside <main>'s own
+            width entirely and needs the token again rather than inheriting it. */}
+        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           {/* size="lg" — matching the primary button, not the app-wide 44px
               default, so the two don't sit at different heights in the same
               row (ghost's low visual weight already keeps it secondary) */}

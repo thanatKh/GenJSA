@@ -69,6 +69,13 @@
      nothing else depends on that value, so it doesn't need a token. */
   --appbar-h: 64px;
 
+  /* Shared outer bound for AppBar.tsx's title-bar row and App.tsx's <main> —
+     read from here directly by both (max-w-[var(--page-max-w)]) so the top
+     bar and the page body always line up on the same left/right edges,
+     whatever width the current stage's own (narrower) content happens to
+     use inside that shared bound. */
+  --page-max-w: 76rem;
+
   /* shadcn/Radix-facing semantic names — aliased onto the brand tokens above
      so shadcn-generated components (bg-primary, text-muted-foreground, etc.)
      resolve to the exact same colors already used by hand-rolled components.

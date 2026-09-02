@@ -54,7 +54,7 @@ export function AppBar({
           offset to park under instead of guessing. sm: reads --appbar-h
           (tokens.css) directly rather than a plain h-16, so that's the one
           place to change it — no second value to remember to update. */}
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4 sm:h-[var(--appbar-h)]">
+      <div className="mx-auto flex h-14 max-w-[var(--page-max-w)] items-center gap-4 px-4 sm:h-[var(--appbar-h)]">
         <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
         <div className="min-w-0">
           <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">

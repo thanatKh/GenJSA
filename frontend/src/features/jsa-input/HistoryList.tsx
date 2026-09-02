@@ -188,7 +188,12 @@ export function HistoryList({
                   size="icon-lg"
                   onClick={() => deleteEntry(entry)}
                   aria-label={`ลบ ${entryTitle(entry)}`}
-                  className="text-muted opacity-100 transition-opacity hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                  // max-sm:size-11 — this button is a destructive action and,
+                  // unlike on desktop (hover-gated, mouse-precise), it's
+                  // always visible and touch-tapped below sm, so it gets the
+                  // app's full 44px minimum there instead of icon-lg's
+                  // stock 36px; desktop keeps the more compact hover size.
+                  className="text-muted opacity-100 transition-opacity hover:text-danger max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>

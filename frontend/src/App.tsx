@@ -180,11 +180,13 @@ export default function App() {
         department={config?.company.department}
       />
 
-      {/* max-w-[76rem] — wider than the 60rem every other stage needs — exists
-          only so stage 0 has room for the form's own 45rem plus a real side
-          column for history on desktop; EditorStep/PdfStep pin themselves
-          back to their previous widths below so they're unaffected. */}
-      <main className="mx-auto w-full max-w-[76rem] flex-1 px-4 py-6 sm:py-8">
+      {/* max-w-[var(--page-max-w)] — shared with AppBar.tsx's title-bar row
+          so the two always share the same left/right edges (see tokens.css).
+          It's wider than the 60rem every other stage needs only so stage 0
+          has room for the form's own 45rem plus a real side column for
+          history on desktop; EditorStep/PdfStep pin themselves back to
+          their previous, narrower widths below so they're unaffected. */}
+      <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-6 sm:py-8">
         <Stepper current={stage} onNavigate={goto} />
 
         {stage === 0 ? (
@@ -215,16 +217,18 @@ export default function App() {
           </div>
         ) : null}
 
+        {/* No inner max-w wrapper — the table benefits from the room, and it
+            keeps this stage's body flush with AppBar's edges (both share
+            <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
+            and off-center under a wider title bar. */}
         {stage === 1 && doc ? (
-          <div className="mx-auto max-w-[60rem]">
-            <EditorStep
-              doc={doc}
-              onChange={setDoc}
-              onContinue={() => goto(2)}
-              onStartOver={startOver}
-              error={error}
-            />
-          </div>
+          <EditorStep
+            doc={doc}
+            onChange={setDoc}
+            onContinue={() => goto(2)}
+            onStartOver={startOver}
+            error={error}
+          />
         ) : null}
 
         {stage === 2 && doc ? (
