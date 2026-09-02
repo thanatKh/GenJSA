@@ -180,11 +180,24 @@ export default function App() {
         department={config?.company.department}
       />
 
-      <main className="mx-auto w-full max-w-[60rem] flex-1 px-4 py-6 sm:py-8">
+      {/* max-w-[76rem] — wider than the 60rem every other stage needs — exists
+          only so stage 0 has room for the form's own 45rem plus a real side
+          column for history on desktop; EditorStep/PdfStep pin themselves
+          back to their previous widths below so they're unaffected. */}
+      <main className="mx-auto w-full max-w-[76rem] flex-1 px-4 py-6 sm:py-8">
         <Stepper current={stage} onNavigate={goto} />
 
         {stage === 0 ? (
-          <div className="mx-auto max-w-[45rem]">
+          // Below xl: unchanged — single 45rem column, history stacked below
+          // the form. From xl up, with real desktop width to spare: history
+          // moves beside the form as its own column instead of competing for
+          // vertical space under it (see HistoryList.tsx's matching xl:
+          // classes that drop its now-unneeded top divider). Deliberately
+          // xl (1280px), not lg (1024px) — the form alone is 45rem (720px),
+          // so anything narrower than xl only leaves the side column ~300px
+          // wide: enough to break, not enough to look right (heading wraps,
+          // search placeholder truncates).
+          <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:items-start xl:gap-x-12 xl:gap-y-0">
             <InputStep
               onGenerate={handleGenerate}
               onSkipToManual={handleSkipToManual}
@@ -203,13 +216,15 @@ export default function App() {
         ) : null}
 
         {stage === 1 && doc ? (
-          <EditorStep
-            doc={doc}
-            onChange={setDoc}
-            onContinue={() => goto(2)}
-            onStartOver={startOver}
-            error={error}
-          />
+          <div className="mx-auto max-w-[60rem]">
+            <EditorStep
+              doc={doc}
+              onChange={setDoc}
+              onContinue={() => goto(2)}
+              onStartOver={startOver}
+              error={error}
+            />
+          </div>
         ) : null}
 
         {stage === 2 && doc ? (

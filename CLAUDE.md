@@ -25,7 +25,7 @@ against them before adding anything:
   returned.
 - **Browser-local history is the one deliberate exception** — finished
   documents (never PDFs) are kept in `localStorage` by
-  `frontend/src/history.ts`: this browser on this PC, 180-day expiry,
+  `frontend/src/history.ts`: this browser on this PC, 365-day expiry,
   deletable per-entry or all at once, never uploaded. It exists so a user can
   reopen yesterday's JSA instead of regenerating it. In-progress drafts stay
   tab-scoped in `sessionStorage` (`frontend/src/store.ts`), and
@@ -139,7 +139,7 @@ Three-step wizard driven by `App.tsx`'s `stage` state (0/1/2):
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engine (jsPDF). `buildJsaPdf.ts` measures text, wraps lines, computes row heights, and paginates by hand since jsPDF has no HTML/CSS layout engine. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
 - `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
-- `history.ts` — localStorage-backed history of finished documents, per-PC and 180-day capped (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
+- `history.ts` — localStorage-backed history of finished documents, per-PC and 365-day capped (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
 
 In dev, Vite proxies `/api` and `/health` to `127.0.0.1:8000` (`vite.config.ts`).
 In prod, FastAPI serves `frontend/dist` directly and mounts the SPA fallback

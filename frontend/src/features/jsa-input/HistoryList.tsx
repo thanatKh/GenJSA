@@ -90,7 +90,11 @@ export function HistoryList({
   };
 
   return (
-    <section className="mt-10 border-t border-line pt-6">
+    // The top divider only makes sense when this sits BELOW the form
+    // (narrow/stacked layout) — from xl up, App.tsx places this as its own
+    // side column next to the form instead (see its own comment for why xl,
+    // not lg), where a rule implying "continued from above" would be wrong.
+    <section className="mt-10 border-t border-line pt-6 xl:mt-0 xl:border-t-0 xl:pt-0">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
           <History className="size-5 shrink-0" aria-hidden="true" />

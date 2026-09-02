@@ -21,10 +21,10 @@ const KEY = "genjsa.history.v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Entries older than this are dropped on the next read. Shown in the UI. */
-export const RETENTION_DAYS = 180;
+export const RETENTION_DAYS = 365;
 
 // Quota guard — localStorage throws when full rather than evicting anything,
-// so cap the list ourselves. At 180 days it's usually this, not the age limit,
+// so cap the list ourselves. At 365 days it's usually this, not the age limit,
 // that bounds the list.
 const MAX_ENTRIES = 100;
 
