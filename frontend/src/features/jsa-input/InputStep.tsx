@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Sparkles } from "lucide-react";
 
 import {
   Alert,
@@ -137,7 +137,7 @@ export function InputStep({
   busy,
   error,
 }: {
-  onGenerate: (values: InputForm) => void;
+  onGenerate: (values: InputForm, detailed: boolean) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
   ) => void;
@@ -158,6 +158,10 @@ export function InputStep({
   const [placeholder] = useState(
     () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)],
   );
+  // "วิเคราะห์อย่างละเอียด" — deliberately local state, not part of InputForm/
+  // the sessionStorage draft: every fresh JSA should start on the fast
+  // default, not silently inherit whatever the user last toggled
+  const [detailed, setDetailed] = useState(false);
 
   const {
     register,
@@ -235,7 +239,7 @@ export function InputStep({
         <GeneratingPanel onCancel={onCancelGenerate} />
       ) : (
         <form
-          onSubmit={handleSubmit(onGenerate)}
+          onSubmit={handleSubmit((values) => onGenerate(values, detailed))}
           className="mt-6 grid gap-5"
           noValidate
         >
@@ -299,6 +303,32 @@ export function InputStep({
           </div>
 
           {error ? <Alert>{error}</Alert> : null}
+
+          {/* Plain button[role=checkbox] rather than a native <input
+              type="checkbox"> — keeps the same brand-styled square as the
+              rest of the app's hand-rolled controls instead of an unstyled
+              OS checkbox, with no new shadcn component needed for one field. */}
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={detailed}
+              onClick={() => setDetailed((v) => !v)}
+              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                detailed
+                  ? "border-navy bg-navy text-white"
+                  : "border-line bg-surface"
+              }`}
+            >
+              {detailed ? <Check className="size-3.5" aria-hidden="true" /> : null}
+            </button>
+            <span className="text-ink">
+              วิเคราะห์อย่างละเอียด
+              <span className="block text-muted">
+                ระบบจะพิจารณาอันตรายและมาตรการป้องกันอย่างละเอียดมากขึ้น
+              </span>
+            </span>
+          </label>
 
           {/* Secondary on the left, primary on the right, both auto-width —
               matches EditorStep's footer (เริ่มใหม่ / สร้าง PDF) so the two

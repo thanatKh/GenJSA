@@ -54,6 +54,13 @@ async def generate_jsa(
     attempts = max(1, settings.ai.retry.max_attempts)
     json_mode = settings.ai.request_json_mode
     last_error: AppError = Errors.AI_BAD_RESPONSE
+    # "วิเคราะห์อย่างละเอียด" — falls back to the default model if detailed_model
+    # isn't configured, so leaving it blank in config/ai.yaml just no-ops the toggle
+    model = (
+        settings.ai.detailed_model
+        if request.detailed and settings.ai.detailed_model
+        else settings.ai.model
+    )
 
     for attempt in range(1, attempts + 1):
         prompt = system_prompt if attempt == 1 else system_prompt + _RETRY_REMINDER
@@ -62,7 +69,7 @@ async def generate_jsa(
             raw = await provider.complete(
                 prompt,
                 user_prompt,
-                model=settings.ai.model,
+                model=model,
                 json_mode=json_mode,
             )
         except AppError as exc:

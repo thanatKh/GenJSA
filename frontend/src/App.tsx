@@ -99,13 +99,16 @@ export default function App() {
     currentHistoryId.save(id);
   };
 
-  const handleGenerate = async (values: InputForm) => {
+  const handleGenerate = async (values: InputForm, detailed: boolean) => {
     setBusy(true);
     setError(null);
     const controller = new AbortController();
     generateController.current = controller;
     try {
-      const generated = await generateJsa(values, { signal: controller.signal });
+      const generated = await generateJsa(
+        { ...values, detailed },
+        { signal: controller.signal },
+      );
       setDoc(generated);
       docDraft.save(generated);
       startHistoryEntry();

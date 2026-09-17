@@ -70,6 +70,9 @@ class GenerateRequest(BaseModel):
     analysis_date: date
     work_description: str = Field(min_length=10, max_length=5000)
     analyst: str = Field(default="", max_length=200)
+    # "วิเคราะห์อย่างละเอียด" — uses config/ai.yaml's detailed_model instead of
+    # model when set and non-blank; silently ignored otherwise (see ai_service.py)
+    detailed: bool = False
 
 
 class AiJsaPayload(BaseModel):

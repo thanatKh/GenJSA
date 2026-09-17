@@ -67,6 +67,8 @@ class AiRetry(BaseModel):
 class AiConfig(BaseModel):
     provider: str = "thaillm"
     model: str
+    # Used for "วิเคราะห์อย่างละเอียด" (detailed analysis) requests — blank disables the option
+    detailed_model: str = ""
     api: AiApi
     request_json_mode: bool = True
     retry: AiRetry = Field(default_factory=AiRetry)
