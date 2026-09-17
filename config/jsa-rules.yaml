@@ -13,11 +13,11 @@ generation:
   steps_suggest_split_above: 20
   # Users can specify their own steps in work_description — the AI must follow them
   respect_user_defined_steps: true
-  # Reasonable number of hazards per step
+  # Reasonable number of hazards per step — same cap in "วิเคราะห์อย่างละเอียด"
+  # (detailed analysis) mode too; that mode adds depth to `details`, not more
+  # hazard entries (see prompts/jsa-generate.md's detailed-mode block)
   hazards_per_step_min: 1
   hazards_per_step_max: 4
-  # Higher ceiling used only for "วิเคราะห์อย่างละเอียด" (detailed analysis) requests
-  hazards_per_step_max_detailed: 6
 
 # Topics the AI must "consider while drafting" when relevant to the work
 # Note: this is not a review system — there is no AI-based JSA review anymore
