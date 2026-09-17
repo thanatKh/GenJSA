@@ -180,6 +180,14 @@ export function HistoryList({
                       ? ` · ${entry.doc.header.supervisor}`
                       : ""}
                     {` · ${entry.doc.steps.length} ขั้นตอน`}
+                    {/* Only shown when there is one — most entries are a JSA
+                        alone, so a "no procedure" marker would be noise on
+                        every row to flag the exception */}
+                    {entry.procedure ? (
+                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-surface px-1.5 py-0.5 text-xs text-navy">
+                        + ขั้นตอนปฏิบัติงาน
+                      </span>
+                    ) : null}
                   </span>
                 </button>
                 <Button

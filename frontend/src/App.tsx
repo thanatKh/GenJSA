@@ -6,6 +6,8 @@ import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { HistoryList } from "./features/jsa-input/HistoryList";
 import { InputStep } from "./features/jsa-input/InputStep";
 import { PdfStep } from "./features/pdf-view/PdfStep";
+import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
+import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
 import {
@@ -13,10 +15,16 @@ import {
   CancelledError,
   fetchPublicConfig,
   generateJsa,
+  generateProcedure,
   type PublicConfig,
 } from "./lib/api";
-import type { InputForm, JsaDocument } from "./lib/schema";
-import { clearAllDrafts, currentHistoryId, docDraft } from "./store";
+import {
+  stepFingerprint,
+  type InputForm,
+  type JsaDocument,
+  type ProcedureDocument,
+} from "./lib/schema";
+import { clearAllDrafts, currentHistoryId, docDraft, procedureDraft } from "./store";
 
 // How long to wait after the last edit before rewriting the history entry.
 // The editor changes `doc` on every keystroke; localStorage writes serialize
@@ -36,12 +44,20 @@ function buildBlankDocument(
   };
 }
 
-type Stage = 0 | 1 | 2;
+// 0-2 are the JSA wizard and map 1:1 onto the Stepper. 3-4 are the optional
+// work procedure, reached only from stage 2 — see the Stepper note in the JSX
+// for why they don't get their own step in the progress bar.
+type Stage = 0 | 1 | 2 | 3 | 4;
 
 export default function App() {
   const [stage, setStage] = useState<Stage>(0);
   const [doc, setDoc] = useState<JsaDocument | null>(() => docDraft.load());
+  const [procedure, setProcedure] = useState<ProcedureDocument | null>(() =>
+    procedureDraft.load(),
+  );
   const [busy, setBusy] = useState(false);
+  const [procedureBusy, setProcedureBusy] = useState(false);
+  const [procedureError, setProcedureError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
   const [config, setConfig] = useState<PublicConfig | null>(null);
@@ -69,6 +85,13 @@ export default function App() {
     }
   }, [stage, doc]);
 
+  // The procedure pages need a procedure. Falling back to stage 2 rather than
+  // 0 on purpose: losing the procedure says nothing about the JSA, which is
+  // still perfectly usable.
+  useEffect(() => {
+    if (stage >= 3 && !procedure) setStage(2);
+  }, [stage, procedure]);
+
   // Keep the history entry in step with the document being edited
   useEffect(() => {
     if (!doc || !historyId) return;
@@ -78,11 +101,23 @@ export default function App() {
     if (!worthKeeping) return;
 
     const timer = setTimeout(
-      () => historyStore.upsert(historyId, doc),
+      () => historyStore.upsertDoc(historyId, doc),
       HISTORY_SAVE_DEBOUNCE_MS,
     );
     return () => clearTimeout(timer);
   }, [doc, historyId]);
+
+  // Same for the procedure. Separate from the effect above because the two
+  // documents are edited on different pages and change independently —
+  // upsertProcedure merges rather than replacing, so neither erases the other.
+  useEffect(() => {
+    if (!procedure || !historyId) return;
+    const timer = setTimeout(
+      () => historyStore.upsertProcedure(historyId, procedure),
+      HISTORY_SAVE_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [procedure, historyId]);
 
   useEffect(() => {
     // One config powers both the app name display and PDF drawing (layout values from config/pdf.yaml)
@@ -99,6 +134,14 @@ export default function App() {
     currentHistoryId.save(id);
   };
 
+  /** Drop the procedure from screen and draft storage. The copy already in
+   * history stays: it belongs to whatever entry it was generated for. */
+  const discardProcedure = () => {
+    setProcedure(null);
+    setProcedureError(null);
+    procedureDraft.clear();
+  };
+
   const handleGenerate = async (values: InputForm, detailed: boolean) => {
     setBusy(true);
     setError(null);
@@ -111,6 +154,8 @@ export default function App() {
       );
       setDoc(generated);
       docDraft.save(generated);
+      // A new JSA means any procedure on screen describes a different job
+      discardProcedure();
       startHistoryEntry();
       setStage(1);
       window.scrollTo({ top: 0 });
@@ -143,6 +188,7 @@ export default function App() {
     const blank = buildBlankDocument(values);
     setDoc(blank);
     docDraft.save(blank);
+    discardProcedure();
     startHistoryEntry();
     setStage(1);
     window.scrollTo({ top: 0 });
@@ -153,6 +199,14 @@ export default function App() {
     // Required, not belt-and-braces: without it the blank-screen guard above
     // can bounce straight back to step 1
     docDraft.save(entry.doc);
+    // Bring back the procedure too when this entry has one, so reopening
+    // yesterday's job restores both documents rather than silently half of it
+    if (entry.procedure) {
+      setProcedure(entry.procedure);
+      procedureDraft.save(entry.procedure);
+    } else {
+      discardProcedure();
+    }
     setHistoryId(entry.id);
     currentHistoryId.save(entry.id);
     setError(null);
@@ -162,6 +216,7 @@ export default function App() {
 
   const startOver = () => {
     setDoc(null);
+    discardProcedure();
     setError(null);
     setHistoryId(null);
     // Drafts only — past work in historyStore.ts deliberately survives "เริ่มใหม่"
@@ -170,10 +225,47 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
+  /** From the JSA's PDF page: draft a procedure, or reopen the existing one. */
+  const handleCreateProcedure = async () => {
+    if (!doc) return;
+    if (procedure) {
+      goto(3);
+      return;
+    }
+
+    setProcedureBusy(true);
+    setProcedureError(null);
+    try {
+      const generated = await generateProcedure(doc);
+      setProcedure(generated);
+      procedureDraft.save(generated);
+      goto(3);
+    } catch (caught) {
+      setProcedureError(
+        caught instanceof ApiError
+          ? caught.message
+          : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ กรุณาลองอีกครั้ง",
+      );
+    } finally {
+      setProcedureBusy(false);
+    }
+  };
+
+  const updateProcedure = (next: ProcedureDocument) => {
+    setProcedure(next);
+    procedureDraft.save(next);
+  };
+
   const goto = (next: Stage) => {
     setStage(next);
     window.scrollTo({ top: 0 });
   };
+
+  // The procedure mirrors the JSA's step list, so edits to those steps leave
+  // it describing work that no longer matches — warn rather than silently
+  // resync, which would throw away the user's own edits to the procedure
+  const procedureStale =
+    !!doc && !!procedure && stepFingerprint(doc) !== stepFingerprint(procedure);
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface">
@@ -190,7 +282,14 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-6 sm:py-8">
-        <Stepper current={stage} onNavigate={goto} />
+        {/* Clamped to 2: the work procedure (stages 3-4) is optional and
+            branches off the JSA's last step rather than extending the wizard.
+            Giving it a fourth circle would imply the JSA isn't finished
+            without it, and most users will stop at the JSA. */}
+        <Stepper
+          current={Math.min(stage, 2) as 0 | 1 | 2}
+          onNavigate={goto}
+        />
 
         {stage === 0 ? (
           // Below xl: unchanged — single 45rem column, history stacked below
@@ -241,6 +340,34 @@ export default function App() {
               config={config}
               onBack={() => goto(1)}
               onNewJsa={startOver}
+              onCreateProcedure={handleCreateProcedure}
+              procedureBusy={procedureBusy}
+              procedureError={procedureError}
+              hasProcedure={!!procedure}
+            />
+          </div>
+        ) : null}
+
+        {stage === 3 && procedure ? (
+          <div className="mx-auto max-w-[45rem]">
+            <ProcedureEditorStep
+              procedure={procedure}
+              onChange={updateProcedure}
+              onContinue={() => goto(4)}
+              onBack={() => goto(2)}
+              stale={procedureStale}
+              error={null}
+            />
+          </div>
+        ) : null}
+
+        {stage === 4 && procedure ? (
+          <div className="mx-auto max-w-[45rem]">
+            <ProcedurePdfStep
+              procedure={procedure}
+              config={config}
+              onBack={() => goto(3)}
+              onBackToJsa={() => goto(2)}
             />
           </div>
         ) : null}

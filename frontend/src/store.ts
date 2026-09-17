@@ -13,10 +13,11 @@
  * contradiction of this file.
  */
 
-import type { InputForm, JsaDocument } from "./lib/schema";
+import type { InputForm, JsaDocument, ProcedureDocument } from "./lib/schema";
 
 const INPUT_KEY = "genjsa.draft.input";
 const DOC_KEY = "genjsa.draft.doc";
+const PROCEDURE_KEY = "genjsa.draft.procedure";
 const HISTORY_ID_KEY = "genjsa.draft.historyId";
 
 function read<T>(key: string): T | null {
@@ -57,6 +58,13 @@ export const docDraft = {
   clear: () => remove(DOC_KEY),
 };
 
+/** The work procedure generated from docDraft, while it's being reviewed. */
+export const procedureDraft = {
+  load: () => read<ProcedureDocument>(PROCEDURE_KEY),
+  save: (value: ProcedureDocument) => write(PROCEDURE_KEY, value),
+  clear: () => remove(PROCEDURE_KEY),
+};
+
 /* Which history.ts entry the in-progress document belongs to. Kept here so a
  * mid-flow refresh — which App.tsx rehydrates straight back into the editor —
  * keeps updating that entry instead of forking a duplicate. */
@@ -70,5 +78,6 @@ export const currentHistoryId = {
 export function clearAllDrafts(): void {
   inputDraft.clear();
   docDraft.clear();
+  procedureDraft.clear();
   currentHistoryId.clear();
 }

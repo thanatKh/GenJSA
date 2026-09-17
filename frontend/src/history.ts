@@ -4,10 +4,11 @@
  * coming back tomorrow to fix one hazard means re-describing the whole job and
  * paying for another AI generation.
  *
- * What is stored: the JSA data only — never a rendered PDF (buildJsaPdf can
- * always redraw one from the document) and never anything the user typed but
- * didn't turn into a document. Nothing here is ever sent anywhere; the backend
- * has no idea this exists.
+ * What is stored: the JSA data, plus the work procedure generated from it when
+ * there is one — never a rendered PDF (either builder can always redraw one
+ * from the document) and never anything the user typed but didn't turn into a
+ * document. Nothing here is ever sent anywhere; the backend has no idea this
+ * exists.
  *
  * Deliberately separate from store.ts: different storage (localStorage vs
  * sessionStorage), different lifetime, different privacy posture. In
@@ -15,7 +16,12 @@
  * App.tsx, which resets the wizard without discarding past work.
  */
 
-import { jsaDocumentSchema, type JsaDocument } from "./lib/schema";
+import {
+  jsaDocumentSchema,
+  procedureDocumentSchema,
+  type JsaDocument,
+  type ProcedureDocument,
+} from "./lib/schema";
 
 const KEY = "genjsa.history.v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -33,6 +39,9 @@ export type HistoryEntry = {
   /** Epoch ms of the last time this entry was written */
   savedAt: number;
   doc: JsaDocument;
+  /** The work procedure generated from `doc`, once one exists. Most entries
+   * never have one, so it stays optional rather than a second entry type. */
+  procedure?: ProcedureDocument;
 };
 
 type HistoryFile = { v: 1; entries: HistoryEntry[] };
@@ -52,7 +61,23 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean } {
       if (typeof entry?.id !== "string" || typeof entry?.savedAt !== "number") return [];
       if (entry.savedAt < cutoff) return [];
       const doc = jsaDocumentSchema.safeParse(entry.doc);
-      return doc.success ? [{ id: entry.id, savedAt: entry.savedAt, doc: doc.data }] : [];
+      if (!doc.success) return [];
+
+      // Validated separately, and a failure drops ONLY the procedure — losing a
+      // malformed procedure is an inconvenience, losing the JSA it belongs to
+      // is the user's actual work
+      const procedure = entry.procedure
+        ? procedureDocumentSchema.safeParse(entry.procedure)
+        : undefined;
+
+      return [
+        {
+          id: entry.id,
+          savedAt: entry.savedAt,
+          doc: doc.data,
+          ...(procedure?.success ? { procedure: procedure.data } : {}),
+        },
+      ];
     });
 
     entries.sort((a, b) => b.savedAt - a.savedAt);
@@ -90,11 +115,44 @@ export function list(): HistoryEntry[] {
   return entries;
 }
 
-/** Create or replace the entry for `id`, moving it to the top of the list. */
-export function upsert(id: string, doc: JsaDocument): void {
-  const others = readRaw().entries.filter((entry) => entry.id !== id);
+/** Create or update the entry for `id`, moving it to the top of the list.
+ *
+ * Merges rather than replaces: an entry holds two documents written by two
+ * different flows (the JSA editor autosaves `doc`; the procedure editor
+ * autosaves `procedure`), so building a fresh object here would silently erase
+ * whichever one this call isn't carrying. The merge lives inside this module
+ * on purpose — a caller that has only one of the two must not be able to get
+ * this wrong.
+ */
+function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "procedure">>): void {
+  const all = readRaw().entries;
+  const existing = all.find((entry) => entry.id === id);
+  const doc = patch.doc ?? existing?.doc;
+  // A procedure is meaningless without the JSA it was generated from, and an
+  // entry with no doc would be dropped by readRaw's validation on the next
+  // read anyway — so skip rather than write a record that can't survive
+  if (!doc) return;
+
+  const procedure = patch.procedure ?? existing?.procedure;
+  const others = all.filter((entry) => entry.id !== id);
   // savedAt is "now", so the updated entry is always the newest — no re-sort needed
-  writeRaw([{ id, savedAt: Date.now(), doc }, ...others].slice(0, MAX_ENTRIES));
+  const next: HistoryEntry = {
+    id,
+    savedAt: Date.now(),
+    doc,
+    ...(procedure ? { procedure } : {}),
+  };
+  writeRaw([next, ...others].slice(0, MAX_ENTRIES));
+}
+
+/** Save the JSA for `id`, keeping any procedure already stored alongside it. */
+export function upsertDoc(id: string, doc: JsaDocument): void {
+  upsertEntry(id, { doc });
+}
+
+/** Save the work procedure for `id`, keeping its JSA. */
+export function upsertProcedure(id: string, procedure: ProcedureDocument): void {
+  upsertEntry(id, { procedure });
 }
 
 export function remove(id: string): void {

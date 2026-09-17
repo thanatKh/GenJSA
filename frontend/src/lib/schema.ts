@@ -88,3 +88,13 @@ export type InputForm = z.infer<typeof inputFormSchema>;
 export type SubStep = z.infer<typeof subStepSchema>;
 export type ProcedureStep = z.infer<typeof procedureStepSchema>;
 export type ProcedureDocument = z.infer<typeof procedureDocumentSchema>;
+
+/** Identifies the JSA step list a procedure was generated from.
+ *
+ * A procedure mirrors its JSA's steps, so editing those steps afterwards
+ * leaves it describing work that no longer matches. Comparing this against the
+ * current JSA is enough to warn the user; it deliberately ignores hazards and
+ * details, which the procedure never reflected in the first place. */
+export function stepFingerprint(doc: JsaDocument | ProcedureDocument): string {
+  return doc.steps.map((step) => step.procedure.trim()).join("|");
+}
