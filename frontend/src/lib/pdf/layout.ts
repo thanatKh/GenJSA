@@ -65,6 +65,22 @@ export type DocumentMeta = {
 
 export type CompanyMeta = { name: string; department: string };
 
+/** The work procedure document — mirrors config/procedure.yaml */
+export type ProcedureMeta = {
+  titleTh: string;
+  titleEn: string;
+  formCode: string;
+  footerText: string;
+  labels: { date: string; author: string; note: string };
+  sections: {
+    purpose: string;
+    scope: string;
+    references: string;
+    tools: string;
+    procedure: string;
+  };
+};
+
 /** Must match config/pdf.yaml — used when config can't be loaded from the API */
 export const FALLBACK_LAYOUT: PdfLayout = {
   page: {
@@ -120,6 +136,23 @@ export const FALLBACK_DOCUMENT: DocumentMeta = {
     procedure_hint: "(ระบุทุกขั้นตอน)",
     hazard: "อันตรายที่อาจเกิดขึ้น",
     control: "มาตรการป้องกัน/ควบคุม",
+  },
+};
+
+/** Must match config/procedure.yaml — used when config can't be loaded from the API */
+export const FALLBACK_PROCEDURE: ProcedureMeta = {
+  titleTh: "ขั้นตอนปฏิบัติงาน",
+  titleEn: "(Work Procedure)",
+  // No official form code — unlike the JSA, this document has no F-number
+  formCode: "",
+  footerText: "",
+  labels: { date: "วันที่จัดทำ", author: "ผู้จัดทำ", note: "หมายเหตุ:" },
+  sections: {
+    purpose: "วัตถุประสงค์",
+    scope: "ขอบเขต",
+    references: "เอกสารอ้างอิง",
+    tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม",
+    procedure: "ขั้นตอนการปฏิบัติงาน",
   },
 };
 

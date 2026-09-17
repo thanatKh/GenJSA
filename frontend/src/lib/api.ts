@@ -4,8 +4,13 @@
  * Never show the status code or server-side details to the user.
  */
 
-import { jsaDocumentSchema, type JsaDocument } from "./schema";
-import type { DocumentMeta, PdfLayout } from "./pdf/layout";
+import {
+  jsaDocumentSchema,
+  procedureDocumentSchema,
+  type JsaDocument,
+  type ProcedureDocument,
+} from "./schema";
+import type { DocumentMeta, PdfLayout, ProcedureMeta } from "./pdf/layout";
 
 const FALLBACK_ERROR =
   "เกิดข้อผิดพลาดที่ไม่คาดคิด ข้อมูลของคุณยังอยู่ กรุณาลองอีกครั้ง";
@@ -44,11 +49,12 @@ export type GenerateInput = {
   detailed?: boolean;
 };
 
-export async function generateJsa(
-  input: GenerateInput,
-  options?: { signal?: AbortSignal },
-): Promise<JsaDocument> {
-  const externalSignal = options?.signal;
+/** POST JSON to a generate endpoint, with the shared timeout/abort handling. */
+async function postGenerate(
+  path: string,
+  body: unknown,
+  externalSignal: AbortSignal | undefined,
+): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
   // Relay the caller's abort onto our own controller rather than passing
@@ -64,10 +70,10 @@ export async function generateJsa(
 
   let response: Response;
   try {
-    response = await fetch("/api/jsa/generate", {
+    response = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch {
@@ -83,13 +89,36 @@ export async function generateJsa(
   if (!response.ok) {
     throw new ApiError(await extractMessage(response));
   }
+  return response;
+}
 
+const SHAPE_ERROR = "ระบบตอบกลับในรูปแบบที่ไม่คาดคิด กรุณากดลองอีกครั้ง";
+
+export async function generateJsa(
+  input: GenerateInput,
+  options?: { signal?: AbortSignal },
+): Promise<JsaDocument> {
+  const response = await postGenerate("/api/jsa/generate", input, options?.signal);
   try {
     return jsaDocumentSchema.parse(await response.json());
   } catch {
-    throw new ApiError(
-      "ระบบตอบกลับในรูปแบบที่ไม่คาดคิด กรุณากดลองอีกครั้ง",
-    );
+    throw new ApiError(SHAPE_ERROR);
+  }
+}
+
+/** Expand a finished JSA into a step-by-step work procedure.
+ *
+ * The one call that sends a document back to the server. It's used for this
+ * request only and never stored — see the persistence notes in CLAUDE.md. */
+export async function generateProcedure(
+  jsa: JsaDocument,
+  options?: { signal?: AbortSignal },
+): Promise<ProcedureDocument> {
+  const response = await postGenerate("/api/procedure/generate", { jsa }, options?.signal);
+  try {
+    return procedureDocumentSchema.parse(await response.json());
+  } catch {
+    throw new ApiError(SHAPE_ERROR);
   }
 }
 
@@ -97,6 +126,8 @@ export type PublicConfig = {
   appName: string;
   company: { name: string; department: string };
   document: DocumentMeta;
+  // The work procedure document (config/procedure.yaml)
+  procedure: ProcedureMeta;
   // Values used to draw the PDF client-side — the full config/pdf.yaml
   pdf: PdfLayout;
 };

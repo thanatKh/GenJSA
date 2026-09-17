@@ -33,6 +33,34 @@ export const jsaDocumentSchema = z.object({
   assumptions: z.array(z.string()).default([]),
 });
 
+/* Work procedure (ขั้นตอนปฏิบัติงาน) — mirrors backend/app/models/procedure.py.
+ * Generated from a finished JSA, so it inherits that document's header.
+ * Every optional field is defaulted so records saved before a field existed
+ * still parse (same reasoning as `analyst` above). */
+
+export const subStepSchema = z.object({
+  no: z.number(),
+  action: z.string(),
+  note: z.string().default(""),
+});
+
+export const procedureStepSchema = z.object({
+  no: z.number(),
+  // Copied from the source JSA — the AI never writes this
+  procedure: z.string(),
+  sub_steps: z.array(subStepSchema).default([]),
+});
+
+export const procedureDocumentSchema = z.object({
+  header: jsaHeaderSchema,
+  purpose: z.string().default(""),
+  scope: z.string().default(""),
+  references: z.array(z.string()).default([]),
+  tools: z.array(z.string()).default([]),
+  steps: z.array(procedureStepSchema),
+  assumptions: z.array(z.string()).default([]),
+});
+
 /** The first-step form — the 3 required fields plus the optional analyst name */
 export const inputFormSchema = z.object({
   supervisor: z
@@ -57,3 +85,6 @@ export type Hazard = z.infer<typeof hazardSchema>;
 export type JsaStep = z.infer<typeof stepSchema>;
 export type JsaDocument = z.infer<typeof jsaDocumentSchema>;
 export type InputForm = z.infer<typeof inputFormSchema>;
+export type SubStep = z.infer<typeof subStepSchema>;
+export type ProcedureStep = z.infer<typeof procedureStepSchema>;
+export type ProcedureDocument = z.infer<typeof procedureDocumentSchema>;

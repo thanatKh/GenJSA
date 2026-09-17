@@ -223,6 +223,9 @@ class ProcedureLabels(BaseModel):
     # it isn't an analysis — so the same header values get different wording
     date: str = "วันที่จัดทำ"
     author: str = "ผู้จัดทำ"
+    # Prefixes a sub-step's caution/acceptance criterion so it doesn't read as
+    # another instruction. A word, not a glyph — TH Sarabun has no ▸/‣/→
+    note: str = "หมายเหตุ:"
 
 
 class ProcedureSections(BaseModel):

@@ -8,12 +8,21 @@
  * into the eagerly-loaded main bundle.
  */
 
-import type { JsaDocument } from "../schema";
+import type { JsaDocument, ProcedureDocument } from "../schema";
+
+/** Strip the characters Windows/macOS reject in a file name, and cap the length */
+function safeActivity(workActivity: string): string {
+  return workActivity.replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 60);
+}
 
 export function pdfFileName(jsa: JsaDocument): string {
-  const safe = jsa.header.work_activity
-    .replace(/[\\/:*?"<>|]/g, "")
-    .trim()
-    .slice(0, 60);
-  return `JSA-${safe || "document"}-${jsa.header.analysis_date}.pdf`;
+  return `JSA-${safeActivity(jsa.header.work_activity) || "document"}-${jsa.header.analysis_date}.pdf`;
+}
+
+/** ASCII "WP-" prefix rather than a Thai one — file names travel through
+ * share sheets, email and Windows shares, and a Thai prefix survives all of
+ * those far less reliably than the document's own (Thai) title does. */
+export function procedurePdfFileName(procedure: ProcedureDocument): string {
+  const safe = safeActivity(procedure.header.work_activity);
+  return `WP-${safe || "document"}-${procedure.header.analysis_date}.pdf`;
 }

@@ -62,6 +62,9 @@ export function PdfStep({
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
+  // TEMPORARY — procedure harness state (phase 4)
+  const [procBusy, setProcBusy] = useState(false);
+  const [procError, setProcError] = useState<string | null>(null);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -155,6 +158,30 @@ export function PdfStep({
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  // TEMPORARY — see the harness card below (phase 4 of the procedure feature)
+  const handleDraftProcedure = async () => {
+    setProcBusy(true);
+    setProcError(null);
+    try {
+      const { generateProcedure } = await import("../../lib/api");
+      const procedure = await generateProcedure(doc);
+      const { buildProcedurePdf } = await import("../../lib/pdf/buildProcedurePdf");
+      const blob = await buildProcedurePdf(procedure, {
+        layout: config?.pdf,
+        document: config?.document,
+        procedure: config?.procedure,
+        company: config?.company,
+      });
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (caught) {
+      setProcError(
+        caught instanceof Error ? caught.message : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ",
+      );
+    } finally {
+      setProcBusy(false);
     }
   };
 
@@ -279,6 +306,23 @@ export function PdfStep({
         {error ? (
           <div className="mt-3">
             <Alert>{error}</Alert>
+          </div>
+        ) : null}
+      </Card>
+
+      {/* TEMPORARY — layout harness for the work procedure document.
+          Phase 4 of the procedure feature: generates and opens the PDF so its
+          layout can be iterated against real AI output. The real entry point
+          (its own card, an editor stage, persistence) lands in phase 5 and
+          replaces this block wholesale. */}
+      <Card className="mt-4">
+        <Button onClick={handleDraftProcedure} loading={procBusy} className="w-full">
+          <FileText className="size-4" aria-hidden="true" />
+          [ทดสอบ] สร้างขั้นตอนปฏิบัติงาน
+        </Button>
+        {procError ? (
+          <div className="mt-3">
+            <Alert>{procError}</Alert>
           </div>
         ) : null}
       </Card>
