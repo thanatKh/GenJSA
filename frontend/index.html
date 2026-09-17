@@ -17,6 +17,14 @@
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
+    <!-- iOS "Add to Home Screen" ignores favicon.ico/svg entirely and falls
+         back to a screenshot of the page without this — no manifest needed
+         for just this tag. Opaque PNG (iOS applies its own rounded-square
+         mask and never honours transparency), rendered from favicon.svg at
+         180x180 via scratchpad/render_icons.mjs (CDP screenshot — same
+         source artwork as the tab icon, so they always match). -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <title>GenJSA — วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน</title>
   </head>
   <body>
