@@ -197,13 +197,13 @@ h3 {
    plain tinted background. Hover-out is quicker than hover-in so the row
    doesn't feel sticky when the pointer sweeps across the list. */
 .t-history-row {
-  transition: background-color var(--duration-quick) var(--ease-out);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 .t-history-row:hover {
   /* navy-soft, not surface-raised: the page ground is already white, so the
      tint has to come from the brand ramp to be visible at all */
   background-color: var(--brand-navy-soft);
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-quick);
 }
 .t-history-row:active {
   background-color: var(--brand-navy-soft);

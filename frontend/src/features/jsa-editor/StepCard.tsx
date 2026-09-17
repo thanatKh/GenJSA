@@ -89,8 +89,8 @@ export function StepCard({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      exit={{ opacity: 0, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       className={cx(
         // Below lg: unchanged standalone card. On lg: the frame around <ul>
         // in EditorStep.tsx owns the border/rounding, and every card becomes
