@@ -28,13 +28,20 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def enforce(request: Request, limit_per_minute: int) -> None:
+def enforce(request: Request, limit_per_minute: int, bucket: str = "") -> None:
+    """Count this request against `bucket` for the caller's IP.
+
+    `bucket` gives an endpoint its own window. Without it, generating a JSA and
+    then a procedure for the same job would spend two of the same six requests,
+    so a user doing the normal thing would hit the limit twice as fast. The
+    default empty bucket keeps existing callers on exactly the key they had.
+    """
     settings = get_settings()
     if not settings.app.rate_limit.enabled:
         return
 
     now = time.monotonic()
-    stamps = _hits[_client_ip(request)]
+    stamps = _hits[f"{_client_ip(request)}|{bucket}" if bucket else _client_ip(request)]
 
     while stamps and now - stamps[0] > _WINDOW_SECONDS:
         stamps.popleft()

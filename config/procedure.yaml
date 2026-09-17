@@ -1,0 +1,41 @@
+# GenJSA — work procedure (ขั้นตอนปฏิบัติงาน) document
+#
+# Unlike config/document.yaml, this is NOT an official company form — there is
+# no F-number for it, so everything here is GenJSA's own design and may be
+# reworded or reordered freely.
+#
+# This file is optional: every value below has a built-in default, so deleting
+# it degrades the document to those defaults rather than stopping the app.
+
+document:
+  title_th: "ขั้นตอนปฏิบัติงาน"
+  title_en: "(Work Procedure)"
+  # No official form code, so the footer carries only the page number and
+  # company name. Set these if the document ever gets a controlled number.
+  form_code: ""
+  footer_text: ""
+
+  labels:
+    # The header values are inherited from the source JSA, but its wording
+    # isn't: this document isn't an analysis, so "วันที่วิเคราะห์" would be wrong
+    date: "วันที่จัดทำ"
+    author: "ผู้จัดทำ"
+
+  # Section headings, in printed order. An empty section is skipped entirely
+  # rather than printing a heading over blank space.
+  sections:
+    purpose: "วัตถุประสงค์"
+    scope: "ขอบเขต"
+    references: "เอกสารอ้างอิง"
+    tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
+    procedure: "ขั้นตอนการปฏิบัติงาน"
+
+  # Prefix for the generated เอกสารอ้างอิง line pointing back at the source JSA
+  jsa_reference_label: "การวิเคราะห์งานเพื่อความปลอดภัย (JSA)"
+
+generation:
+  language: "th"
+  # Sub-steps per JSA step. The max also caps total output so a long JSA can't
+  # exceed config/ai.yaml's shared max_tokens.
+  sub_steps_min: 2
+  sub_steps_max: 6

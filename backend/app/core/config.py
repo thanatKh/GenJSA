@@ -212,6 +212,54 @@ class JsaRulesConfig(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# procedure.yaml — the work procedure (ขั้นตอนปฏิบัติงาน) document
+#
+# Unlike document.yaml, this is NOT an official company form: there is no
+# F-number for it, so the structure here is GenJSA's own and may be tuned.
+# Every field has a default, so the file is optional (see _load_yaml_optional).
+# --------------------------------------------------------------------------- #
+class ProcedureLabels(BaseModel):
+    # The JSA's "วันที่วิเคราะห์" / "ผู้วิเคราะห์" are wrong for a procedure —
+    # it isn't an analysis — so the same header values get different wording
+    date: str = "วันที่จัดทำ"
+    author: str = "ผู้จัดทำ"
+
+
+class ProcedureSections(BaseModel):
+    """Section headings, in printed order. The procedure section is always last."""
+
+    purpose: str = "วัตถุประสงค์"
+    scope: str = "ขอบเขต"
+    references: str = "เอกสารอ้างอิง"
+    tools: str = "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
+    procedure: str = "ขั้นตอนการปฏิบัติงาน"
+
+
+class ProcedureDocumentMeta(BaseModel):
+    title_th: str = "ขั้นตอนปฏิบัติงาน"
+    title_en: str = "(Work Procedure)"
+    # No official form code — the footer shows only the page number and company
+    form_code: str = ""
+    footer_text: str = ""
+    labels: ProcedureLabels = Field(default_factory=ProcedureLabels)
+    sections: ProcedureSections = Field(default_factory=ProcedureSections)
+    # Prefix for the generated line pointing back at the source JSA
+    jsa_reference_label: str = "การวิเคราะห์งานเพื่อความปลอดภัย (JSA)"
+
+
+class ProcedureGeneration(BaseModel):
+    language: str = "th"
+    sub_steps_min: int = 2
+    # Caps output so a long JSA can't blow config/ai.yaml's shared max_tokens
+    sub_steps_max: int = 6
+
+
+class ProcedureConfig(BaseModel):
+    document: ProcedureDocumentMeta = Field(default_factory=ProcedureDocumentMeta)
+    generation: ProcedureGeneration = Field(default_factory=ProcedureGeneration)
+
+
+# --------------------------------------------------------------------------- #
 # Aggregate
 # --------------------------------------------------------------------------- #
 class Settings(BaseModel):
@@ -221,6 +269,7 @@ class Settings(BaseModel):
     document: DocumentConfig
     pdf: PdfConfig
     rules: JsaRulesConfig
+    procedure: ProcedureConfig
     thaillm_api_key: str
 
     @property
@@ -232,6 +281,20 @@ def _load_yaml(name: str) -> dict:
     path = CONFIG_DIR / name
     if not path.exists():
         raise RuntimeError(f"ไม่พบไฟล์ config: {path}")
+    with path.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _load_yaml_optional(name: str) -> dict:
+    """Like _load_yaml, but a missing file means "use the model's defaults".
+
+    Only for config whose every field has a sensible default. It keeps a deploy
+    that ships new code without a new config file from failing to boot at all —
+    the app degrades to the built-in values instead.
+    """
+    path = CONFIG_DIR / name
+    if not path.exists():
+        return {}
     with path.open(encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 
@@ -255,5 +318,6 @@ def get_settings() -> Settings:
         document=DocumentConfig(**_load_yaml("document.yaml")),
         pdf=PdfConfig(**_load_yaml("pdf.yaml")),
         rules=JsaRulesConfig(**_load_yaml("jsa-rules.yaml")),
+        procedure=ProcedureConfig(**_load_yaml_optional("procedure.yaml")),
         thaillm_api_key=api_key,
     )
