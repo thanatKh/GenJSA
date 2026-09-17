@@ -16,6 +16,8 @@ generation:
   # Reasonable number of hazards per step
   hazards_per_step_min: 1
   hazards_per_step_max: 4
+  # Higher ceiling used only for "วิเคราะห์อย่างละเอียด" (detailed analysis) requests
+  hazards_per_step_max_detailed: 6
 
 # Topics the AI must "consider while drafting" when relevant to the work
 # Note: this is not a review system — there is no AI-based JSA review anymore

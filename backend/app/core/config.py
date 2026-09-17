@@ -204,6 +204,7 @@ class JsaGeneration(BaseModel):
     respect_user_defined_steps: bool = True
     hazards_per_step_min: int = 1
     hazards_per_step_max: int = 4
+    hazards_per_step_max_detailed: int = 6
 
 
 class JsaRulesConfig(BaseModel):

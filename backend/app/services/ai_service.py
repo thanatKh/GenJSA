@@ -27,7 +27,7 @@ _RETRY_REMINDER = (
 )
 
 
-def _load_system_prompt(settings: Settings) -> str:
+def _load_system_prompt(settings: Settings, *, detailed: bool = False) -> str:
     """Load the prompt from disk every time, rendered with values from config/jsa-rules.yaml.
 
     Not cached, so editing the prompt takes effect immediately during dev
@@ -36,7 +36,9 @@ def _load_system_prompt(settings: Settings) -> str:
     path = PROMPTS_DIR / "jsa-generate.md"
     if not path.exists():
         raise RuntimeError(f"Prompt file not found: {path}")
-    return Template(path.read_text(encoding="utf-8")).render(rules=settings.rules)
+    return Template(path.read_text(encoding="utf-8")).render(
+        rules=settings.rules, detailed=detailed
+    )
 
 
 def _build_user_prompt(request: GenerateRequest) -> str:
@@ -48,19 +50,18 @@ async def generate_jsa(
     provider: LLMProvider,
     settings: Settings,
 ) -> JsaDocument:
-    system_prompt = _load_system_prompt(settings)
+    # "วิเคราะห์อย่างละเอียด" — falls back to the default model/prompt if
+    # detailed_model isn't configured, so leaving it blank in config/ai.yaml
+    # no-ops the toggle entirely (same model AND same prompt)
+    use_detailed = bool(request.detailed and settings.ai.detailed_model)
+    model = settings.ai.detailed_model if use_detailed else settings.ai.model
+
+    system_prompt = _load_system_prompt(settings, detailed=use_detailed)
     user_prompt = _build_user_prompt(request)
 
     attempts = max(1, settings.ai.retry.max_attempts)
     json_mode = settings.ai.request_json_mode
     last_error: AppError = Errors.AI_BAD_RESPONSE
-    # "วิเคราะห์อย่างละเอียด" — falls back to the default model if detailed_model
-    # isn't configured, so leaving it blank in config/ai.yaml just no-ops the toggle
-    model = (
-        settings.ai.detailed_model
-        if request.detailed and settings.ai.detailed_model
-        else settings.ai.model
-    )
 
     for attempt in range(1, attempts + 1):
         prompt = system_prompt if attempt == 1 else system_prompt + _RETRY_REMINDER
