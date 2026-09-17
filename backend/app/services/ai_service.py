@@ -9,7 +9,7 @@ import asyncio
 import logging
 
 from jinja2 import Template
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from ..core.config import PROMPTS_DIR, Settings
 from ..core.errors import AppError, Errors
@@ -27,38 +27,41 @@ _RETRY_REMINDER = (
 )
 
 
-def _load_system_prompt(settings: Settings, *, detailed: bool = False) -> str:
-    """Load the prompt from disk every time, rendered with values from config/jsa-rules.yaml.
+def render_prompt(filename: str, **context: object) -> str:
+    """Load a prompt from disk every time and render it as a Jinja2 template.
 
-    Not cached, so editing the prompt takes effect immediately during dev
-    (the file is small, so this is cheap).
+    Not cached, so editing a prompt takes effect immediately during dev
+    (the files are small, so this is cheap).
     """
-    path = PROMPTS_DIR / "jsa-generate.md"
+    path = PROMPTS_DIR / filename
     if not path.exists():
         raise RuntimeError(f"Prompt file not found: {path}")
-    return Template(path.read_text(encoding="utf-8")).render(
-        rules=settings.rules, detailed=detailed
-    )
+    return Template(path.read_text(encoding="utf-8")).render(**context)
+
+
+def _load_system_prompt(settings: Settings, *, detailed: bool = False) -> str:
+    return render_prompt("jsa-generate.md", rules=settings.rules, detailed=detailed)
 
 
 def _build_user_prompt(request: GenerateRequest) -> str:
     return f"รายละเอียดงานที่จะปฏิบัติ:\n\n{request.work_description.strip()}"
 
 
-async def generate_jsa(
-    request: GenerateRequest,
+async def generate_validated[T: BaseModel](
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    payload_model: type[T],
     provider: LLMProvider,
     settings: Settings,
-) -> JsaDocument:
-    # "วิเคราะห์อย่างละเอียด" — falls back to the default model/prompt if
-    # detailed_model isn't configured, so leaving it blank in config/ai.yaml
-    # no-ops the toggle entirely (same model AND same prompt)
-    use_detailed = bool(request.detailed and settings.ai.detailed_model)
-    model = settings.ai.detailed_model if use_detailed else settings.ai.model
+) -> T:
+    """Call the LLM until it returns something that validates as `payload_model`.
 
-    system_prompt = _load_system_prompt(settings, detailed=use_detailed)
-    user_prompt = _build_user_prompt(request)
-
+    Document-agnostic on purpose: both the JSA and the work procedure run through
+    here, so the retry/backoff/json-mode-fallback behaviour can only ever be
+    fixed (or broken) in one place.
+    """
     attempts = max(1, settings.ai.retry.max_attempts)
     json_mode = settings.ai.request_json_mode
     last_error: AppError = Errors.AI_BAD_RESPONSE
@@ -89,7 +92,7 @@ async def generate_jsa(
             continue
 
         try:
-            payload = AiJsaPayload.model_validate(repair_and_parse(raw))
+            return payload_model.model_validate(repair_and_parse(raw))
         except (ValueError, ValidationError):
             # Log only the attempt number — never the response itself, since it contains work content
             logger.warning("AI response invalid on attempt %d/%d", attempt, attempts)
@@ -97,18 +100,39 @@ async def generate_jsa(
             await _backoff(settings, attempt, attempts)
             continue
 
-        return JsaDocument(
-            header=JsaHeader(
-                work_activity=payload.work_activity.strip(),
-                supervisor=request.supervisor.strip(),
-                analysis_date=request.analysis_date,
-                analyst=request.analyst.strip(),
-            ),
-            steps=payload.steps,
-            assumptions=payload.assumptions,
-        )
-
     raise last_error
+
+
+async def generate_jsa(
+    request: GenerateRequest,
+    provider: LLMProvider,
+    settings: Settings,
+) -> JsaDocument:
+    # "วิเคราะห์อย่างละเอียด" — falls back to the default model/prompt if
+    # detailed_model isn't configured, so leaving it blank in config/ai.yaml
+    # no-ops the toggle entirely (same model AND same prompt)
+    use_detailed = bool(request.detailed and settings.ai.detailed_model)
+    model = settings.ai.detailed_model if use_detailed else settings.ai.model
+
+    payload = await generate_validated(
+        system_prompt=_load_system_prompt(settings, detailed=use_detailed),
+        user_prompt=_build_user_prompt(request),
+        model=model,
+        payload_model=AiJsaPayload,
+        provider=provider,
+        settings=settings,
+    )
+
+    return JsaDocument(
+        header=JsaHeader(
+            work_activity=payload.work_activity.strip(),
+            supervisor=request.supervisor.strip(),
+            analysis_date=request.analysis_date,
+            analyst=request.analyst.strip(),
+        ),
+        steps=payload.steps,
+        assumptions=payload.assumptions,
+    )
 
 
 async def _backoff(settings: Settings, attempt: int, attempts: int) -> None:
