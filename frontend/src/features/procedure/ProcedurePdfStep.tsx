@@ -11,17 +11,21 @@ import { ArrowLeft, CircleCheck, FileText, LoaderCircle, Save, Share2 } from "lu
 import { Alert, Button, Card } from "../../components/ui";
 import { procedurePdfFileName } from "../../lib/pdf/fileName";
 import { formatThaiDate } from "../../lib/thaidate";
+import type { StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { usePdfDelivery } from "../pdf-view/usePdfDelivery";
 
 export function ProcedurePdfStep({
   procedure,
+  photos,
   config,
   onBack,
   onBackToJsa,
 }: {
   procedure: ProcedureDocument;
+  /** Step photos, keyed by step number — memory-only, see App.tsx */
+  photos: Record<number, StepPhoto>;
   config: PublicConfig | null;
   onBack: () => void;
   onBackToJsa: () => void;
@@ -44,10 +48,11 @@ export function ProcedurePdfStep({
         document: config?.document,
         procedure: config?.procedure,
         company: config?.company,
+        photos,
       });
     },
     fileName: procedurePdfFileName(procedure),
-    deps: [procedure, config],
+    deps: [procedure, photos, config],
     buildErrorMessage:
       "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูลขั้นตอนปฏิบัติงานของคุณยังอยู่ครบ " +
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",

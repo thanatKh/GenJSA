@@ -27,7 +27,9 @@ import {
   Label,
   UndoToast,
 } from "../../components/ui";
+import type { StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
+import { StepPhotoField } from "./StepPhotoField";
 
 // Same undo window as EditorStep's step/hazard deletion
 const UNDO_TIMEOUT_MS = 6000;
@@ -37,6 +39,8 @@ type PendingDelete = { label: string; restore: () => void };
 export function ProcedureEditorStep({
   procedure,
   onChange,
+  photos,
+  onPhotoChange,
   onContinue,
   onBack,
   onRegenerate,
@@ -45,6 +49,10 @@ export function ProcedureEditorStep({
 }: {
   procedure: ProcedureDocument;
   onChange: (next: ProcedureDocument) => void;
+  /** Step photos keyed by step number. Kept outside ProcedureDocument — they
+   * never reach the backend and are memory-only (see App.tsx). */
+  photos: Record<number, StepPhoto>;
+  onPhotoChange: (stepNo: number, photo: StepPhoto | null) => void;
   onContinue: () => void;
   onBack: () => void;
   // App.tsx unmounts this component entirely while a regenerate is in
@@ -272,6 +280,14 @@ export function ProcedureEditorStep({
                   เพิ่มขั้นตอนย่อย
                 </Button>
               </div>
+
+              {/* Keyed by step.no, the same key buildProcedurePdf draws from —
+                  the backend renumbers steps 1..n so it tracks position */}
+              <StepPhotoField
+                stepNo={step.no}
+                photo={photos[step.no]}
+                onChange={(photo) => onPhotoChange(step.no, photo)}
+              />
             </Card>
           </li>
         ))}
@@ -332,7 +348,7 @@ export function ProcedureEditorStep({
       <ConfirmDialog
         open={confirmRegenerate}
         title="สร้างขั้นตอนปฏิบัติงานใหม่?"
-        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่คุณแก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้"
+        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่คุณแก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้ (รูปภาพที่แนบไว้จะยังอยู่)"
         confirmLabel="สร้างใหม่"
         onConfirm={() => {
           setConfirmRegenerate(false);

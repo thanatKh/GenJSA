@@ -28,6 +28,7 @@ import {
   type DocumentMeta,
   type PdfLayout,
   type ProcedureMeta,
+  type StepPhoto,
 } from "./layout";
 
 export type BuildProcedureOptions = {
@@ -35,6 +36,10 @@ export type BuildProcedureOptions = {
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
   company?: CompanyMeta;
+  /** Optional photo per main step, keyed by ProcedureStep.no. Held outside the
+   * document because it never reaches the backend and is never persisted —
+   * see StepPhoto in layout.ts. */
+  photos?: Record<number, StepPhoto>;
 };
 
 export async function buildProcedurePdf(
@@ -48,6 +53,7 @@ export async function buildProcedurePdf(
   const D = options.document ?? FALLBACK_DOCUMENT;
   const P = options.procedure ?? FALLBACK_PROCEDURE;
   const C = options.company;
+  const photos = options.photos ?? {};
 
   const E = await createEngine(L);
   const { doc, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines } = E;
@@ -60,6 +66,10 @@ export async function buildProcedurePdf(
   const subIndent = mmToPt(14);
   const sectionGap = mmToPt(4);
   const blockGap = mmToPt(2);
+  const photoGap = mmToPt(2);
+  // ~a third of an A4 page. Big enough to read a gauge or a valve tag, small
+  // enough that a step with a photo still shares its page with other steps.
+  const photoMaxH = mmToPt(80);
 
   let y = mT;
 
@@ -140,7 +150,59 @@ export async function buildProcedurePdf(
     });
   };
 
+  /** A step's photo, drawn as one atomic block under its sub-steps.
+   *
+   * Deliberately not routed through drawFlowing: that advances one text line at
+   * a time and would happily split an image across a page boundary. An image
+   * either fits on the current page or moves whole to the next one.
+   *
+   * The height clamp is load-bearing. Without it a portrait photo can be taller
+   * than the usable body area, and then need() flips to a fresh page where it
+   * STILL doesn't fit — drawing off the bottom of every page forever. Clamping
+   * to the body height (and re-deriving the width from the clamped height)
+   * guarantees termination and preserves the aspect ratio either way. */
+  /** Drawn size of a photo: fits inside BOTH a width and a height budget,
+   * preserving aspect ratio.
+   *
+   * The height cap is what keeps this a work instruction rather than a photo
+   * album: without it a 4:3 photo at full column width eats two-thirds of the
+   * page and a portrait one takes a whole page to itself. Landscape shots end
+   * up width-limited, portrait ones height-limited, and both stay comfortably
+   * beside their text.
+   *
+   * Capping against usableBodyH too is what guarantees need() terminates: an
+   * image that can't fit even a freshly-headed page would otherwise be pushed
+   * to a new page forever and still overflow it. */
+  const photoSize = (photo: StepPhoto) => {
+    const maxW = contentW - subIndent;
+    const maxH = Math.min(photoMaxH, usableBodyH);
+    const ratio = photo.ratio > 0 ? photo.ratio : 1;
+
+    let w = maxW;
+    let h = w / ratio;
+    if (h > maxH) {
+      h = maxH;
+      w = h * ratio;
+    }
+    return { w, h };
+  };
+
+  /** One atomic block — never split across pages, unlike drawFlowing's text. */
+  const drawPhoto = (photo: StepPhoto) => {
+    const { w, h } = photoSize(photo);
+    y += photoGap;
+    need(h);
+    doc.addImage(photo.data, "JPEG", mL + subIndent, y, w, h);
+    y += h;
+  };
+
   y = drawHeader(y);
+
+  // Every page repeats the same header, so the first one's height is the height
+  // on all of them — i.e. this is exactly what a fresh page has room for, and
+  // the ceiling drawPhoto clamps to. Captured after the call because drawHeader
+  // measures wrapped header fields rather than using a fixed height.
+  const usableBodyH = bodyBottom - y - photoGap;
 
   // ------------------------------------------------------------ sections --
   let sectionNo = 0;
@@ -209,6 +271,7 @@ export async function buildProcedurePdf(
       L.font.body_pt,
       `${stepsHeadingNo}.${step.no}`,
     );
+    const photo = photos[step.no];
 
     // Keep a step title with its first sub-step — a heading alone at the foot
     // of a page is the one pagination problem a flowing layout still has.
@@ -222,7 +285,37 @@ export async function buildProcedurePdf(
           1,
         ) * lineH
       : 0;
-    need(Math.min(titleLines.length, 1) * lineH + firstSubH);
+
+    // A photo is part of the step it illustrates, so try to keep the whole
+    // step — title, sub-steps and photo — together. Without this the photo
+    // lands alone at the top of the next page while its title stays behind on
+    // the previous one, which reads as an unrelated image.
+    //
+    // Only when the step genuinely fits a page: a long step is going to break
+    // across pages regardless, and reserving room it can never have would push
+    // every such step onto a fresh page for nothing.
+    let keepTogether = Math.min(titleLines.length, 1) * lineH + firstSubH;
+    if (photo) {
+      const stepH =
+        titleLines.length * lineH +
+        step.sub_steps.reduce(
+          (total, sub) =>
+            total +
+            wrap(
+              sub.action,
+              contentW - subIndent,
+              "normal",
+              L.font.body_pt,
+              `${stepsHeadingNo}.${step.no}.${sub.no}`,
+            ).length *
+              lineH,
+          0,
+        ) +
+        photoGap +
+        photoSize(photo).h;
+      if (stepH <= usableBodyH) keepTogether = stepH;
+    }
+    need(keepTogether);
 
     drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent);
 
@@ -238,6 +331,10 @@ export async function buildProcedurePdf(
 
       drawFlowing(actionLines, mL + subIndent, contentW - subIndent);
     });
+
+    // After the sub-steps: the photo illustrates the step as a whole, so it
+    // reads as the result of the instructions rather than interrupting them.
+    if (photo) drawPhoto(photo);
 
     y += blockGap;
   });

@@ -156,6 +156,35 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
   },
 };
 
+/* ------------------------------------------------------------- photos --
+ * An optional photo attached to one main step of a work procedure.
+ *
+ * Deliberately NOT part of ProcedureDocument: that type mirrors
+ * backend/app/models/procedure.py field for field, and photos never reach the
+ * backend. Keeping them separate also keeps them out of sessionStorage — the
+ * procedure draft is re-serialised on every keystroke, which megabytes of
+ * base64 would make painfully slow — and out of localStorage history, which
+ * only ever stores text it can redraw a document from.
+ *
+ * Consequence, by design: photos live in memory for one editing session and
+ * are gone on refresh. The exported PDF is the permanent copy.
+ */
+export type StepPhoto = {
+  /** JPEG data URL, already downscaled to PHOTO_MAX_EDGE_PX */
+  data: string;
+  /** naturalWidth / naturalHeight, for aspect-preserving placement */
+  ratio: number;
+};
+
+/** Photos are downscaled on ingest, before they ever reach state.
+ *
+ * 1000px across the PDF's ~160mm text column is roughly 160 DPI — ample for a
+ * printed work instruction — and measured at ~190KB per photo even for a
+ * worst-case noisy source. Raw 12MP originals would bloat the PDF and make
+ * addImage slow for no visible gain. */
+export const PHOTO_MAX_EDGE_PX = 1000;
+export const PHOTO_JPEG_QUALITY = 0.7;
+
 export const MM_PER_PT = 0.352777778;
 
 export function mmToPt(mm: number): number {

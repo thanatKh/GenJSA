@@ -11,6 +11,7 @@ import { InputStep } from "./features/jsa-input/InputStep";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
+import type { StepPhoto } from "./lib/pdf/layout";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
 import {
@@ -61,6 +62,17 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [procedureBusy, setProcedureBusy] = useState(false);
   const [procedureError, setProcedureError] = useState<string | null>(null);
+  /* Photos attached to procedure steps, keyed by ProcedureStep.no.
+   *
+   * Held here rather than inside ProcedureDocument on purpose. That type
+   * mirrors the backend model and is written to sessionStorage on every
+   * keystroke (see updateProcedure), so megabytes of base64 inside it would be
+   * both a schema lie and a typing-lag bug. Keeping them separate also means a
+   * regenerate replaces the document while the photos stay put.
+   *
+   * Consequence, accepted by design: photos are memory-only and do not survive
+   * a refresh. The exported PDF is the permanent copy, and the editor says so. */
+  const [photos, setPhotos] = useState<Record<number, StepPhoto>>({});
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
   const [config, setConfig] = useState<PublicConfig | null>(null);
@@ -143,6 +155,9 @@ export default function App() {
     setProcedure(null);
     setProcedureError(null);
     procedureDraft.clear();
+    // Required, not tidiness: photos are keyed by step number, so leaving them
+    // behind would attach this job's images to the next job's steps 1, 2, 3…
+    setPhotos({});
   };
 
   const handleGenerate = async (values: InputForm, detailed: boolean) => {
@@ -256,6 +271,16 @@ export default function App() {
       const generated = await generateProcedure(doc);
       setProcedure(generated);
       procedureDraft.save(generated);
+      // Photos survive a regenerate — they're the user's own work, not the
+      // AI's, and the step they illustrate usually still exists. Drop only the
+      // ones whose step number is gone from the new draft, so repeated
+      // redrafts in one session can't accumulate unreachable images.
+      setPhotos((current) => {
+        const live = new Set(generated.steps.map((step) => step.no));
+        return Object.fromEntries(
+          Object.entries(current).filter(([no]) => live.has(Number(no))),
+        );
+      });
       goto(3);
     } catch (caught) {
       setProcedureError(
@@ -271,6 +296,16 @@ export default function App() {
   const updateProcedure = (next: ProcedureDocument) => {
     setProcedure(next);
     procedureDraft.save(next);
+  };
+
+  /** Attach or clear one step's photo. Never touches the document. */
+  const updatePhoto = (stepNo: number, photo: StepPhoto | null) => {
+    setPhotos((current) => {
+      const next = { ...current };
+      if (photo) next[stepNo] = photo;
+      else delete next[stepNo];
+      return next;
+    });
   };
 
   const goto = (next: Stage) => {
@@ -418,6 +453,8 @@ export default function App() {
             <ProcedureEditorStep
               procedure={procedure}
               onChange={updateProcedure}
+              photos={photos}
+              onPhotoChange={updatePhoto}
               onContinue={() => goto(4)}
               onBack={() => goto(2)}
               onRegenerate={() => void handleCreateProcedure({ force: true })}
@@ -431,6 +468,7 @@ export default function App() {
           <div className="mx-auto max-w-[45rem]">
             <ProcedurePdfStep
               procedure={procedure}
+              photos={photos}
               config={config}
               onBack={() => goto(3)}
               onBackToJsa={() => goto(2)}
