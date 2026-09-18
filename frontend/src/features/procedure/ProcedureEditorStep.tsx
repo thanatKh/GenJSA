@@ -8,13 +8,22 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, FileText, Info, Plus, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Info,
+  Plus,
+  RotateCcw,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 
 import {
   Alert,
   AutoGrowTextarea,
   Button,
   Card,
+  ConfirmDialog,
   Label,
   UndoToast,
 } from "../../components/ui";
@@ -30,6 +39,8 @@ export function ProcedureEditorStep({
   onChange,
   onContinue,
   onBack,
+  onRegenerate,
+  regenerating,
   stale,
   error,
 }: {
@@ -37,11 +48,15 @@ export function ProcedureEditorStep({
   onChange: (next: ProcedureDocument) => void;
   onContinue: () => void;
   onBack: () => void;
+  /** Draft the whole procedure again from the current JSA */
+  onRegenerate: () => void;
+  regenerating: boolean;
   /** The JSA's steps changed after this procedure was generated */
   stale: boolean;
   error: string | null;
 }) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -131,6 +146,21 @@ export function ProcedureEditorStep({
             ขั้นตอนใน JSA เปลี่ยนไปหลังจากร่างเอกสารนี้แล้ว
             กรุณาตรวจสอบว่ายังตรงกัน หรือสร้างขั้นตอนปฏิบัติงานใหม่
           </p>
+          {/* Offered here rather than as a permanent action: this is the one
+              moment the user has a concrete reason to want it, and it discards
+              everything they've edited below */}
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmRegenerate(true)}
+              loading={regenerating}
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+              สร้างใหม่จาก JSA ปัจจุบัน
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -306,6 +336,20 @@ export function ProcedureEditorStep({
         open={!!pendingDelete}
         message={pendingDelete?.label ?? ""}
         onUndo={undoDelete}
+      />
+
+      {/* Unlike a step deletion this can't be undone with a toast — it
+          replaces the whole document — so it asks first */}
+      <ConfirmDialog
+        open={confirmRegenerate}
+        title="สร้างขั้นตอนปฏิบัติงานใหม่?"
+        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่คุณแก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้"
+        confirmLabel="สร้างใหม่"
+        onConfirm={() => {
+          setConfirmRegenerate(false);
+          onRegenerate();
+        }}
+        onCancel={() => setConfirmRegenerate(false)}
       />
     </section>
   );

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { AppBar } from "./components/AppBar";
 import { Stepper } from "./components/Stepper";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
+import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
+import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
 import { HistoryList } from "./features/jsa-input/HistoryList";
 import { InputStep } from "./features/jsa-input/InputStep";
 import { PdfStep } from "./features/pdf-view/PdfStep";
@@ -225,10 +227,14 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  /** From the JSA's PDF page: draft a procedure, or reopen the existing one. */
-  const handleCreateProcedure = async () => {
+  /** Draft a procedure from the current JSA.
+   *
+   * From the PDF page this reopens an existing one rather than spending
+   * another AI call; `force` is the editor's "regenerate" path, which has
+   * already confirmed that the user's edits are being discarded. */
+  const handleCreateProcedure = async ({ force = false } = {}) => {
     if (!doc) return;
-    if (procedure) {
+    if (procedure && !force) {
       goto(3);
       return;
     }
@@ -333,14 +339,27 @@ export default function App() {
           />
         ) : null}
 
-        {stage === 2 && doc ? (
+        {/* The procedure takes as long as the JSA did, so it gets the same
+            honest wait — elapsed counter and all — rather than a lone spinner
+            on a button. Replaces the page content for the same reason
+            InputStep does: the wait should be the only thing on screen. */}
+        {stage === 2 && doc && procedureBusy ? (
+          <div className="mx-auto max-w-[45rem]">
+            <h1 className="text-[1.75rem] font-semibold text-navy">
+              กำลังสร้างขั้นตอนปฏิบัติงาน
+            </h1>
+            <GeneratingPanel stages={PROCEDURE_STAGES} />
+          </div>
+        ) : null}
+
+        {stage === 2 && doc && !procedureBusy ? (
           <div className="mx-auto max-w-[45rem]">
             <PdfStep
               doc={doc}
               config={config}
               onBack={() => goto(1)}
               onNewJsa={startOver}
-              onCreateProcedure={handleCreateProcedure}
+              onCreateProcedure={() => void handleCreateProcedure()}
               procedureBusy={procedureBusy}
               procedureError={procedureError}
               hasProcedure={!!procedure}
@@ -355,8 +374,10 @@ export default function App() {
               onChange={updateProcedure}
               onContinue={() => goto(4)}
               onBack={() => goto(2)}
+              onRegenerate={() => void handleCreateProcedure({ force: true })}
+              regenerating={procedureBusy}
               stale={procedureStale}
-              error={null}
+              error={procedureError}
             />
           </div>
         ) : null}

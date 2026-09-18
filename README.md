@@ -6,15 +6,26 @@ JSA, the user edits every field, and it's exported as an A4 PDF.
 
 ```
 Enter work details  →  AI drafts JSA  →  Review and edit  →  Open PDF
+                                                               │
+                                        (optional) ────────────┘
+                                             ↓
+              AI drafts work procedure  →  Review and edit  →  Open PDF
 ```
+
+A JSA says *what could go wrong at each stage of the job*. It deliberately
+stays at that level and never becomes a set of instructions. So GenJSA can
+also draft a **work procedure (ขั้นตอนปฏิบัติงาน)** from a finished JSA —
+expanding each step into the how-to detail the person doing the job needs —
+reviewed and exported as its own PDF. It's optional; most users stop at the
+JSA.
 
 ## Principles this system follows
 
 | Principle | Meaning |
 |---|---|
 | **No database** | No DB, no login, no server-side storage |
-| **No JSA content persistence on the server** | Data lives in memory only for the duration of one request, then it's gone |
-| **History stays on your PC** | Finished JSAs (not PDFs) are kept in this browser's `localStorage` for 365 days, deletable at any time, never uploaded |
+| **No document content persistence on the server** | Data lives in memory only for the duration of one request, then it's gone |
+| **History stays on your PC** | Finished documents (not PDFs) are kept in this browser's `localStorage` for 365 days, deletable at any time, never uploaded |
 | **No content logging** | Logs capture only error/status level — never work descriptions or JSA content |
 | **AI drafts, humans review** | No automated review system — the supervisor reviews and is responsible |
 | **Config, not code, changes behavior** | No admin UI — everything changeable lives in `config/` |
@@ -83,23 +94,32 @@ cd backend && source .venv/bin/activate && pytest
 | PDF font size / margins / header color | `config/pdf.yaml` |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | How the AI thinks / what it must not do | `prompts/jsa-generate.md` |
-| PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` |
+| Work procedure titles / sections / drafting rules | `config/procedure.yaml` |
+| How the AI writes the work procedure | `prompts/procedure-generate.md` |
+| PDF layout logic | `frontend/src/lib/pdf/` (`buildJsaPdf.ts`, `buildProcedurePdf.ts`, shared `engine.ts`) |
 | Request size / rate limit / CORS | `config/app.yaml` |
 | Brand colors / UI theme | `frontend/src/styles/tokens.css` |
 
 ## PDF generation
 
-The PDF is built **entirely in the browser** with jsPDF
-(`frontend/src/lib/pdf/`) — the backend has no Chromium, no PDF route, and
-never sees the finished document. It only serves layout values from
-`config/pdf.yaml` via `GET /api/config/public`, so the document's appearance
-can still be tuned from config without touching code on either side.
+Both PDFs are built **entirely in the browser** with jsPDF
+(`frontend/src/lib/pdf/`) — the backend has no Chromium and no PDF route. It
+only serves layout values from `config/pdf.yaml` via
+`GET /api/config/public`, so appearance can be tuned from config without
+touching code on either side.
 
-Because jsPDF has no HTML/CSS layout engine, `buildJsaPdf.ts` measures text,
-wraps lines, computes row heights, and paginates by hand. One accepted
-trade-off: Thai line wrapping has no word-segmentation dictionary, so a
-break can occasionally land mid-word — still readable, never overflows a
-column.
+(The one time a finished document goes back to the server is to draft a work
+procedure from it — see `POST /api/procedure/generate`. It's used for that
+request and never stored or logged.)
+
+Because jsPDF has no HTML/CSS layout engine, both builders measure text, wrap
+lines, and paginate by hand — `engine.ts` holds what they share. The JSA is a
+bordered three-column table fixed by the official form; the work procedure
+has no such form, so it's laid out as a flowing numbered document instead.
+
+One accepted trade-off: Thai line wrapping has no word-segmentation
+dictionary, so a break can occasionally land mid-word — still readable, never
+overflows a column.
 
 ## Fonts
 
@@ -131,10 +151,11 @@ plenty.
 
 ```
 GenJSA/
-├── frontend/           React + TS + Vite + Tailwind v4 (3-step wizard)
+├── frontend/           React + TS + Vite + Tailwind v4 (3-step wizard,
+│   │                   plus an optional work-procedure branch)
 │   └── src/
-│       ├── lib/pdf/     PDF layout engine (jsPDF, runs client-side)
-│       ├── features/    input / editor / pdf-view steps
+│       ├── lib/pdf/     PDF layout engines (jsPDF, runs client-side)
+│       ├── features/    input / editor / pdf-view / procedure steps
 │       └── components/
 │           ├── ui/        shadcn/ui primitives (Radix) — generated via the
 │           │               shadcn CLI, then hand-patched for brand tokens/
@@ -145,11 +166,11 @@ GenJSA/
 │   └── app/
 │       ├── api/          routes
 │       ├── core/         config, errors, rate limiting, Thai dates
-│       ├── models/       Pydantic schema for a JSA
+│       ├── models/       Pydantic schema per document type
 │       ├── providers/    LLM provider (swap vendors without touching JSA logic)
 │       └── services/     generation, JSON repair
 ├── config/              everything that's meant to be changed
-├── prompts/             the AI's prompt
+├── prompts/             the AI's prompts (one per document type)
 ├── assets/              logo + PDF fonts
 ├── references/          the original form (source of truth, not committed)
 └── scripts/             model_bench.py

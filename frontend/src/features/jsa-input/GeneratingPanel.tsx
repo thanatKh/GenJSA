@@ -11,13 +11,8 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, X } from "lucide-react";
 import { SkeletonCard } from "../../components/ui";
+import { JSA_STAGES } from "./generatingStages";
 
-const STAGES = [
-  "กำลังทำความเข้าใจงาน…",
-  "กำลังแยกขั้นตอนหลัก…",
-  "กำลังระบุอันตรายและมาตรการป้องกัน…",
-  "กำลังจัดรูปแบบเอกสาร…",
-] as const;
 
 // Paced to spread the four messages across a typical wait rather than burning
 // through them in 16s and then sitting on the last one for two minutes
@@ -55,14 +50,22 @@ function formatRange(minSeconds: number, maxSeconds: number): string {
   return `${formatDuration(minSeconds)}–${formatDuration(maxSeconds)}`;
 }
 
-export function GeneratingPanel({ onCancel }: { onCancel?: () => void }) {
+export function GeneratingPanel({
+  onCancel,
+  stages = JSA_STAGES,
+}: {
+  onCancel?: () => void;
+  /** What the wait is narrating — see PROCEDURE_STAGES */
+  stages?: readonly string[];
+}) {
   const [stage, setStage] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const stageCount = stages.length;
 
   useEffect(() => {
     const ticker = setInterval(() => {
       // Hold on the last message rather than looping back to the first, which would look stuck
-      setStage((current) => Math.min(current + 1, STAGES.length - 1));
+      setStage((current) => Math.min(current + 1, stageCount - 1));
     }, STAGE_MS);
     const clock = setInterval(() => setElapsed((s) => s + 1), 1000);
 
@@ -70,7 +73,7 @@ export function GeneratingPanel({ onCancel }: { onCancel?: () => void }) {
       clearInterval(ticker);
       clearInterval(clock);
     };
-  }, []);
+  }, [stageCount]);
 
   const slow = elapsed >= SLOW_AFTER_SECONDS;
 
@@ -86,8 +89,8 @@ export function GeneratingPanel({ onCancel }: { onCancel?: () => void }) {
               shimmer span's ::before duplicate (index.css) is decoration only,
               not something a screen reader needs to see or announce twice. */}
           <p className="font-medium" aria-live="polite">
-            <span className="t-shimmer-label" data-text={STAGES[stage]}>
-              {STAGES[stage]}
+            <span className="t-shimmer-label" data-text={stages[stage]}>
+              {stages[stage]}
             </span>
           </p>
         </div>

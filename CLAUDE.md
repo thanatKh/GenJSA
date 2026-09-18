@@ -11,7 +11,21 @@ exported as an A4 PDF — entirely client-side.
 
 ```
 Enter work details  →  AI drafts JSA  →  Review and edit  →  Open PDF
+                                                               │
+                                        (optional) ────────────┘
+                                             ↓
+              AI drafts work procedure  →  Review and edit  →  Open PDF
 ```
+
+**The second document — ขั้นตอนปฏิบัติงาน (work procedure).** The JSA is
+task-level by rule: its prompt bans move-by-move instructions. That leaves a
+gap, because whoever actually does the job still needs the how-to. From the
+JSA's PDF page the user can expand it into a work procedure — each JSA step
+becomes concrete sub-steps — which is reviewed and exported the same way.
+It's optional, and most users will stop at the JSA.
+
+Unlike the JSA, the procedure matches no official company form, so its
+structure is GenJSA's own (`config/procedure.yaml`) and can be changed freely.
 
 ## Non-negotiable design principles
 
@@ -19,18 +33,29 @@ These constraints shape almost every implementation decision here — check
 against them before adding anything:
 
 - **No database, no login, no server-side storage.**
-- **No JSA content persistence on the server** — data lives in memory only
-  for the duration of one request, then it's gone. Nothing is ever written
-  server-side, and nothing crosses back to the backend once a document is
-  returned.
-- **Browser-local history is the one deliberate exception** — finished
+- **No document content persistence on the server** — data lives in memory
+  only for the duration of one request, then it's gone. Nothing is ever
+  written server-side.
+- **One document does travel back to the backend, deliberately.**
+  `POST /api/procedure/generate` takes a finished `JsaDocument` in its request
+  body, because a work procedure is generated *from* the JSA rather than from
+  a fresh description. This is the single exception to "the browser only ever
+  sends a work description." It does not weaken the rule above it: the JSA is
+  used for that one request and never stored, logged, or written anywhere —
+  `backend/app/api/jsa.py` logs its step count and nothing else. Any new
+  endpoint that wants a whole document back needs the same justification.
+- **Browser-local history is the one deliberate storage exception** — finished
   documents (never PDFs) are kept in `localStorage` by
   `frontend/src/history.ts`: this browser on this PC, 365-day expiry,
   deletable per-entry or all at once, never uploaded. It exists so a user can
-  reopen yesterday's JSA instead of regenerating it. In-progress drafts stay
-  tab-scoped in `sessionStorage` (`frontend/src/store.ts`), and
-  `clearAllDrafts()` must never touch history. If this looks like a bug, it
-  isn't — read `history.ts`'s header comment before "fixing" it.
+  reopen yesterday's JSA instead of regenerating it. One entry holds the JSA
+  and, when one was generated, its work procedure — written by two different
+  pages, so `upsertDoc`/`upsertProcedure` merge rather than replace (writing a
+  fresh entry object there silently erases the other document; that was a real
+  bug). In-progress drafts stay tab-scoped in `sessionStorage`
+  (`frontend/src/store.ts`), and `clearAllDrafts()` must never touch history.
+  If this looks like a bug, it isn't — read `history.ts`'s header comment
+  before "fixing" it.
 - **No content logging** — logs capture error/status only, never work
   descriptions or AI responses. `uvicorn.access` logging is explicitly
   disabled in `backend/app/main.py`. When touching logging calls, log
@@ -87,30 +112,56 @@ python ../scripts/model_bench.py -n 10     # benchmark config/ai.yaml's candidat
 to the browser → held in React state + `sessionStorage` → user edits in
 `EditorStep` → `PdfStep` renders it with jsPDF, entirely in the browser.
 
+Then, optionally, from `PdfStep`: `POST /api/procedure/generate` (carrying the
+finished JSA) → `services/procedure_service.generate_procedure` → the same
+provider/repair/validate path → `models/procedure.ProcedureDocument` →
+`ProcedureEditorStep` → `ProcedurePdfStep`.
+
 The backend **never generates a PDF**. `GET /api/config/public` hands the
 frontend layout values sourced from `config/pdf.yaml` (page size, fonts,
-table widths, colors) so `frontend/src/lib/pdf/buildJsaPdf.ts` can draw the
-document itself. This keeps the backend Chromium-free and lets document
-appearance be config-tunable from both sides without duplicating logic.
+table widths, colors) so `frontend/src/lib/pdf/` can draw the documents
+itself. This keeps the backend Chromium-free and lets document appearance be
+config-tunable from both sides without duplicating logic.
 
 ### Backend generation pipeline (`backend/app/services/ai_service.py`)
 
-1. Load `prompts/jsa-generate.md`, render it with Jinja2 against
-   `config/jsa-rules.yaml` (not cached — edits take effect immediately).
+`generate_validated()` is the shared core — both document types run through
+it, so retry behaviour can only ever be fixed (or broken) in one place:
+
+1. Load the prompt via `render_prompt()`, rendered with Jinja2 against its
+   config (not cached — edits take effect immediately).
 2. Call the LLM provider (`providers/llm/`) with the system + user prompt.
 3. `services/json_repair.py` attempts to coerce the raw text into valid JSON.
-4. Validate into `models.jsa.AiJsaPayload` (Pydantic).
+4. Validate into the caller's payload model (Pydantic).
 5. On failure (bad JSON / invalid schema / provider rejects `json_mode`),
    retry up to `config/ai.yaml`'s `retry.max_attempts`, appending a Thai
    "answer with JSON only" reminder and falling back to non-JSON-mode.
-6. On success, `AiJsaPayload` (AI-owned fields: `work_activity`, `steps`,
-   `assumptions`) is combined with request-supplied fields (`supervisor`,
-   `analysis_date`) into the final `JsaDocument`.
+
+`generate_jsa` then combines `AiJsaPayload` (AI-owned: `work_activity`,
+`steps`, `assumptions`) with request-supplied fields (`supervisor`,
+`analysis_date`) into the final `JsaDocument`.
 
 `JsaDocument.steps` numbering is re-derived server-side on every validation
 (`renumber_steps`) — the frontend can freely add/remove/reorder steps, and
 the backend is the single source of truth for step numbers printed on the
-document.
+document. `ProcedureDocument` does the same for its steps and sub-steps.
+
+### Procedure generation (`backend/app/services/procedure_service.py`)
+
+Two rules are enforced **structurally, not by the prompt**, because a model
+will drift from either one. Keep it that way when editing:
+
+- **The AI cannot restructure the steps.** `AiProcedurePayload` has no field
+  for step titles — they're copied from the source JSA — and sub-steps are
+  zipped onto the JSA's list *by index, not by the model's own numbering*. A
+  short or renumbered response loses detail instead of corrupting the shape.
+- **The AI cannot invent references.** `เอกสารอ้างอิง` is built in code from
+  the JSA header. Asked for references, a model produces plausible standard
+  numbers it has no basis for, so it is never offered the field.
+
+Hazards and controls are deliberately **not** sent in the prompt: they aren't
+needed to write how-to steps, and it keeps safety text a human already
+approved from being reworded.
 
 ### Provider abstraction (`backend/app/providers/llm/`)
 
@@ -129,17 +180,30 @@ browser — never the model name or API key.
 
 ### Frontend structure (`frontend/src/`)
 
-Three-step wizard driven by `App.tsx`'s `stage` state (0/1/2):
+`App.tsx`'s `stage` state drives everything. 0-2 are the JSA wizard and map
+1:1 onto `Stepper`; 3-4 are the optional work procedure, reached only from
+stage 2. **The Stepper stays three steps** (`Math.min(stage, 2)`) — a fourth
+circle would imply the JSA is unfinished without a procedure, and most users
+will stop at the JSA.
 
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
-- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Clicking one loads it into `EditorStep`.
+- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Clicking one loads it into `EditorStep`; entries that also have a procedure are badged.
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
-- `features/pdf-view/PdfStep.tsx` — builds the PDF and offers to open it, save it (desktop Chromium's native picker), or share it (mobile).
-- `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/jsa.py` by hand (keep both in sync when the shape changes).
+- `features/pdf-view/PdfStep.tsx` — the JSA PDF, plus the card that starts a work procedure.
+- `features/pdf-view/usePdfDelivery.ts` — **shared by both PDF pages**: builds the blob and routes save/share by browser capability. Its header documents the popup-blocking, iOS-viewer and user-activation constraints behind every rule in it; each one is a fix for something that actually broke. Read it before changing how those buttons behave, and don't reimplement it inline for a third document.
+- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA) and a warning appears if the JSA's steps changed after the procedure was generated.
+- `features/procedure/ProcedurePdfStep.tsx` — the procedure PDF, same delivery hook.
+- `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
-- `lib/pdf/` — the PDF layout engine (jsPDF). `buildJsaPdf.ts` measures text, wraps lines, computes row heights, and paginates by hand since jsPDF has no HTML/CSS layout engine. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
+- `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
 - `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
 - `history.ts` — localStorage-backed history of finished documents, per-PC and 365-day capped (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
+
+⚠️ **Bundle boundary**: `engine.ts` statically imports jsPDF (~230KB with its
+transitive deps), so it must only ever be reached through a dynamic
+`import()`. That's why `fileName.ts` exists as a separate, dependency-free
+module — the PDF pages import file names statically and the builders
+dynamically. Check the chunk list after `npm run build` if you touch this.
 
 In dev, Vite proxies `/api` and `/health` to `127.0.0.1:8000` (`vite.config.ts`).
 In prod, FastAPI serves `frontend/dist` directly and mounts the SPA fallback
@@ -185,7 +249,10 @@ first, then hand-merge.
 | Analyst line at the end of the PDF | `config/pdf.yaml` → `signature` (wording: `config/document.yaml` → `labels.analyst`) |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | How the AI thinks / what it must not do | `prompts/jsa-generate.md` |
-| PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` |
+| Work procedure titles / section headings / labels | `config/procedure.yaml` (optional file — deleting it falls back to built-in defaults) |
+| Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |
+| How the AI writes the procedure | `prompts/procedure-generate.md` |
+| PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
 | History retention / entry cap | `frontend/src/history.ts` → `RETENTION_DAYS` / `MAX_ENTRIES` |
 | Request size / rate limit / CORS | `config/app.yaml` |
 
