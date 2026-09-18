@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronDown, ChevronRight, History, Search, Trash2, X } from "lucide-react";
+import { ChevronRight, History, Search, Trash2, X } from "lucide-react";
 
 import { Button, ConfirmDialog, Input, UndoToast } from "../../components/ui";
 import * as historyStore from "../../history";
@@ -16,7 +16,11 @@ import { formatThaiDate, isoFromDate } from "../../lib/thaidate";
 // Below this many entries, scanning the list beats typing — the search box
 // would just be one more control in the way
 const SEARCH_THRESHOLD = 5;
-const COLLAPSED_COUNT = 5;
+// Past this many, the list scrolls in a fixed-height area instead of
+// growing the page — roughly 5-6 rows' worth, so the whole list is still
+// reachable without the page itself getting tall on a long history
+const SCROLL_MAX_HEIGHT = "22rem";
+const SCROLL_THRESHOLD = 6;
 // Same undo window as EditorStep's step/hazard deletion
 const UNDO_TIMEOUT_MS = 6000;
 
@@ -33,7 +37,6 @@ export function HistoryList({
 }) {
   const [entries, setEntries] = useState<HistoryEntry[]>(() => historyStore.list());
   const [query, setQuery] = useState("");
-  const [expanded, setExpanded] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [undoEntry, setUndoEntry] = useState<HistoryEntry | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,10 +64,7 @@ export function HistoryList({
   if (entries.length === 0) return null;
 
   const searching = query.trim().length > 0;
-  // A search should show everything it found; the collapse only applies to the
-  // full, unfiltered list
-  const visible = searching || expanded ? matches : matches.slice(0, COLLAPSED_COUNT);
-  const hiddenCount = matches.length - visible.length;
+  const scrollable = matches.length > SCROLL_THRESHOLD;
 
   const deleteEntry = (entry: HistoryEntry) => {
     historyStore.remove(entry.id);
@@ -142,9 +142,17 @@ export function HistoryList({
       {matches.length === 0 ? (
         <p className="mt-4 text-sm text-muted">ไม่พบรายการที่ค้นหา</p>
       ) : (
-        <ul className="mt-3 grid list-none gap-0 p-0">
+        // Fixed-height scroll area once the list is long enough, rather than
+        // an expand-in-place button — the whole list stays one scroll away
+        // instead of growing the page under a long history. overflow-y-auto
+        // only actually engages once content exceeds SCROLL_MAX_HEIGHT, so
+        // this is a no-op below the threshold.
+        <ul
+          className="mt-3 grid list-none gap-0 overflow-y-auto p-0"
+          style={scrollable ? { maxHeight: SCROLL_MAX_HEIGHT } : undefined}
+        >
           <AnimatePresence initial={false}>
-            {visible.map((entry, index) => (
+            {matches.map((entry, index) => (
               <motion.li
                 key={entry.id}
                 layout
@@ -155,8 +163,9 @@ export function HistoryList({
                   duration: 0.25,
                   ease: [0.22, 1, 0.36, 1],
                   // Stagger only on first paint; a deleted row must not make
-                  // the rows below it ripple
-                  delay: expanded || searching ? 0 : index * 0.04,
+                  // the rows below it ripple. Capped rather than per-index so
+                  // a long list's stagger doesn't drag on for a full second.
+                  delay: searching ? 0 : Math.min(index, 10) * 0.04,
                 }}
                 className="group grid grid-cols-[1fr_auto] items-center gap-2 border-b border-line"
               >
@@ -210,17 +219,6 @@ export function HistoryList({
           </AnimatePresence>
         </ul>
       )}
-
-      {hiddenCount > 0 ? (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="mt-3 flex items-center gap-1 text-sm text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
-        >
-          <ChevronDown className="size-4" aria-hidden="true" />
-          ดูเพิ่มอีก {hiddenCount} รายการ
-        </button>
-      ) : null}
 
       <p className="mt-4 text-sm text-muted">
         เก็บไว้ในเบราว์เซอร์ของเครื่องนี้ {historyStore.RETENTION_DAYS} วัน
