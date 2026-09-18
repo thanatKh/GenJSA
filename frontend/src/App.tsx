@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ListOrdered } from "lucide-react";
 
 import { AppBar } from "./components/AppBar";
 import { Stepper } from "./components/Stepper";
@@ -334,30 +333,22 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-6 sm:py-8">
-        {/* Clamped to 2: the work procedure (stages 3-4) is optional and
-            branches off the JSA's last step rather than extending the wizard.
-            Giving it a fourth circle would imply the JSA isn't finished
-            without it, and most users will stop at the JSA. */}
+        {/* current stays clamped to 2: the work procedure (stages 3-4) is
+            optional and branches off the JSA's last step rather than
+            extending the wizard — most users will stop at the JSA, and a
+            permanent fourth circle would imply it isn't finished without one.
+            `branch` is how stages 3-4 still get a "you are here": see its doc
+            comment in Stepper.tsx for why it's a dashed branch node rather
+            than a fourth step. */}
         <Stepper
           current={Math.min(stage, 2) as 0 | 1 | 2}
           onNavigate={goto}
+          branch={
+            stage >= 3
+              ? { label: "ขั้นตอนปฏิบัติงาน", onBack: () => goto(2) }
+              : undefined
+          }
         />
-
-        {/* Stages 3-4 leave the JSA wizard, but the Stepper above deliberately
-            stays clamped at "3 of 3 done" — which is true, the JSA IS finished.
-            This line says where you actually are, in the same slot the eye
-            already checks for position. Label only: navigation lives on the
-            pages themselves, and duplicating it here put the same destination
-            on screen twice. */}
-        {stage >= 3 ? (
-          <p className="-mt-4 mb-6 flex items-center gap-2 text-sm text-muted">
-            <ListOrdered className="size-4 shrink-0 text-navy" aria-hidden="true" />
-            <span>
-              <span className="font-medium text-navy">ขั้นตอนปฏิบัติงาน</span>
-              {" · เอกสารเพิ่มเติมจาก JSA นี้"}
-            </span>
-          </p>
-        ) : null}
 
         {stage === 0 ? (
           // Below xl: unchanged — single 45rem column, history stacked below

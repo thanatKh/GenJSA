@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { ListOrdered } from "lucide-react";
 
 const STEPS = ["กรอกข้อมูล", "ตรวจทานและแก้ไข", "เอกสาร PDF"] as const;
 
@@ -64,15 +65,51 @@ function StepCircle({
   );
 }
 
+/** Same 28px badge as StepCircle, but an icon instead of a number/check — used
+ * only for the optional branch node below. The different glyph is deliberate:
+ * a number would read as "step 4 of the same sequence", which the branch
+ * explicitly isn't (see the Stepper doc comment). */
+function BranchCircle() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 28 28"
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      <circle cx="14" cy="14" r="14" className="fill-navy" />
+      <foreignObject x="7" y="7" width="14" height="14">
+        <ListOrdered className="size-3.5 text-white" strokeWidth={2.5} />
+      </foreignObject>
+    </svg>
+  );
+}
+
 export function Stepper({
   current,
   onNavigate,
+  branch,
 }: {
   current: 0 | 1 | 2;
   // Completed steps only — jumping ahead to a step that has no data yet
   // isn't offered. Preserves whatever's in progress; callers should never
   // wire this to anything that clears the document.
   onNavigate?: (index: 0 | 1 | 2) => void;
+  /** The work procedure is optional and branches off step 3 rather than
+   * extending the JSA wizard — giving it a permanent 4th circle would imply
+   * the JSA isn't finished without it, which is false for most users. So this
+   * node exists ONLY while the caller is actually on a procedure stage
+   * (App.tsx passes it conditionally) — never rendered on stages 0-2, where
+   * the plain 3-step track above is the whole story.
+   *
+   * Visually a branch, not a continuation: a dashed connector (not the solid
+   * one between steps 1-3) and an icon badge (not a number) both say "this
+   * peels off the main sequence" rather than "step 4 of 4". `label` names the
+   * document the user is actually in; `onBack` is the one live action here —
+   * back to the JSA PDF page — everything else on the procedure pages already
+   * has its own navigation. */
+  branch?: { label: string; onBack: () => void };
 }) {
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
@@ -82,7 +119,7 @@ export function Stepper({
       <ol className="flex items-center">
         {STEPS.map((label, index) => {
           const done = index < current;
-          const active = index === current;
+          const active = index === current && !branch;
           return (
             <Fragment key={label}>
               <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
@@ -134,6 +171,35 @@ export function Stepper({
             </Fragment>
           );
         })}
+
+        {branch ? (
+          <>
+            {/* Dashed, not solid like steps 1-3 — the line style itself signals
+                "branch", readable even before the eye reaches the icon badge. */}
+            <li
+              className="mx-1 h-px flex-1 border-t border-dashed border-navy/50 sm:mx-3"
+              aria-hidden="true"
+            />
+            <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
+              <button
+                type="button"
+                onClick={branch.onBack}
+                aria-label={`${branch.label} — กลับไปหน้าเอกสาร JSA`}
+                className="flex min-w-0 items-center gap-1.5 rounded-md
+                           focus-visible:outline-none focus-visible:ring-2
+                           focus-visible:ring-ring/50 sm:gap-2"
+              >
+                <BranchCircle />
+                <span
+                  className="truncate text-xs font-semibold text-navy sm:text-sm"
+                  aria-current="step"
+                >
+                  {branch.label}
+                </span>
+              </button>
+            </li>
+          </>
+        ) : null}
       </ol>
     </nav>
   );
