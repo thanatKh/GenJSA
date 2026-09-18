@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "PowerShell(node \"C:\\\\Users\\\\611612\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--OneDrive---PTTOR-01-Engineering-8---------------06-Web-Dev-GenJSA\\\\ee5699b7-0e0c-4887-83f5-1687291e3f60\\\\scratchpad\\\\resize_probe.mjs\")",
+      "Bash(rm -f \"/c/Users/611612/AppData/Local/Temp/claude/d--OneDrive---PTTOR-01-Engineering-8---------------06-Web-Dev-GenJSA/ee5699b7-0e0c-4887-83f5-1687291e3f60/scratchpad/resize_probe.mjs\" && echo cleaned)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\611612\\AppData\\Local\\Temp\\claude\\d--OneDrive---PTTOR-01-Engineering-8---------------06-Web-Dev-GenJSA\\ee5699b7-0e0c-4887-83f5-1687291e3f60\\scratchpad"
+    ]
+  }
+}
