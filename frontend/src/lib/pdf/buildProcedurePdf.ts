@@ -63,12 +63,17 @@ export async function buildProcedurePdf(
 
   let y = mT;
 
-  /** Start a new page and reset the cursor. No header is repeated — a flowing
-   * document doesn't need the title bar restated, and the footer already
-   * carries the page number. */
+  /** Start a new page, redraw the title bar, and reset the cursor.
+   *
+   * The title bar repeats on every page — a continuation page with no title
+   * at all reads as loose content, not part of the same document, especially
+   * once printed or read on its own. The work-activity/supervisor/date box
+   * does NOT repeat: those don't change page to page, and repeating them
+   * would cost real vertical space on a document that's already page-light. */
   const newPage = () => {
     doc.addPage();
-    y = mT;
+    y = E.drawTitleBar(P.titleTh, P.titleEn, mT);
+    y += sectionGap;
   };
 
   const need = (height: number) => {
