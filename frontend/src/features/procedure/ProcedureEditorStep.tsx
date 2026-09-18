@@ -40,7 +40,6 @@ export function ProcedureEditorStep({
   onContinue,
   onBack,
   onRegenerate,
-  regenerating,
   stale,
   error,
 }: {
@@ -48,9 +47,12 @@ export function ProcedureEditorStep({
   onChange: (next: ProcedureDocument) => void;
   onContinue: () => void;
   onBack: () => void;
+  // App.tsx unmounts this component entirely while a regenerate is in
+  // flight (see its comment there for why), so there is no in-place
+  // "regenerating" state to render here — calling this just starts the
+  // request and the parent takes it from there.
   /** Draft the whole procedure again from the current JSA */
   onRegenerate: () => void;
-  regenerating: boolean;
   /** The JSA's steps changed after this procedure was generated */
   stale: boolean;
   error: string | null;
@@ -155,7 +157,6 @@ export function ProcedureEditorStep({
               variant="outline"
               size="sm"
               onClick={() => setConfirmRegenerate(true)}
-              loading={regenerating}
             >
               <RotateCcw className="size-4" aria-hidden="true" />
               สร้างใหม่จาก JSA ปัจจุบัน

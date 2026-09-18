@@ -367,7 +367,21 @@ export default function App() {
           </div>
         ) : null}
 
-        {stage === 3 && procedure ? (
+        {/* Regenerating replaces the editor with the same full-page wait as a
+            first-time draft, for the same reason: the old sub-steps must not
+            stay on screen and editable while a response that's about to
+            overwrite them is in flight — the AI's reply silently wins that
+            race, so nothing here may be edited until it lands. */}
+        {stage === 3 && procedure && procedureBusy ? (
+          <div className="mx-auto max-w-[45rem]">
+            <h1 className="text-[1.75rem] font-semibold text-navy">
+              กำลังสร้างขั้นตอนปฏิบัติงานใหม่
+            </h1>
+            <GeneratingPanel stages={PROCEDURE_STAGES} />
+          </div>
+        ) : null}
+
+        {stage === 3 && procedure && !procedureBusy ? (
           <div className="mx-auto max-w-[45rem]">
             <ProcedureEditorStep
               procedure={procedure}
@@ -375,7 +389,6 @@ export default function App() {
               onContinue={() => goto(4)}
               onBack={() => goto(2)}
               onRegenerate={() => void handleCreateProcedure({ force: true })}
-              regenerating={procedureBusy}
               stale={procedureStale}
               error={procedureError}
             />
