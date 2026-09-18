@@ -63,61 +63,65 @@ export async function buildProcedurePdf(
 
   let y = mT;
 
-  /** Start a new page, redraw the title bar, and reset the cursor.
+  /** Title bar + the work-activity/supervisor/date fields, framed the same
+   * way on every page. Returns the y below it. Pushes one pageFrames entry
+   * per call, so drawFrames() (one call per page, by index) always has an
+   * entry waiting for the page it's about to stroke.
    *
-   * The title bar repeats on every page — a continuation page with no title
-   * at all reads as loose content, not part of the same document, especially
-   * once printed or read on its own. The work-activity/supervisor/date box
-   * does NOT repeat: those don't change page to page, and repeating them
-   * would cost real vertical space on a document that's already page-light. */
+   * Repeating the full header — not just the title — on every page: a
+   * continuation page that opens straight into step content with no
+   * work-activity/date visible reads as loose text, not the same document,
+   * especially once printed or read as a standalone sheet. */
+  const drawHeader = (top: number): number => {
+    let cursor = E.drawTitleBar(P.titleTh, P.titleEn, top);
+    const frameTop = top;
+
+    const activityLines = E.measureFieldLines(
+      D.labels.work_activity,
+      procedure.header.work_activity,
+      contentW,
+    );
+    const activityH = E.fieldRowHeight(activityLines);
+    doc.setLineWidth(L.table.border_width_pt);
+    doc.setDrawColor(...E.border);
+    doc.rect(mL, cursor, contentW, activityH);
+    E.drawField(D.labels.work_activity, activityLines, mL, contentW, cursor, activityH);
+    cursor += activityH;
+
+    // Supervisor and date share a row, split at the same 2/3 point the JSA uses
+    const splitW = contentW * 0.665;
+    const supervisorLines = E.measureFieldLines(
+      D.labels.supervisor,
+      procedure.header.supervisor,
+      splitW,
+    );
+    const dateLines = E.measureFieldLines(
+      P.labels.date,
+      formatThaiDate(procedure.header.analysis_date),
+      contentW - splitW,
+    );
+    const infoH = Math.max(E.fieldRowHeight(supervisorLines), E.fieldRowHeight(dateLines));
+    doc.rect(mL, cursor, splitW, infoH);
+    doc.rect(mL + splitW, cursor, contentW - splitW, infoH);
+    E.drawField(D.labels.supervisor, supervisorLines, mL, splitW, cursor, infoH);
+    E.drawField(P.labels.date, dateLines, mL + splitW, contentW - splitW, cursor, infoH);
+    cursor += infoH;
+
+    E.pageFrames.push({ top: frameTop, bottom: cursor });
+    return cursor + sectionGap;
+  };
+
+  /** Start a new page, redraw the full header, and reset the cursor. */
   const newPage = () => {
     doc.addPage();
-    y = E.drawTitleBar(P.titleTh, P.titleEn, mT);
-    y += sectionGap;
+    y = drawHeader(mT);
   };
 
   const need = (height: number) => {
     if (y + height > bodyBottom) newPage();
   };
 
-  // ------------------------------------------------------------- header --
-  const frameTop = y;
-  y = E.drawTitleBar(P.titleTh, P.titleEn, y);
-
-  const activityLines = E.measureFieldLines(
-    D.labels.work_activity,
-    procedure.header.work_activity,
-    contentW,
-  );
-  const activityH = E.fieldRowHeight(activityLines);
-  doc.setLineWidth(L.table.border_width_pt);
-  doc.setDrawColor(...E.border);
-  doc.rect(mL, y, contentW, activityH);
-  E.drawField(D.labels.work_activity, activityLines, mL, contentW, y, activityH);
-  y += activityH;
-
-  // Supervisor and date share a row, split at the same 2/3 point the JSA uses
-  const splitW = contentW * 0.665;
-  const supervisorLines = E.measureFieldLines(
-    D.labels.supervisor,
-    procedure.header.supervisor,
-    splitW,
-  );
-  const dateLines = E.measureFieldLines(
-    P.labels.date,
-    formatThaiDate(procedure.header.analysis_date),
-    contentW - splitW,
-  );
-  const infoH = Math.max(E.fieldRowHeight(supervisorLines), E.fieldRowHeight(dateLines));
-  doc.rect(mL, y, splitW, infoH);
-  doc.rect(mL + splitW, y, contentW - splitW, infoH);
-  E.drawField(D.labels.supervisor, supervisorLines, mL, splitW, y, infoH);
-  E.drawField(P.labels.date, dateLines, mL + splitW, contentW - splitW, y, infoH);
-  y += infoH;
-
-  // The header block is the only framed part of this document
-  E.pageFrames.push({ top: frameTop, bottom: y });
-  y += sectionGap;
+  y = drawHeader(y);
 
   // ------------------------------------------------------------ sections --
   let sectionNo = 0;
