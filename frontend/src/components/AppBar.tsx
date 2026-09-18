@@ -40,10 +40,17 @@ export function AppBar({
   appName = "GenJSA",
   documentMeta,
   department,
+  onHome,
 }: {
   appName?: string;
   documentMeta?: DocumentMeta;
   department?: string;
+  /** Reset to a fresh JSA — the same "เริ่มใหม่"/"สร้าง JSA ใหม่" action already
+   * on EditorStep/PdfStep. No confirm dialog here for the same reason those
+   * don't have one: in-progress work is already autosaved to history as the
+   * user types, so nothing is actually lost, just navigated away from. Optional
+   * so AppBar doesn't require a working reset in contexts that don't have one. */
+  onHome?: () => void;
 }) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -55,15 +62,37 @@ export function AppBar({
           (tokens.css) directly rather than a plain h-16, so that's the one
           place to change it — no second value to remember to update. */}
       <div className="mx-auto flex h-14 max-w-[var(--page-max-w)] items-center gap-4 px-4 sm:h-[var(--appbar-h)]">
-        <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
-        <div className="min-w-0">
-          <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
-            {appName}
-          </span>
-          <p className="truncate text-xs text-muted">
-            เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
-          </p>
-        </div>
+        {onHome ? (
+          <button
+            type="button"
+            onClick={onHome}
+            aria-label={`${appName} — กลับไปเริ่มต้นใหม่`}
+            className="flex min-w-0 items-center gap-3 rounded-md
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
+            <span className="min-w-0 text-left">
+              <span className="block font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
+                {appName}
+              </span>
+              <span className="block truncate text-xs text-muted">
+                เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
+              </span>
+            </span>
+          </button>
+        ) : (
+          <>
+            <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
+            <div className="min-w-0">
+              <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
+                {appName}
+              </span>
+              <p className="truncate text-xs text-muted">
+                เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
+              </p>
+            </div>
+          </>
+        )}
 
         <Button
           type="button"

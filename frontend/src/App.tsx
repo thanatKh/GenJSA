@@ -324,6 +324,7 @@ export default function App() {
         appName={appName}
         documentMeta={config?.document}
         department={config?.company.department}
+        onHome={startOver}
       />
 
       {/* max-w-[var(--page-max-w)] — shared with AppBar.tsx's title-bar row
