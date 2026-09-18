@@ -60,6 +60,18 @@ export function ProcedurePdfStep({
 
   return (
     <section>
+      {/* Above the H1, mirroring ProcedureEditorStep — this is the second
+          document of two, so the way back to the first belongs where the eye
+          starts, not only in the link row past the card. */}
+      <button
+        type="button"
+        onClick={onBackToJsa}
+        className="mb-3 flex items-center gap-1 text-sm text-muted hover:text-navy"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        กลับไปหน้าเอกสาร JSA
+      </button>
+
       <h1 className="text-[1.75rem] font-semibold text-navy">เอกสารขั้นตอนปฏิบัติงาน</h1>
       <p className="mt-1.5 text-muted">
         {savePickerSupported
@@ -149,6 +161,8 @@ export function ProcedurePdfStep({
         ) : null}
       </Card>
 
+      {/* Only "กลับไปแก้ไข" here — the way back to the JSA moved above the H1,
+          and having it in both places put the same destination on screen twice. */}
       <div className="mt-5 flex items-center justify-center gap-4 text-sm">
         <button
           type="button"
@@ -157,16 +171,6 @@ export function ProcedurePdfStep({
         >
           <ArrowLeft className="size-3.5" aria-hidden="true" />
           กลับไปแก้ไข
-        </button>
-        <span className="text-line" aria-hidden="true">
-          ·
-        </span>
-        <button
-          type="button"
-          onClick={onBackToJsa}
-          className="text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
-        >
-          กลับไปหน้าเอกสาร JSA
         </button>
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ListOrdered } from "lucide-react";
 
 import { AppBar } from "./components/AppBar";
 import { Stepper } from "./components/Stepper";
@@ -196,7 +197,9 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  const handleOpenHistory = (entry: HistoryEntry) => {
+  /** Restore both documents from a history entry. `to` is where to land —
+   * the two callers differ only in that. */
+  const openHistoryEntry = (entry: HistoryEntry, to: Stage) => {
     setDoc(entry.doc);
     // Required, not belt-and-braces: without it the blank-screen guard above
     // can bounce straight back to step 1
@@ -212,9 +215,17 @@ export default function App() {
     setHistoryId(entry.id);
     currentHistoryId.save(entry.id);
     setError(null);
-    setStage(1);
+    setStage(to);
     window.scrollTo({ top: 0 });
   };
+
+  const handleOpenHistory = (entry: HistoryEntry) => openHistoryEntry(entry, 1);
+
+  /** Straight to the procedure editor, for the "+ ขั้นตอนปฏิบัติงาน" badge.
+   * Safe even if the procedure fails to restore: the guard above bounces
+   * stage 3 back to 2 rather than leaving a blank screen. */
+  const handleOpenHistoryProcedure = (entry: HistoryEntry) =>
+    openHistoryEntry(entry, 3);
 
   const startOver = () => {
     setDoc(null);
@@ -297,6 +308,22 @@ export default function App() {
           onNavigate={goto}
         />
 
+        {/* Stages 3-4 leave the JSA wizard, but the Stepper above deliberately
+            stays clamped at "3 of 3 done" — which is true, the JSA IS finished.
+            This line says where you actually are, in the same slot the eye
+            already checks for position. Label only: navigation lives on the
+            pages themselves, and duplicating it here put the same destination
+            on screen twice. */}
+        {stage >= 3 ? (
+          <p className="-mt-4 mb-6 flex items-center gap-2 text-sm text-muted">
+            <ListOrdered className="size-4 shrink-0 text-navy" aria-hidden="true" />
+            <span>
+              <span className="font-medium text-navy">ขั้นตอนปฏิบัติงาน</span>
+              {" · เอกสารเพิ่มเติมจาก JSA นี้"}
+            </span>
+          </p>
+        ) : null}
+
         {stage === 0 ? (
           // Below xl: unchanged — single 45rem column, history stacked below
           // the form. From xl up, with real desktop width to spare: history
@@ -321,7 +348,12 @@ export default function App() {
               error={error}
             />
             {/* Hidden while generating so it doesn't compete with GeneratingPanel */}
-            {busy ? null : <HistoryList onOpen={handleOpenHistory} />}
+            {busy ? null : (
+              <HistoryList
+                onOpen={handleOpenHistory}
+                onOpenProcedure={handleOpenHistoryProcedure}
+              />
+            )}
           </div>
         ) : null}
 

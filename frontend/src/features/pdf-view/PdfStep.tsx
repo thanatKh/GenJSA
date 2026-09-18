@@ -90,6 +90,15 @@ export function PdfStep({
           ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
           : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
       </p>
+      {/* Names the second document before the user scrolls — the card that
+          offers it sits a full card below, and a reader who stops at the PDF
+          button never learns it exists. Deliberately a plain sentence, not a
+          banner: the procedure is optional and most users stop here. */}
+      <p className="mt-1.5 text-sm text-muted">
+        {hasProcedure
+          ? "เอกสารนี้มี “ขั้นตอนปฏิบัติงาน” ที่สร้างไว้แล้ว เปิดดูได้จากด้านล่าง"
+          : "หากต้องการเอกสารวิธีทำงานอย่างละเอียดสำหรับใช้หน้างาน สร้าง “ขั้นตอนปฏิบัติงาน” ได้จากด้านล่าง"}
+      </p>
 
       <Card className="mt-6">
         <div className="flex items-start gap-3">
@@ -205,8 +214,14 @@ export function PdfStep({
         </div>
 
         <div className="mt-4 border-t border-line pt-4">
+          {/* Primary weight only when the procedure already exists: that's
+              navigation back to something the user already invested in. While
+              it doesn't, it stays outline — a primary button costing an AI call
+              and a 30s+ wait would read as a required next step, and the JSA
+              PDF above must keep its place as the answer to "I came here to
+              make a JSA". */}
           <Button
-            variant="outline"
+            variant={hasProcedure ? "default" : "outline"}
             onClick={onCreateProcedure}
             loading={procedureBusy}
             className="w-full"

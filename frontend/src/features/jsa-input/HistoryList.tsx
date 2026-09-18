@@ -32,8 +32,13 @@ function entryTitle(entry: HistoryEntry): string {
 
 export function HistoryList({
   onOpen,
+  onOpenProcedure,
 }: {
   onOpen: (entry: HistoryEntry) => void;
+  /** Open the entry's work procedure directly, skipping the JSA editor. Only
+   * ever called for entries that have one — the badge that triggers it isn't
+   * rendered otherwise. */
+  onOpenProcedure: (entry: HistoryEntry) => void;
 }) {
   const [entries, setEntries] = useState<HistoryEntry[]>(() => historyStore.list());
   const [query, setQuery] = useState("");
@@ -169,36 +174,61 @@ export function HistoryList({
                 }}
                 className="group grid grid-cols-[1fr_auto] items-center gap-2 border-b border-line"
               >
-                <button
-                  type="button"
-                  onClick={() => onOpen(entry)}
-                  className="t-history-row min-w-0 rounded-md py-3 pl-2 pr-1 text-left"
-                >
-                  <span className="flex min-w-0 items-center gap-1">
-                    <span className="truncate font-medium text-ink group-hover:text-navy">
-                      {entryTitle(entry)}
-                    </span>
-                    <ChevronRight
-                      className="t-history-chevron size-4 shrink-0 text-navy"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="mt-0.5 block truncate text-sm text-muted">
-                    {formatThaiDate(isoFromDate(new Date(entry.savedAt)))}
-                    {entry.doc.header.supervisor
-                      ? ` · ${entry.doc.header.supervisor}`
-                      : ""}
-                    {` · ${entry.doc.steps.length} ขั้นตอน`}
-                    {/* Only shown when there is one — most entries are a JSA
-                        alone, so a "no procedure" marker would be noise on
-                        every row to flag the exception */}
-                    {entry.procedure ? (
-                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-surface px-1.5 py-0.5 text-xs text-navy">
-                        + ขั้นตอนปฏิบัติงาน
+                {/* The row button and the procedure badge share this cell so
+                    the badge never competes with the title for width — at
+                    360px its own grid column truncated the title to a useless
+                    "เปลี่ยน mech…". Below sm the badge sits under the metadata
+                    line; from sm up there's room for it inline. */}
+                <div className="flex min-w-0 flex-col py-1 sm:flex-row sm:items-center sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(entry)}
+                    className="t-history-row min-w-0 rounded-md py-2 pl-2 pr-1 text-left"
+                  >
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span className="truncate font-medium text-ink group-hover:text-navy">
+                        {entryTitle(entry)}
                       </span>
-                    ) : null}
-                  </span>
-                </button>
+                      <ChevronRight
+                        className="t-history-chevron size-4 shrink-0 text-navy"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-muted">
+                      {formatThaiDate(isoFromDate(new Date(entry.savedAt)))}
+                      {entry.doc.header.supervisor
+                        ? ` · ${entry.doc.header.supervisor}`
+                        : ""}
+                      {` · ${entry.doc.steps.length} ขั้นตอน`}
+                    </span>
+                  </button>
+
+                  {/* Its own button, a sibling of the row (never nested —
+                      nested buttons are invalid HTML). It used to be an inert
+                      <span> inside the row's metadata line, which made it a
+                      lie: it advertised a second document but the click it sat
+                      inside always landed on the JSA editor. Only rendered
+                      when there IS a procedure — a "no procedure" marker on
+                      every other row would be noise to flag the exception. */}
+                  {entry.procedure ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenProcedure(entry)}
+                      aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                      // Full 44px tap height below sm (always visible and
+                      // touch-tapped there, like the delete button); compact
+                      // once it moves inline on desktop hover targets.
+                      className="ml-2 self-start whitespace-nowrap rounded-full bg-surface
+                                 px-2.5 text-xs text-navy hover:bg-navy-soft
+                                 focus-visible:outline-none focus-visible:ring-2
+                                 focus-visible:ring-ring/50
+                                 max-sm:flex max-sm:h-11 max-sm:items-center
+                                 sm:ml-0 sm:self-auto sm:py-0.5"
+                    >
+                      + ขั้นตอนปฏิบัติงาน
+                    </button>
+                  ) : null}
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
