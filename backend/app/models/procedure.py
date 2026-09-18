@@ -21,11 +21,6 @@ from .jsa import JsaDocument, JsaHeader
 class SubStep(BaseModel):
     no: int = Field(ge=1)
     action: str = Field(min_length=1, max_length=1000)
-    # One optional slot for "ระวัง…" / "ตรวจสอบว่า…" / an acceptance criterion.
-    # Deliberately one free-text field rather than three structured ones: the
-    # model files these inconsistently, and the PDF renders it as a single
-    # indented line under the action either way.
-    note: str = Field(default="", max_length=1000)
 
 
 class ProcedureStep(BaseModel):

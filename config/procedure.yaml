@@ -20,9 +20,6 @@ document:
     # isn't: this document isn't an analysis, so "วันที่วิเคราะห์" would be wrong
     date: "วันที่จัดทำ"
     author: "ผู้จัดทำ"
-    # Prefixes a sub-step's caution or acceptance criterion. Keep this a word,
-    # not a symbol — TH Sarabun New has no ▸/‣/→ glyph and draws nothing at all
-    note: "หมายเหตุ:"
 
   # Section headings, in printed order. An empty section is skipped entirely
   # rather than printing a heading over blank space.

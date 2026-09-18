@@ -50,7 +50,7 @@ export async function buildProcedurePdf(
   const C = options.company;
 
   const E = await createEngine(L);
-  const { doc, mL, mT, contentW, bodyBottom, lineH, pad, wrap, drawLines } = E;
+  const { doc, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines } = E;
 
   const headingPt = L.font.body_pt + 2;
   const headingLineH = headingPt * L.font.line_height;
@@ -202,21 +202,10 @@ export async function buildProcedurePdf(
         L.font.body_pt,
         marker,
       );
-      // Bold "หมายเหตุ:" marker rather than a glyph like ▸ — TH Sarabun has no
-      // such glyph and silently drew nothing, leaving cautions looking exactly
-      // like another instruction line
-      const noteLines = sub.note.trim()
-        ? wrap(sub.note, contentW - subIndent - pad * 2, "normal", L.font.body_pt, P.labels.note)
-        : [];
 
-      need(actionLines.length * lineH + noteLines.length * lineH);
+      need(actionLines.length * lineH);
       drawLines(actionLines, mL + subIndent, y, contentW - subIndent);
       y += actionLines.length * lineH;
-
-      if (noteLines.length) {
-        drawLines(noteLines, mL + subIndent + pad * 2, y, contentW - subIndent - pad * 2);
-        y += noteLines.length * lineH;
-      }
     });
 
     y += blockGap;

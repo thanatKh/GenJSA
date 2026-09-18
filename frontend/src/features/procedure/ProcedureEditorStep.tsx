@@ -95,7 +95,7 @@ export function ProcedureEditorStep({
   const addSub = (stepIndex: number) =>
     patchStep(stepIndex, [
       ...procedure.steps[stepIndex].sub_steps,
-      { no: 0, action: "", note: "" },
+      { no: 0, action: "" },
     ]);
 
   const removeSub = (stepIndex: number, subIndex: number) => {
@@ -237,27 +237,15 @@ export function ProcedureEditorStep({
                     <span className="pt-2.5 text-sm text-muted tabular-nums">
                       {stepIndex + 1}.{subIndex + 1}
                     </span>
-                    <div className="grid gap-2">
-                      <AutoGrowTextarea
-                        minRows={1}
-                        value={sub.action}
-                        placeholder="สิ่งที่ต้องลงมือทำ"
-                        aria-label={`ขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1}`}
-                        onChange={(event) =>
-                          patchSub(stepIndex, subIndex, { action: event.target.value })
-                        }
-                      />
-                      <AutoGrowTextarea
-                        minRows={1}
-                        value={sub.note}
-                        placeholder="หมายเหตุ / ข้อควรระวัง (ถ้ามี)"
-                        aria-label={`หมายเหตุของขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1}`}
-                        className="text-sm"
-                        onChange={(event) =>
-                          patchSub(stepIndex, subIndex, { note: event.target.value })
-                        }
-                      />
-                    </div>
+                    <AutoGrowTextarea
+                      minRows={1}
+                      value={sub.action}
+                      placeholder="สิ่งที่ต้องลงมือทำ"
+                      aria-label={`ขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1}`}
+                      onChange={(event) =>
+                        patchSub(stepIndex, subIndex, { action: event.target.value })
+                      }
+                    />
                     <Button
                       type="button"
                       variant="ghost"

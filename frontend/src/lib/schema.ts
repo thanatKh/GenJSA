@@ -41,7 +41,6 @@ export const jsaDocumentSchema = z.object({
 export const subStepSchema = z.object({
   no: z.number(),
   action: z.string(),
-  note: z.string().default(""),
 });
 
 export const procedureStepSchema = z.object({
