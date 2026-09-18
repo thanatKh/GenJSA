@@ -121,6 +121,25 @@ export async function buildProcedurePdf(
     if (y + height > bodyBottom) newPage();
   };
 
+  /** Draw a wrapped block line-by-line, breaking to a new page mid-block if
+   * it runs out of room — instead of drawParagraph's old one-shot drawLines,
+   * which just drew straight past bodyBottom and off the visible page for
+   * any block taller than the space left. A single block that's taller than
+   * one whole page (a long purpose/scope, or one long sub-step) needs this
+   * even right after a fresh newPage(), not just at the ragged bottom of a
+   * partially-used page.
+   *
+   * `need(1 line)` is checked per line — cheap, and the natural unit here
+   * since nothing in this document ever needs to keep two lines of body text
+   * together mid-paragraph. */
+  const drawFlowing = (lines: Line[], x: number, cellW: number, step: number = lineH) => {
+    lines.forEach((line) => {
+      if (y + step > bodyBottom) newPage();
+      drawLines([line], x, y, cellW, L.font.body_pt, step);
+      y += step;
+    });
+  };
+
   y = drawHeader(y);
 
   // ------------------------------------------------------------ sections --
@@ -137,15 +156,17 @@ export async function buildProcedurePdf(
 
   const drawParagraph = (text: string, indent: number) => {
     const lines = wrap(text, contentW - indent, "normal", L.font.body_pt);
-    drawLines(lines, mL + indent, y, contentW - indent);
-    y += lines.length * lineH;
+    drawFlowing(lines, mL + indent, contentW - indent);
   };
 
   /** A section whose body is one paragraph (วัตถุประสงค์, ขอบเขต). */
   const textSection = (title: string, body: string) => {
     if (!body.trim()) return; // empty section prints nothing, not a bare heading
     const bodyLines = wrap(body, contentW - stepIndent, "normal", L.font.body_pt);
-    need(headingLineH + bodyLines.length * lineH);
+    // Only reserve room for the heading plus the first line here — the rest
+    // of the paragraph flows and paginates itself via drawParagraph below,
+    // same reasoning as the step/sub-step loop further down.
+    need(headingLineH + Math.min(bodyLines.length, 1) * lineH);
     drawHeading(title);
     drawParagraph(body, stepIndent);
     y += sectionGap;
@@ -159,12 +180,10 @@ export async function buildProcedurePdf(
     const wrapped: Line[][] = clean.map((item) =>
       wrap(item, contentW - stepIndent, "normal", L.font.body_pt, "•"),
     );
-    need(headingLineH + wrapped[0].length * lineH);
+    need(headingLineH + Math.min(wrapped[0].length, 1) * lineH);
     drawHeading(title);
     wrapped.forEach((lines) => {
-      need(lines.length * lineH);
-      drawLines(lines, mL + stepIndent, y, contentW - stepIndent);
-      y += lines.length * lineH;
+      drawFlowing(lines, mL + stepIndent, contentW - stepIndent);
     });
     y += sectionGap;
   };
@@ -192,15 +211,20 @@ export async function buildProcedurePdf(
     );
 
     // Keep a step title with its first sub-step — a heading alone at the foot
-    // of a page is the one pagination problem a flowing layout still has
+    // of a page is the one pagination problem a flowing layout still has.
+    // Only reserved for the title's first line plus the first sub-step's
+    // first line: a title or sub-step longer than that flows and paginates
+    // itself via drawFlowing below, same as the section paragraphs above.
     const firstSub = step.sub_steps[0];
     const firstSubH = firstSub
-      ? wrap(firstSub.action, contentW - subIndent, "normal", L.font.body_pt, "0.0.0").length * lineH
+      ? Math.min(
+          wrap(firstSub.action, contentW - subIndent, "normal", L.font.body_pt, "0.0.0").length,
+          1,
+        ) * lineH
       : 0;
-    need(titleLines.length * lineH + firstSubH);
+    need(Math.min(titleLines.length, 1) * lineH + firstSubH);
 
-    drawLines(titleLines, mL + stepIndent, y, contentW - stepIndent);
-    y += titleLines.length * lineH;
+    drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent);
 
     step.sub_steps.forEach((sub) => {
       const marker = `${stepsHeadingNo}.${step.no}.${sub.no}`;
@@ -212,9 +236,7 @@ export async function buildProcedurePdf(
         marker,
       );
 
-      need(actionLines.length * lineH);
-      drawLines(actionLines, mL + subIndent, y, contentW - subIndent);
-      y += actionLines.length * lineH;
+      drawFlowing(actionLines, mL + subIndent, contentW - subIndent);
     });
 
     y += blockGap;
