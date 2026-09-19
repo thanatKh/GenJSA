@@ -118,7 +118,13 @@ export function Stepper({
           steps instead of trailing off after the last one */}
       <ol className="flex items-center">
         {STEPS.map((label, index) => {
-          const done = index < current;
+          // While on the procedure branch, the JSA truly is finished — all
+          // three steps get the checkmark, not just the ones strictly before
+          // `current`. Without the `branch` override, step 3 (index === current)
+          // fell into neither "done" nor "active" once `active` below excluded
+          // it, and rendered as a bare, unfilled circle showing "3" — looking
+          // unfinished on a JSA that's actually complete.
+          const done = branch ? index <= current : index < current;
           const active = index === current && !branch;
           return (
             <Fragment key={label}>
