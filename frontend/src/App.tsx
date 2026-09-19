@@ -400,16 +400,33 @@ export default function App() {
             permanent fourth circle would imply it isn't finished without one.
             `branch` is how stages 3-4 still get a "you are here": see its doc
             comment in Stepper.tsx for why it's a dashed branch node rather
-            than a fourth step. */}
-        <Stepper
-          current={Math.min(stage, 2) as 0 | 1 | 2}
-          onNavigate={goto}
-          branch={
-            stage >= 3
-              ? { label: "ขั้นตอนปฏิบัติงาน", onBack: () => goto(2) }
-              : undefined
+            than a fourth step.
+
+            Width: every stage but 1 wraps its own content at max-w-[45rem]
+            (stage 0 escapes that at xl: via its own grid — see below), so the
+            Stepper needs the same cap there or it visibly overflows past the
+            narrower content beneath it. Only stage 1 (EditorStep) spans the
+            full <main> width by design, so the Stepper matches that here too
+            instead of shrinking to 45rem above a wider table. */}
+        <div
+          className={
+            stage === 1
+              ? undefined
+              : stage === 0
+                ? "mx-auto max-w-[45rem] xl:max-w-none"
+                : "mx-auto max-w-[45rem]"
           }
-        />
+        >
+          <Stepper
+            current={Math.min(stage, 2) as 0 | 1 | 2}
+            onNavigate={goto}
+            branch={
+              stage >= 3
+                ? { label: "ขั้นตอนปฏิบัติงาน", onBack: () => goto(2) }
+                : undefined
+            }
+          />
+        </div>
 
         {stage === 0 ? (
           // Below xl: unchanged — single 45rem column, history stacked below
