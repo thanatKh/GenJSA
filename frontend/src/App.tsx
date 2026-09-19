@@ -456,10 +456,11 @@ export default function App() {
           </div>
         ) : null}
 
-        {stage === 4 && procedure ? (
+        {stage === 4 && procedure && doc ? (
           <div className="mx-auto max-w-[45rem]">
             <ProcedurePdfStep
               procedure={procedure}
+              doc={doc}
               photos={photos}
               config={config}
               onBack={() => goto(3)}

@@ -13,11 +13,18 @@ import { CircleCheck, FileText, LoaderCircle, Save, Share2 } from "lucide-react"
 import { Alert, Button, Card } from "../../components/ui";
 
 export function PdfDeliveryCard({
+  kicker,
   title,
   summary,
   delivery,
   className,
 }: {
+  /** Small label above the title naming which document this is — e.g.
+   * "เอกสารขั้นตอนปฏิบัติงาน" / "เอกสาร JSA". Omit when the page's own H1
+   * already says so (PdfStep's single-card case); required once two cards
+   * for the same job sit on one page (ProcedurePdfStep), where both titles
+   * read identically and the metadata rows are the only other differentiator. */
+  kicker?: string;
   title: string;
   summary: { label: string; value: string }[];
   /** The relevant slice of a usePdfDelivery() result */
@@ -45,6 +52,11 @@ export function PdfDeliveryCard({
           <FileText className="size-6 shrink-0 text-muted" aria-hidden="true" />
         )}
         <div className="min-w-0">
+          {kicker ? (
+            <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wide text-navy">
+              {kicker}
+            </span>
+          ) : null}
           <h2 className="font-display font-semibold text-ink break-words">{title}</h2>
           <dl className="mt-2 grid gap-1 text-sm">
             {summary.map((row) => (

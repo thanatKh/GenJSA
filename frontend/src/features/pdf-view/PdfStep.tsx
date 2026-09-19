@@ -9,22 +9,14 @@
  * changing how the buttons below behave.
  */
 
-import {
-  ArrowLeft,
-  CircleCheck,
-  FilePlus2,
-  FileText,
-  ListOrdered,
-  LoaderCircle,
-  Save,
-  Share2,
-} from "lucide-react";
+import { ArrowLeft, FilePlus2, ListOrdered } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
 import { pdfFileName } from "../../lib/pdf/fileName";
 import { formatThaiDate } from "../../lib/thaidate";
 import type { JsaDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
+import { PdfDeliveryCard } from "./PdfDeliveryCard";
 import { usePdfDelivery } from "./usePdfDelivery";
 
 export function PdfStep({
@@ -47,17 +39,7 @@ export function PdfStep({
   /** A procedure already exists for this JSA — the action re-opens it */
   hasProcedure: boolean;
 }) {
-  const {
-    url,
-    error,
-    savePickerSupported,
-    canSavePicker,
-    canShareFile,
-    saving,
-    sharing,
-    handleSave,
-    handleShare,
-  } = usePdfDelivery({
+  const delivery = usePdfDelivery({
     // Dynamic import: jsPDF drags in html2canvas + dompurify (~230KB) via
     // the .html() plugin, which we never use — load it only once this
     // page is actually reached, so users who haven't generated a JSA
@@ -86,7 +68,7 @@ export function PdfStep({
     <section>
       <h1 className="text-[1.75rem] font-semibold text-navy">เอกสาร JSA</h1>
       <p className="mt-1.5 text-muted">
-        {savePickerSupported
+        {delivery.savePickerSupported
           ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
           : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
       </p>
@@ -100,100 +82,16 @@ export function PdfStep({
           : "หากต้องการเอกสารวิธีทำงานอย่างละเอียดสำหรับใช้หน้างาน สร้าง “ขั้นตอนปฏิบัติงาน” ได้จากด้านล่าง"}
       </p>
 
-      <Card className="mt-6">
-        <div className="flex items-start gap-3">
-          {url ? (
-            <CircleCheck className="size-6 shrink-0 text-navy" aria-hidden="true" />
-          ) : (
-            <FileText className="size-6 shrink-0 text-muted" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <h2 className="font-display font-semibold text-ink break-words">
-              {doc.header.work_activity}
-            </h2>
-            <dl className="mt-2 grid gap-1 text-sm">
-              <div className="flex gap-1.5">
-                <dt className="text-muted">หัวหน้างาน:</dt>
-                <dd className="text-ink">{doc.header.supervisor}</dd>
-              </div>
-              <div className="flex gap-1.5">
-                <dt className="text-muted">วันที่วิเคราะห์:</dt>
-                <dd className="text-ink">
-                  {formatThaiDate(doc.header.analysis_date)}
-                </dd>
-              </div>
-              <div className="flex gap-1.5">
-                <dt className="text-muted">เนื้อหา:</dt>
-                <dd className="text-ink">
-                  {doc.steps.length} ขั้นตอน · {hazardCount} รายการอันตราย
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-
-        {/* Open/save live inside the same card as the document they act on,
-            not as a detached row below it — a divider (not a new Card) marks
-            "info" from "actions" while keeping them one visual unit. Open PDF
-            spans both columns when there's no save/share button to sit
-            beside it, so this stays exactly one row either way. */}
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
-          {url ? (
-            // ⚠️ Never add a `download` attribute here — it forces an
-            // immediate download (on mobile Chrome this saves silently to
-            // Downloads with no dialog at all), which violates the "no
-            // auto-download" requirement. Let target="_blank" open the native
-            // viewer instead, and let the user save/print/share from its menu.
-            // The save button below is not a loophole in that rule: the file
-            // picker always shows a dialog and always lets the user choose the
-            // destination, which is exactly what `download` skips.
-            // asChild merges Button's classes onto the real <a> below without
-            // introducing a <button> or JS-mediated navigation — the anchor
-            // must stay a real, directly-clickable link to avoid mobile
-            // Safari's popup blocking.
-            <Button
-              asChild
-              className={canSavePicker || canShareFile ? undefined : "col-span-2"}
-            >
-              <a href={url} target="_blank" rel="noopener">
-                <FileText className="size-4" aria-hidden="true" />
-                เปิดเอกสาร PDF
-              </a>
-            </Button>
-          ) : (
-            <Button disabled className="col-span-2">
-              {error ? null : (
-                <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-              )}
-              {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
-            </Button>
-          )}
-
-          {/* Exactly one of these two ever renders — see the routing table in
-              the file header. Both are explicit, user-chosen actions behind a
-              dedicated button, never a silent auto-save. */}
-          {canSavePicker ? (
-            <Button variant="outline" onClick={handleSave} loading={saving}>
-              <Save className="size-4" aria-hidden="true" />
-              บันทึกไฟล์
-            </Button>
-          ) : canShareFile ? (
-            <Button variant="outline" onClick={handleShare} loading={sharing}>
-              <Share2 className="size-4" aria-hidden="true" />
-              แชร์ / บันทึกไฟล์
-            </Button>
-          ) : null}
-        </div>
-
-        {/* Kept inside the card too — right under the action that would have
-            produced it, rather than floating between the card and the
-            back/new-JSA row below */}
-        {error ? (
-          <div className="mt-3">
-            <Alert>{error}</Alert>
-          </div>
-        ) : null}
-      </Card>
+      <PdfDeliveryCard
+        className="mt-6"
+        title={doc.header.work_activity}
+        summary={[
+          { label: "หัวหน้างาน", value: doc.header.supervisor },
+          { label: "วันที่วิเคราะห์", value: formatThaiDate(doc.header.analysis_date) },
+          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
+        ]}
+        delivery={delivery}
+      />
 
       {/* A card, not a text link beside "กลับไปแก้ไข" below — this starts an
           AI generation with a real cost and a wait, so it shouldn't carry the
