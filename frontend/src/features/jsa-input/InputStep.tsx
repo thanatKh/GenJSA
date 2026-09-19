@@ -24,7 +24,8 @@ import { ThaiDatePicker } from "../../components/ThaiDatePicker";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
 import { todayIso } from "../../lib/thaidate";
 import { inputDraft } from "../../store";
-import { GeneratingPanel } from "./GeneratingPanel";
+import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
+import { GeneratingPanel, TYPICAL_MAX_SECONDS, TYPICAL_MIN_SECONDS } from "./GeneratingPanel";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -137,7 +138,7 @@ export function InputStep({
   busy,
   error,
 }: {
-  onGenerate: (values: InputForm, detailed: boolean) => void;
+  onGenerate: (values: InputForm, detailed: boolean, withProcedure: boolean) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
   ) => void;
@@ -162,6 +163,11 @@ export function InputStep({
   // the sessionStorage draft: every fresh JSA should start on the fast
   // default, not silently inherit whatever the user last toggled
   const [detailed, setDetailed] = useState(false);
+  // "สร้างขั้นตอนปฏิบัติงานด้วย" — same reasoning: unchecked by default so this
+  // never silently doubles the wait for someone who didn't ask for it, and so
+  // the checkbox itself does the discoverability work of showing every
+  // first-time visitor that GenJSA can produce both documents.
+  const [withProcedure, setWithProcedure] = useState(false);
 
   const {
     register,
@@ -235,11 +241,19 @@ export function InputStep({
       {busy ? (
         // Replace the form entirely while generating — fields are disabled anyway,
         // and this guarantees the loading state is visible immediately with no
-        // scrolling, instead of appearing below a possibly-long textarea
-        <GeneratingPanel onCancel={onCancelGenerate} />
+        // scrolling, instead of appearing below a possibly-long textarea.
+        // withProcedure is read here, not reset once busy starts, so it still
+        // reflects exactly what was submitted — safe to read mid-flight since
+        // the checkbox itself is gone from the screen while this renders.
+        <GeneratingPanel
+          onCancel={onCancelGenerate}
+          stages={withProcedure ? COMBINED_STAGES : JSA_STAGES}
+          typicalMinSeconds={withProcedure ? TYPICAL_MIN_SECONDS * 2 : undefined}
+          typicalMaxSeconds={withProcedure ? TYPICAL_MAX_SECONDS * 2 : undefined}
+        />
       ) : (
         <form
-          onSubmit={handleSubmit((values) => onGenerate(values, detailed))}
+          onSubmit={handleSubmit((values) => onGenerate(values, detailed, withProcedure))}
           className="mt-6 grid gap-5"
           noValidate
         >
@@ -326,6 +340,35 @@ export function InputStep({
               วิเคราะห์อย่างละเอียด
               <span className="block text-muted">
                 ระบบจะพิจารณาอันตรายและมาตรการป้องกันอย่างละเอียดมากขึ้น
+              </span>
+            </span>
+          </label>
+
+          {/* A second checkbox, not a separate section — this is one more
+              choice about what to generate, same weight as "วิเคราะห์อย่างละเอียด"
+              above. Unchecked by default: the procedure is still an optional
+              power feature, not something every JSA should carry. Its real
+              job is discoverability — every first-time visitor now SEES this
+              capability exists on the very first screen, which a card buried
+              on the PDF page three stages later never achieved. */}
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={withProcedure}
+              onClick={() => setWithProcedure((v) => !v)}
+              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                withProcedure
+                  ? "border-navy bg-navy text-white"
+                  : "border-line bg-surface"
+              }`}
+            >
+              {withProcedure ? <Check className="size-3.5" aria-hidden="true" /> : null}
+            </button>
+            <span className="text-ink">
+              สร้างขั้นตอนปฏิบัติงานด้วย
+              <span className="block text-muted">
+                ขยายแต่ละขั้นตอนใน JSA เป็นวิธีปฏิบัติงานอย่างละเอียด ใช้เวลาเพิ่มขึ้นประมาณเท่าตัว
               </span>
             </span>
           </label>

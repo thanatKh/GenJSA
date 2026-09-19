@@ -21,3 +21,10 @@ export const PROCEDURE_STAGES = [
   "กำลังเพิ่มข้อควรระวังและเกณฑ์ตรวจสอบ…",
   "กำลังจัดรูปแบบเอกสาร…",
 ] as const;
+
+/** When "สร้างขั้นตอนปฏิบัติงานด้วย" is checked on step 1, generation runs as
+ * one continuous wait — JSA_STAGES' four messages, then PROCEDURE_STAGES'
+ * four — rather than resetting the elapsed counter partway through, which
+ * would make the second half look like a stuck restart instead of the
+ * natural continuation it is. */
+export const COMBINED_STAGES = [...JSA_STAGES, ...PROCEDURE_STAGES] as const;

@@ -159,7 +159,11 @@ export default function App() {
     setPhotos({});
   };
 
-  const handleGenerate = async (values: InputForm, detailed: boolean) => {
+  const handleGenerate = async (
+    values: InputForm,
+    detailed: boolean,
+    withProcedure: boolean,
+  ) => {
     setBusy(true);
     setError(null);
     const controller = new AbortController();
@@ -174,14 +178,70 @@ export default function App() {
       // A new JSA means any procedure on screen describes a different job
       discardProcedure();
       startHistoryEntry();
+
+      // Chained under the SAME controller/signal as the JSA call, so ยกเลิก
+      // (cancelGenerate) aborts either half — including after the JSA already
+      // succeeded, per the "cancel always discards everything" choice made
+      // for this feature. The JSA is only committed to history below, once
+      // this whole block (both calls) is past the point where it can still
+      // be cancelled — see the CancelledError branch, which intentionally
+      // discards a JSA that finished but whose procedure call was cancelled.
+      if (withProcedure) {
+        setProcedureBusy(true);
+        setProcedureError(null);
+        try {
+          const procedureGenerated = await generateProcedure(generated, {
+            signal: controller.signal,
+          });
+          setProcedure(procedureGenerated);
+          procedureDraft.save(procedureGenerated);
+        } catch (procedureCaught) {
+          // The JSA already succeeded and is kept regardless — losing the
+          // procedure never costs the user the document they actually asked
+          // to review first. Cancellation here is handled by the outer catch
+          // (the same AbortSignal rejects both fetches), so this only ever
+          // reports a genuine procedure failure.
+          if (!(procedureCaught instanceof CancelledError)) {
+            setProcedureError(
+              procedureCaught instanceof ApiError
+                ? procedureCaught.message
+                : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ กรุณาลองอีกครั้ง",
+            );
+          } else {
+            throw procedureCaught;
+          }
+        } finally {
+          setProcedureBusy(false);
+        }
+      }
+
       setStage(1);
       window.scrollTo({ top: 0 });
     } catch (caught) {
       // Cancelled by the user (see cancelGenerate) — not a failure, so no
       // error banner; just fall through to the form as if nothing happened.
       // Form data is otherwise left untouched on a real error too — never
-      // clear anything just because the request failed.
-      if (!(caught instanceof CancelledError)) {
+      // clear anything just because the request failed. A cancel during the
+      // procedure half also discards the JSA that already finished, matching
+      // "ยกเลิก always aborts everything" — setStage/setDoc above already ran
+      // for the JSA, so undo them rather than leaving a half-finished result
+      // stage 0 has no way to explain.
+      if (caught instanceof CancelledError) {
+        // Only reachable once the JSA already succeeded and the cancel landed
+        // during the procedure half — a plain single-JSA cancel never gets
+        // here at all, since setDoc/startHistoryEntry below only run after
+        // generateJsa resolves. Roll back exactly what this function itself
+        // set: the JSA, its draft, and the history id it allocated.
+        //
+        // Deliberately NOT inputDraft — GeneratingPanel's cancel button relies
+        // on the typed description surviving any cancel with no confirm
+        // dialog; clearing it here would break that promise for this one path.
+        setDoc(null);
+        docDraft.clear();
+        discardProcedure();
+        setHistoryId(null);
+        currentHistoryId.clear();
+      } else {
         setError(
           caught instanceof ApiError
             ? caught.message

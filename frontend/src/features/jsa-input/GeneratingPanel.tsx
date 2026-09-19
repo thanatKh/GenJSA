@@ -28,12 +28,11 @@ const STAGE_MS = 12000;
 // measured distribution. Re-measure with `python scripts/model_bench.py -n 10`
 // (it reports latency per model) and update these whenever config/ai.yaml's
 // model changes.
-const TYPICAL_MIN_SECONDS = 60;
-const TYPICAL_MAX_SECONDS = 180;
-
-// Only call it slow once we're past the range we advertised — warning earlier
-// than that would contradict the line right above it.
-const SLOW_AFTER_SECONDS = TYPICAL_MAX_SECONDS;
+// Exported so callers that chain a second AI call (see COMBINED_STAGES) can
+// derive an honest doubled range instead of re-declaring their own numbers
+// that could drift from these.
+export const TYPICAL_MIN_SECONDS = 60;
+export const TYPICAL_MAX_SECONDS = 180;
 
 /** 90 -> "1 นาที 30 วินาที", 45 -> "45 วินาที" */
 function formatDuration(totalSeconds: number): string {
@@ -53,10 +52,18 @@ function formatRange(minSeconds: number, maxSeconds: number): string {
 export function GeneratingPanel({
   onCancel,
   stages = JSA_STAGES,
+  typicalMinSeconds = TYPICAL_MIN_SECONDS,
+  typicalMaxSeconds = TYPICAL_MAX_SECONDS,
 }: {
   onCancel?: () => void;
   /** What the wait is narrating — see PROCEDURE_STAGES */
   stages?: readonly string[];
+  /** Override the quoted "โดยทั่วไปใช้เวลาประมาณ" range — needed when this
+   * panel spans more than one AI call (see COMBINED_STAGES), where the
+   * single-call default would undersell the real wait and make it look
+   * stuck once elapsed time passes what was promised. */
+  typicalMinSeconds?: number;
+  typicalMaxSeconds?: number;
 }) {
   const [stage, setStage] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -75,7 +82,7 @@ export function GeneratingPanel({
     };
   }, [stageCount]);
 
-  const slow = elapsed >= SLOW_AFTER_SECONDS;
+  const slow = elapsed >= typicalMaxSeconds;
 
   return (
     <section className="mt-6" aria-busy="true">
@@ -118,7 +125,7 @@ export function GeneratingPanel({
           live region would read the whole line out loud each time */}
       <p className="mt-1.5 text-sm text-muted">
         โดยทั่วไปใช้เวลาประมาณ{" "}
-        {formatRange(TYPICAL_MIN_SECONDS, TYPICAL_MAX_SECONDS)} · ผ่านไปแล้ว{" "}
+        {formatRange(typicalMinSeconds, typicalMaxSeconds)} · ผ่านไปแล้ว{" "}
         <span className="font-medium tabular-nums text-ink">
           {formatDuration(elapsed)}
         </span>
