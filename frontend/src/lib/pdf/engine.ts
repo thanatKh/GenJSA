@@ -320,13 +320,27 @@ export async function createEngine(L: PdfLayout) {
   };
 
   // ------------------------------------------------------------- footer --
-  /** Draw the footer on every page. Must run last — it needs the total page count. */
-  const drawFooter = (formCode: string, footerText: string, companyName: string) => {
+  /** Draw the footer on every page. Must run last — it needs the total page count.
+   *
+   * `skipPage1` is for buildProcedurePdf's standalone cover page: a title
+   * page prints no form code, company name or "หน้า N / total" of its own,
+   * matching how the pageFrames border already skips it (see drawFrames'
+   * top===bottom convention). buildJsaPdf has no cover page and never passes
+   * this, so its page 1 — real form content — keeps its footer as before.
+   * `total` stays the real jsPDF page count either way, so page 2's "2/N"
+   * here still matches physical page 2 in a printed stack rather than being
+   * renumbered around the cover. */
+  const drawFooter = (
+    formCode: string,
+    footerText: string,
+    companyName: string,
+    skipPage1 = false,
+  ) => {
     const total = doc.getNumberOfPages();
     const footerRight = L.footer.show_company && companyName ? companyName : "";
     const footerLeft = `${formCode} ${footerText}`.trim();
 
-    for (let page = 1; page <= total; page += 1) {
+    for (let page = skipPage1 ? 2 : 1; page <= total; page += 1) {
       doc.setPage(page);
       setFont("normal", L.font.footer_pt);
       doc.setTextColor(0, 0, 0);

@@ -3,20 +3,31 @@
  * Deliberately does *not* show a percentage or an ETA, since we don't actually
  * know the remaining time — a guessed number would be misleading. Instead it
  * shows three honest things: the typical range, a live count of seconds
- * elapsed, and a description of the current stage. The elapsed counter is the
- * load-bearing one: a number that keeps ticking is proof the page is alive,
- * which a static "please wait" can never be.
+ * elapsed, and a scripted activity log of what the AI is plausibly doing.
+ *
+ * That log is the load-bearing gimmick here — see generatingStages.ts's
+ * header comment for why it's a wall-clock-paced narration, not real
+ * telemetry: the backend makes one blocking call and returns once, whole,
+ * with no intermediate status to report. Advancing on a timer rather than
+ * real events is the same honesty trade-off the elapsed-seconds counter
+ * already makes explicit (no fake progress bar) — this file just also has to
+ * keep that trade-off honest at the presentation layer: a completed (✓) line
+ * must never claim more than "the wait has gone on long enough that this
+ * plausibly happened by now", never "the AI just told us this step finished".
  */
 
 import { useEffect, useState } from "react";
-import { LoaderCircle, X } from "lucide-react";
-import { SkeletonCard } from "../../components/ui";
+import { CircleCheck, LoaderCircle, X } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { JSA_STAGES } from "./generatingStages";
 
-
-// Paced to spread the four messages across a typical wait rather than burning
-// through them in 16s and then sitting on the last one for two minutes
-const STAGE_MS = 12000;
+// How long each log line stays "active" (spinning) before the next one
+// appears and this one flips to done. Shorter than the old STAGE_MS (12s)
+// on purpose — there are ~2x as many lines now (see generatingStages.ts), so
+// pacing them at roughly the same total-list-consumed-by duration keeps the
+// overall rhythm similar rather than doubling how long the log takes to
+// exhaust.
+const LINE_MS = 7000;
 
 // The range quoted to the user, in seconds. This file used to claim 10-60s;
 // a timed run against the real ThaiLLM endpoint took 133s, so that was wrong
@@ -49,6 +60,75 @@ function formatRange(minSeconds: number, maxSeconds: number): string {
   return `${formatDuration(minSeconds)}–${formatDuration(maxSeconds)}`;
 }
 
+/** One line of the activity log. */
+function LogLine({
+  text,
+  status,
+}: {
+  text: string;
+  status: "done" | "active" | "pending";
+}) {
+  return (
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 6, filter: "blur(3px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="flex items-center gap-2.5"
+    >
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        {/* Three states, three icons — swapped rather than styled in place,
+            so "done" reads as a genuine state change (a check that pops in),
+            not a color fade on the same glyph. */}
+        <AnimatePresence initial={false} mode="wait">
+          {status === "done" ? (
+            <motion.span
+              key="done"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.35, ease: [0.34, 1.36, 0.64, 1] }}
+            >
+              <CircleCheck className="size-4 text-navy" aria-hidden="true" />
+            </motion.span>
+          ) : status === "active" ? (
+            <motion.span
+              key="active"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25 }}
+            >
+              <LoaderCircle
+                className="size-4 animate-spin text-navy"
+                aria-hidden="true"
+              />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="pending"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              className="size-1.5 rounded-full bg-line"
+            />
+          )}
+        </AnimatePresence>
+      </span>
+      <span
+        className={
+          status === "pending"
+            ? "text-sm text-muted"
+            : status === "active"
+              ? "t-shimmer-label text-sm font-medium"
+              : "text-sm text-muted line-through decoration-line"
+        }
+        data-text={status === "active" ? text : undefined}
+      >
+        {text}
+      </span>
+    </motion.li>
+  );
+}
+
 export function GeneratingPanel({
   onCancel,
   stages = JSA_STAGES,
@@ -65,15 +145,18 @@ export function GeneratingPanel({
   typicalMinSeconds?: number;
   typicalMaxSeconds?: number;
 }) {
-  const [stage, setStage] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const stageCount = stages.length;
 
   useEffect(() => {
     const ticker = setInterval(() => {
-      // Hold on the last message rather than looping back to the first, which would look stuck
-      setStage((current) => Math.min(current + 1, stageCount - 1));
-    }, STAGE_MS);
+      // Hold on the last line rather than looping back to the first — once
+      // there are no more lines to reveal, the honest move is to let the
+      // final one sit "active" (still spinning) for however long the real
+      // request actually takes, not to pretend a new step started.
+      setActiveIndex((current) => Math.min(current + 1, stageCount - 1));
+    }, LINE_MS);
     const clock = setInterval(() => setElapsed((s) => s + 1), 1000);
 
     return () => {
@@ -87,20 +170,7 @@ export function GeneratingPanel({
   return (
     <section className="mt-6" aria-busy="true">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <LoaderCircle
-            className="size-5 shrink-0 animate-spin text-navy"
-            aria-hidden="true"
-          />
-          {/* aria-live lives on the <p>, reading the real text node — the
-              shimmer span's ::before duplicate (index.css) is decoration only,
-              not something a screen reader needs to see or announce twice. */}
-          <p className="font-medium" aria-live="polite">
-            <span className="t-shimmer-label" data-text={stages[stage]}>
-              {stages[stage]}
-            </span>
-          </p>
-        </div>
+        <p className="font-medium text-ink">กำลังร่างเอกสารด้วย AI</p>
 
         {onCancel ? (
           // Plain text link (not a Button) — matches the de-emphasized
@@ -136,9 +206,33 @@ export function GeneratingPanel({
           : "ระบบกำลังทำงานอยู่ กรุณาอย่าปิดหรือรีเฟรชหน้านี้ ข้อมูลที่กรอกไว้ยังอยู่ครบ"}
       </p>
 
-      <div className="mt-4 grid gap-3">
-        <SkeletonCard />
-      </div>
+      {/* The activity log itself — see this file's header comment and
+          generatingStages.ts's for why this is a scripted, timer-paced
+          narration and not a real trace of backend events. Rendered as a
+          <ul>/aria-live region rather than a bare div list so a screen
+          reader gets one polite announcement per line as it goes active,
+          the same courtesy the old single-line version gave via its own
+          aria-live paragraph. */}
+      <ul
+        aria-live="polite"
+        aria-label="ขั้นตอนที่ระบบกำลังทำ"
+        className="mt-4 grid list-none gap-2 rounded-[var(--radius)] border border-line bg-raised p-4"
+      >
+        <AnimatePresence initial={false}>
+          {/* Only lines up to and including the active one are ever rendered
+              — a "pending" status/dot exists in the type below for a design
+              that shows the whole plan upfront, but this build reveals one
+              line at a time instead (see the log's own doc comment); nothing
+              currently reaches the pending branch in LogLine. */}
+          {stages.slice(0, activeIndex + 1).map((text, index) => (
+            <LogLine
+              key={text}
+              text={text}
+              status={index < activeIndex ? "done" : "active"}
+            />
+          ))}
+        </AnimatePresence>
+      </ul>
     </section>
   );
 }

@@ -12,7 +12,7 @@
  * the buttons here behave.
  */
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FilePlus2 } from "lucide-react";
 
 import { pdfFileName, procedurePdfFileName } from "../../lib/pdf/fileName";
 import { formatThaiDate } from "../../lib/thaidate";
@@ -29,6 +29,7 @@ export function ProcedurePdfStep({
   config,
   onBack,
   onBackToJsa,
+  onNewJsa,
 }: {
   procedure: ProcedureDocument;
   /** The JSA this procedure was generated from — always available here: a
@@ -37,11 +38,15 @@ export function ProcedurePdfStep({
    * finishing the procedure doesn't mean detouring back through onBackToJsa
    * just to download the JSA. */
   doc: JsaDocument;
-  /** Step photos, keyed by step number — memory-only, see App.tsx */
+  /** Step photos, keyed by step number — persisted in IndexedDB, see App.tsx / lib/photoStore.ts */
   photos: Record<number, StepPhoto>;
   config: PublicConfig | null;
   onBack: () => void;
   onBackToJsa: () => void;
+  /** Same action as PdfStep's "สร้าง JSA ใหม่" — this was the one page in the
+   * two-document flow missing it, leaving no way out but the header logo or
+   * several taps back through กลับไปแก้ไข / กลับไปหน้าเอกสาร JSA. */
+  onNewJsa: () => void;
 }) {
   const procedureDelivery = usePdfDelivery({
     build: async () => {
@@ -148,8 +153,11 @@ export function ProcedurePdfStep({
         delivery={procedureDelivery}
       />
 
-      {/* Only "กลับไปแก้ไข" here — the way back to the JSA moved above the H1,
-          and having it in both places put the same destination on screen twice. */}
+      {/* กลับไปแก้ไข plus สร้าง JSA ใหม่ — the way back to the JSA itself moved
+          above the H1, so this row only needs the two actions PdfStep's own
+          footer has, not a third repeating that link. Without สร้าง JSA ใหม่
+          here, this was the one page in the whole two-document flow with no
+          way to start over except the header logo. */}
       <div className="mt-5 flex items-center justify-center gap-4 text-sm">
         <button
           type="button"
@@ -158,6 +166,17 @@ export function ProcedurePdfStep({
         >
           <ArrowLeft className="size-3.5" aria-hidden="true" />
           กลับไปแก้ไข
+        </button>
+        <span className="text-line" aria-hidden="true">
+          ·
+        </span>
+        <button
+          type="button"
+          onClick={onNewJsa}
+          className="flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+        >
+          <FilePlus2 className="size-3.5" aria-hidden="true" />
+          สร้าง JSA ใหม่
         </button>
       </div>
     </section>

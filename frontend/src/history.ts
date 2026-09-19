@@ -14,6 +14,12 @@
  * sessionStorage), different lifetime, different privacy posture. In
  * particular, clearAllDrafts() must never touch history — see startOver() in
  * App.tsx, which resets the wizard without discarding past work.
+ *
+ * Also the lifecycle owner for lib/photoStore.ts (IndexedDB, step photos):
+ * every path below that drops an entry — remove(), clear(), and readRaw()'s
+ * own silent age/quota pruning — also deletes that entry's photos, so a
+ * photo never outlives the history row it illustrates. photoStore.ts itself
+ * has no expiry logic of its own; it only reacts to what happens here.
  */
 
 import {
@@ -22,6 +28,7 @@ import {
   type JsaDocument,
   type ProcedureDocument,
 } from "./lib/schema";
+import { clearForHistoryIds } from "./lib/photoStore";
 
 const KEY = "genjsa.history.v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,26 +53,38 @@ export type HistoryEntry = {
 
 type HistoryFile = { v: 1; entries: HistoryEntry[] };
 
-/** Reads and validates, newest first. `pruned` = something was dropped on the way. */
-function readRaw(): { entries: HistoryEntry[]; pruned: boolean } {
+/** Reads and validates, newest first. `pruned` = something was dropped on the
+ * way — droppedIds names exactly which entries so the caller can clean up
+ * their photos in photoStore.ts too (age expiry and corrupt records both
+ * silently drop entries here, and neither had a caller-visible hook before
+ * photoStore.ts existed — this is that hook). */
+function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: string[] } {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { entries: [], pruned: false };
+    if (!raw) return { entries: [], pruned: false, droppedIds: [] };
     const parsed = JSON.parse(raw) as Partial<HistoryFile>;
-    if (!Array.isArray(parsed?.entries)) return { entries: [], pruned: true };
+    if (!Array.isArray(parsed?.entries)) return { entries: [], pruned: true, droppedIds: [] };
 
     // Validate rather than cast: these records outlive schema changes, and one
     // corrupt entry must not blank the whole list
     const cutoff = Date.now() - RETENTION_DAYS * DAY_MS;
+    const droppedIds: string[] = [];
     const entries = parsed.entries.flatMap((entry) => {
       if (typeof entry?.id !== "string" || typeof entry?.savedAt !== "number") return [];
-      if (entry.savedAt < cutoff) return [];
+      if (entry.savedAt < cutoff) {
+        droppedIds.push(entry.id);
+        return [];
+      }
       const doc = jsaDocumentSchema.safeParse(entry.doc);
-      if (!doc.success) return [];
+      if (!doc.success) {
+        droppedIds.push(entry.id);
+        return [];
+      }
 
       // Validated separately, and a failure drops ONLY the procedure — losing a
       // malformed procedure is an inconvenience, losing the JSA it belongs to
-      // is the user's actual work
+      // is the user's actual work. Not added to droppedIds: the entry (and
+      // its photos) survive, only its procedure half didn't parse.
       const procedure = entry.procedure
         ? procedureDocumentSchema.safeParse(entry.procedure)
         : undefined;
@@ -81,10 +100,10 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean } {
     });
 
     entries.sort((a, b) => b.savedAt - a.savedAt);
-    return { entries, pruned: entries.length !== parsed.entries.length };
+    return { entries, pruned: entries.length !== parsed.entries.length, droppedIds };
   } catch {
     // Private-mode browsers block storage entirely — keep working without history
-    return { entries: [], pruned: false };
+    return { entries: [], pruned: false, droppedIds: [] };
   }
 }
 
@@ -96,11 +115,13 @@ function writeRaw(entries: HistoryEntry[]): void {
     // Out of quota (or blocked). Drop the oldest entry and try once more —
     // losing the least recent JSA beats failing to save the current one.
     if (entries.length > 1) {
+      const evicted = entries[entries.length - 1];
       try {
         localStorage.setItem(
           KEY,
           JSON.stringify({ v: 1, entries: entries.slice(0, -1) } satisfies HistoryFile),
         );
+        void clearForHistoryIds([evicted.id]);
       } catch {
         /* still no room — history is a convenience, never fail loudly */
       }
@@ -110,8 +131,13 @@ function writeRaw(entries: HistoryEntry[]): void {
 
 /** Newest first. Prunes expired/corrupt records, writing back if anything changed. */
 export function list(): HistoryEntry[] {
-  const { entries, pruned } = readRaw();
-  if (pruned) writeRaw(entries);
+  const { entries, pruned, droppedIds } = readRaw();
+  if (pruned) {
+    writeRaw(entries);
+    // Fire-and-forget, same posture as the rest of photoStore.ts — a photo
+    // cleanup that fails leaves orphaned rows in IndexedDB, never a broken UI.
+    if (droppedIds.length) void clearForHistoryIds(droppedIds);
+  }
   return entries;
 }
 
@@ -155,8 +181,17 @@ export function upsertProcedure(id: string, procedure: ProcedureDocument): void 
   upsertEntry(id, { procedure });
 }
 
+/** Removes the entry AND its photos. Note for HistoryList.tsx's undo flow:
+ * restore() below only needs to put the JSA/procedure documents back to make
+ * the entry usable again — it deliberately does not try to restore photos
+ * within the undo window, so a delete-then-undo loses any photos that were
+ * attached. Accepted trade-off: re-attaching them is exactly the manual
+ * "drag the photo back in" work the user would otherwise do anyway, and it
+ * keeps remove()/restore() from needing to shuttle photo blobs through the
+ * undo toast's in-memory HistoryEntry just for this one edge case. */
 export function remove(id: string): void {
   writeRaw(readRaw().entries.filter((entry) => entry.id !== id));
+  void clearForHistoryIds([id]);
 }
 
 /** Put a removed entry back with its original savedAt, so undo doesn't reorder the list. */
@@ -167,11 +202,13 @@ export function restore(entry: HistoryEntry): void {
 }
 
 export function clear(): void {
+  const ids = readRaw().entries.map((entry) => entry.id);
   try {
     localStorage.removeItem(KEY);
   } catch {
     /* fail silently */
   }
+  if (ids.length) void clearForHistoryIds(ids);
 }
 
 export function newId(): string {

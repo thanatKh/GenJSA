@@ -166,8 +166,11 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
  * base64 would make painfully slow — and out of localStorage history, which
  * only ever stores text it can redraw a document from.
  *
- * Consequence, by design: photos live in memory for one editing session and
- * are gone on refresh. The exported PDF is the permanent copy.
+ * Persisted in IndexedDB instead (lib/photoStore.ts), keyed by history.ts's
+ * historyId — so a photo survives a refresh (the reason this store exists at
+ * all: someone on a phone at the job site loses photos to a stray refresh far
+ * more easily than someone at a desk), but is deleted the moment the history
+ * entry that owns it is, since it has no independent identity without one.
  */
 export type StepPhoto = {
   /** JPEG data URL, already downscaled to PHOTO_MAX_EDGE_PX */

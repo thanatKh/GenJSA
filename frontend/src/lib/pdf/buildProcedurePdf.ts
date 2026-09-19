@@ -208,13 +208,15 @@ export async function buildProcedurePdf(
     let cursor = mT + mmToPt(30);
 
     if (logo) {
-      // A masthead-sized logo, not the compact title-bar one (L.logo is sized
-      // for a slim header row) — this is the one page where the logo is the
-      // visual anchor, not a corner mark.
-      const logoH = mmToPt(28);
+      // Bigger than the compact title-bar logo (L.logo is sized for a slim
+      // header row) since this is the one page where it's the visual anchor,
+      // not a corner mark — but not so big it reads as the whole page's
+      // subject. 16mm keeps it clearly the largest single element while
+      // staying well under the title text's own visual weight below it.
+      const logoH = mmToPt(16);
       const logoW = Math.min(logoH * logo.ratio, contentW * 0.5);
       doc.addImage(logo.data, "PNG", centerX - logoW / 2, cursor, logoW, logoH);
-      cursor += logoH + mmToPt(14);
+      cursor += logoH + mmToPt(10);
     }
 
     E.setFont("bold", L.font.title_th_pt + 10);
@@ -431,7 +433,10 @@ export async function buildProcedurePdf(
   E.drawSignature(P.labels.author, authorName, y);
 
   E.drawFrames();
-  E.drawFooter(P.formCode, P.footerText, C?.name ?? "");
+  // skipPage1: the cover page prints no footer/page-number of its own,
+  // matching how it already has no border frame (drawCoverPage's
+  // zero-height pageFrames entry) — see drawFooter's doc comment.
+  E.drawFooter(P.formCode, P.footerText, C?.name ?? "", true);
 
   // Gives the browser's own PDF viewer something meaningful to show instead of
   // a blob URL fragment (see the note in buildJsaPdf.ts — no <a download> here)

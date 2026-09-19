@@ -13,6 +13,7 @@ import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import type { StepPhoto } from "./lib/pdf/layout";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
+import * as photoStore from "./lib/photoStore";
 import {
   ApiError,
   CancelledError,
@@ -61,16 +62,17 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [procedureBusy, setProcedureBusy] = useState(false);
   const [procedureError, setProcedureError] = useState<string | null>(null);
-  /* Photos attached to procedure steps, keyed by ProcedureStep.no.
+  /* Photos attached to procedure steps, keyed by ProcedureStep.no. This is
+   * the in-memory copy the editor/PDF actually read from; lib/photoStore.ts
+   * (IndexedDB) is the persisted copy that survives a refresh, kept in sync
+   * with this map rather than replacing it — see updatePhoto below for the
+   * write side and the effect below that for the load-on-mount side.
    *
    * Held here rather than inside ProcedureDocument on purpose. That type
    * mirrors the backend model and is written to sessionStorage on every
    * keystroke (see updateProcedure), so megabytes of base64 inside it would be
    * both a schema lie and a typing-lag bug. Keeping them separate also means a
-   * regenerate replaces the document while the photos stay put.
-   *
-   * Consequence, accepted by design: photos are memory-only and do not survive
-   * a refresh. The exported PDF is the permanent copy, and the editor says so. */
+   * regenerate replaces the document while the photos stay put. */
   const [photos, setPhotos] = useState<Record<number, StepPhoto>>({});
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
@@ -79,6 +81,12 @@ export default function App() {
   // never rendered — a state setter here would just cause an extra re-render
   // every generate call for no visual purpose
   const generateController = useRef<AbortController | null>(null);
+  // Same reasoning, separate controller: handleCreateProcedure runs from two
+  // different stages (2: first draft, 3: regenerate) and is never in flight
+  // at the same time as handleGenerate's own controller above, but keeping
+  // them separate avoids one cancel button ever accidentally reaching into
+  // the other flow's request.
+  const procedureController = useRef<AbortController | null>(null);
   // Which historyStore.ts entry the current document belongs to, so edits update
   // that row instead of piling up duplicates
   const [historyId, setHistoryId] = useState<string | null>(() =>
@@ -105,6 +113,27 @@ export default function App() {
   useEffect(() => {
     if (stage >= 3 && !procedure) setStage(2);
   }, [stage, procedure]);
+
+  // Recover photos from IndexedDB whenever historyId points at a real entry —
+  // covers both a refresh mid-review (historyId restored from
+  // currentHistoryId's sessionStorage draft on mount, procedure restored the
+  // same way, photos now recoverable too instead of just gone) and opening a
+  // history entry from HistoryList. Merged into the in-memory map rather than
+  // replacing it outright, though in practice photos is always {} at the two
+  // moments this actually fires (mount, or right after openHistoryEntry sets
+  // both historyId and discards/replaces photos) — merging is what stays
+  // correct if that ever stops being true, at no extra cost when it is.
+  useEffect(() => {
+    if (!historyId) return;
+    let cancelled = false;
+    void photoStore.loadForHistoryId(historyId).then((loaded) => {
+      if (cancelled || Object.keys(loaded).length === 0) return;
+      setPhotos((current) => ({ ...loaded, ...current }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [historyId]);
 
   // Keep the history entry in step with the document being edited
   useEffect(() => {
@@ -157,6 +186,11 @@ export default function App() {
     // Required, not tidiness: photos are keyed by step number, so leaving them
     // behind would attach this job's images to the next job's steps 1, 2, 3…
     setPhotos({});
+    // Also drop this job's persisted photos, not just the in-memory map — the
+    // caller is about to move on to a different job (a new JSA, "เริ่มใหม่",
+    // or opening a different history entry), and the current historyId is
+    // still whatever job is being left behind at the moment this runs.
+    if (historyId) void photoStore.clearForHistoryId(historyId);
   };
 
   const handleGenerate = async (
@@ -326,8 +360,10 @@ export default function App() {
 
     setProcedureBusy(true);
     setProcedureError(null);
+    const controller = new AbortController();
+    procedureController.current = controller;
     try {
-      const generated = await generateProcedure(doc);
+      const generated = await generateProcedure(doc, { signal: controller.signal });
       setProcedure(generated);
       procedureDraft.save(generated);
       // Photos survive a regenerate — they're the user's own work, not the
@@ -336,28 +372,62 @@ export default function App() {
       // redrafts in one session can't accumulate unreachable images.
       setPhotos((current) => {
         const live = new Set(generated.steps.map((step) => step.no));
+        const orphaned = Object.keys(current)
+          .map(Number)
+          .filter((no) => !live.has(no));
+        // Same pruning applied to the persisted copy, or an orphan dropped
+        // from the in-memory map here would simply reappear the next time
+        // this historyId's photos are loaded from IndexedDB (on refresh, or
+        // reopening this entry from history).
+        if (historyId && orphaned.length) {
+          void Promise.all(orphaned.map((no) => photoStore.remove(historyId, no)));
+        }
         return Object.fromEntries(
           Object.entries(current).filter(([no]) => live.has(Number(no))),
         );
       });
       goto(3);
     } catch (caught) {
-      setProcedureError(
-        caught instanceof ApiError
-          ? caught.message
-          : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ กรุณาลองอีกครั้ง",
-      );
+      // Cancelled via ยกเลิก on the busy panel — not a failure, so no error
+      // banner. Unlike handleGenerate's combined flow, there is nothing to
+      // roll back here: this function never touches `procedure` until the
+      // request actually succeeds (see setProcedure above), so a cancel
+      // during a first-time draft leaves the caller back on PdfStep exactly
+      // as it was, and a cancel during a regenerate leaves the existing
+      // procedure on screen untouched.
+      if (!(caught instanceof CancelledError)) {
+        setProcedureError(
+          caught instanceof ApiError
+            ? caught.message
+            : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ กรุณาลองอีกครั้ง",
+        );
+      }
     } finally {
       setProcedureBusy(false);
+      procedureController.current = null;
     }
   };
+
+  // "ยกเลิก" on the busy panel shown for both handleCreateProcedure paths
+  // (first draft from stage 2, regenerate from stage 3) — aborts the
+  // in-flight fetch so the wait actually stops, same reasoning as
+  // cancelGenerate above.
+  const cancelCreateProcedure = () => procedureController.current?.abort();
 
   const updateProcedure = (next: ProcedureDocument) => {
     setProcedure(next);
     procedureDraft.save(next);
   };
 
-  /** Attach or clear one step's photo. Never touches the document. */
+  /** Attach or clear one step's photo. Never touches the document.
+   *
+   * Also writes through to photoStore.ts (IndexedDB) so the photo survives a
+   * refresh — fire-and-forget, same as every other call into that module,
+   * since a failed persist here is never worse than this feature not
+   * existing at all. Skipped when there's no historyId yet (shouldn't happen
+   * in practice: a procedure can't exist before startHistoryEntry() has run,
+   * per handleCreateProcedure's own guard) — there'd be nothing to key the
+   * write by. */
   const updatePhoto = (stepNo: number, photo: StepPhoto | null) => {
     setPhotos((current) => {
       const next = { ...current };
@@ -365,6 +435,9 @@ export default function App() {
       else delete next[stepNo];
       return next;
     });
+    if (!historyId) return;
+    if (photo) void photoStore.save(historyId, stepNo, photo);
+    else void photoStore.remove(historyId, stepNo);
   };
 
   const goto = (next: Stage) => {
@@ -422,7 +495,14 @@ export default function App() {
             onNavigate={goto}
             branch={
               stage >= 3
-                ? { label: "ขั้นตอนปฏิบัติงาน", onBack: () => goto(2) }
+                ? {
+                    label: "ขั้นตอนปฏิบัติงาน",
+                    onBack: () => goto(2),
+                    // Inert on stage 3 (ProcedureEditorStep) — that's the page
+                    // this node itself represents. Stays a live back-link on
+                    // stage 4 (ProcedurePdfStep), a genuinely different page.
+                    isCurrent: stage === 3,
+                  }
                 : undefined
             }
           />
@@ -484,7 +564,7 @@ export default function App() {
             <h1 className="text-[1.75rem] font-semibold text-navy">
               กำลังสร้างขั้นตอนปฏิบัติงาน
             </h1>
-            <GeneratingPanel stages={PROCEDURE_STAGES} />
+            <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
           </div>
         ) : null}
 
@@ -513,7 +593,7 @@ export default function App() {
             <h1 className="text-[1.75rem] font-semibold text-navy">
               กำลังสร้างขั้นตอนปฏิบัติงานใหม่
             </h1>
-            <GeneratingPanel stages={PROCEDURE_STAGES} />
+            <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
           </div>
         ) : null}
 
@@ -542,6 +622,7 @@ export default function App() {
               config={config}
               onBack={() => goto(3)}
               onBackToJsa={() => goto(2)}
+              onNewJsa={startOver}
             />
           </div>
         ) : null}

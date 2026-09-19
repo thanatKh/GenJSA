@@ -109,7 +109,19 @@ export function Stepper({
    * document the user is actually in; `onBack` is the one live action here —
    * back to the JSA PDF page — everything else on the procedure pages already
    * has its own navigation. */
-  branch?: { label: string; onBack: () => void };
+  branch?: {
+    label: string;
+    onBack: () => void;
+    /** True while the caller is actually rendering the procedure-editor
+     * stage this node represents (stage 3) — the same page the node's own
+     * `aria-current="step"` already claims. There, clicking it to jump back
+     * to the JSA PDF page reads as "go back" on a node that visually says
+     * "you are here", the same contradiction steps 1-3 avoid by rendering
+     * their own active circle as plain text, not a button. False on the
+     * procedure PDF stage (4), where the branch node is a real, different
+     * destination one step behind and stays clickable. */
+    isCurrent: boolean;
+  };
 }) {
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
@@ -187,22 +199,35 @@ export function Stepper({
               aria-hidden="true"
             />
             <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
-              <button
-                type="button"
-                onClick={branch.onBack}
-                aria-label={`${branch.label} — กลับไปหน้าเอกสาร JSA`}
-                className="flex min-w-0 items-center gap-1.5 rounded-md
-                           focus-visible:outline-none focus-visible:ring-2
-                           focus-visible:ring-ring/50 sm:gap-2"
-              >
-                <BranchCircle />
-                <span
-                  className="truncate text-xs font-semibold text-navy sm:text-sm"
-                  aria-current="step"
+              {branch.isCurrent ? (
+                // Inert, matching how steps 1-3 render their own active circle
+                // as plain text rather than a button — this node's
+                // aria-current="step" already tells the user they're here, so
+                // it shouldn't also act as a "go back" link on itself.
+                <>
+                  <BranchCircle />
+                  <span
+                    className="truncate text-xs font-semibold text-navy sm:text-sm"
+                    aria-current="step"
+                  >
+                    {branch.label}
+                  </span>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={branch.onBack}
+                  aria-label={`${branch.label} — กลับไปหน้าเอกสาร JSA`}
+                  className="flex min-w-0 items-center gap-1.5 rounded-md
+                             focus-visible:outline-none focus-visible:ring-2
+                             focus-visible:ring-ring/50 sm:gap-2"
                 >
-                  {branch.label}
-                </span>
-              </button>
+                  <BranchCircle />
+                  <span className="truncate text-xs font-semibold text-navy sm:text-sm">
+                    {branch.label}
+                  </span>
+                </button>
+              )}
             </li>
           </>
         ) : null}

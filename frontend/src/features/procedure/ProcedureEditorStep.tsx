@@ -50,7 +50,8 @@ export function ProcedureEditorStep({
   procedure: ProcedureDocument;
   onChange: (next: ProcedureDocument) => void;
   /** Step photos keyed by step number. Kept outside ProcedureDocument — they
-   * never reach the backend and are memory-only (see App.tsx). */
+   * never reach the backend, and persist in IndexedDB rather than this
+   * document (see App.tsx / lib/photoStore.ts). */
   photos: Record<number, StepPhoto>;
   onPhotoChange: (stepNo: number, photo: StepPhoto | null) => void;
   onContinue: () => void;
@@ -68,6 +69,15 @@ export function ProcedureEditorStep({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Local, uncommitted text for the tools textarea — see its onChange/onBlur
+  // below for why this can't be a plain derived `procedure.tools.join("\n")`.
+  // A lazy initializer is enough, no resync effect needed: App.tsx unmounts
+  // this whole component during a regenerate (swaps in GeneratingPanel) and
+  // remounts it fresh once the new procedure lands, and opening a different
+  // history entry replaces the page the same way — so every case that
+  // changes `procedure` out from under this field is already a fresh mount.
+  const [toolsText, setToolsText] = useState(() => procedure.tools.join("\n"));
 
   useEffect(() => {
     return () => {
@@ -129,6 +139,13 @@ export function ProcedureEditorStep({
   // One per line, the same convention EditorStep uses for controls
   const linesToList = (text: string) =>
     text.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  // Commit toolsText into the document. Normally fires on blur; also called
+  // right before leaving this page (สร้างเอกสาร / กลับไปหน้าเอกสาร JSA) in
+  // case the user clicks straight from the textarea without blurring it
+  // first — otherwise the last line they typed would ship in the editor's
+  // local state but never reach procedure.tools or the PDF.
+  const flushTools = () => patch({ tools: linesToList(toolsText) });
 
   return (
     <section>
@@ -200,8 +217,16 @@ export function ProcedureEditorStep({
             <AutoGrowTextarea
               id="tools"
               minRows={2}
-              value={procedure.tools.join("\n")}
-              onChange={(event) => patch({ tools: linesToList(event.target.value) })}
+              // Raw text while typing, not procedure.tools.join("\n") — that
+              // round-trip through linesToList's .filter(Boolean) on every
+              // keystroke silently ate the very newline the user just typed
+              // (an Enter press produces a trailing "" line, which filter()
+              // strips before the next render, so the textarea's own value
+              // snaps back to one line). Local state lets Enter actually land;
+              // the list only gets cleaned up into procedure.tools on blur.
+              value={toolsText}
+              onChange={(event) => setToolsText(event.target.value)}
+              onBlur={flushTools}
               aria-describedby="tools_hint"
             />
             <p id="tools_hint" className="mt-1.5 text-sm text-muted">
@@ -326,11 +351,26 @@ export function ProcedureEditorStep({
           otherwise only be reachable after scrolling the whole document */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-[var(--page-max-w)] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-          <Button type="button" variant="ghost" size="lg" onClick={onBack}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            onClick={() => {
+              flushTools();
+              onBack();
+            }}
+          >
             <ArrowLeft className="size-4" aria-hidden="true" />
             กลับไปหน้าเอกสาร JSA
           </Button>
-          <Button type="button" size="lg" onClick={onContinue}>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => {
+              flushTools();
+              onContinue();
+            }}
+          >
             <FileText className="size-5" aria-hidden="true" />
             สร้างเอกสาร
           </Button>

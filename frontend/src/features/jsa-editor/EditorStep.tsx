@@ -147,8 +147,16 @@ export function EditorStep({
   // too (see the header card below), nothing else was re-checking it, so a
   // cleared field could sail through to a PDF with a blank sign-off name.
   const missingSupervisor = !doc.header.supervisor.trim();
+  // work_activity has no step-1 equivalent at all: "ข้ามขั้นตอนนี้" (manual
+  // mode) starts it blank (buildBlankDocument), and this editable field here
+  // is the only place it's ever set. Backend's JsaHeader.work_activity has
+  // min_length=1, so leaving it blank doesn't just print an empty title on
+  // the JSA PDF — it 422s the moment "สร้างขั้นตอนปฏิบัติงาน" POSTs this doc to
+  // /api/procedure/generate. Catch it here, at the source, rather than as a
+  // failure on a later page the user has no reason to connect back to this field.
+  const missingActivity = !doc.header.work_activity.trim();
   const missingSteps = doc.steps.some((step) => !step.procedure.trim());
-  const incomplete = missingSupervisor || missingSteps;
+  const incomplete = missingSupervisor || missingActivity || missingSteps;
 
   return (
     <section>
@@ -170,6 +178,7 @@ export function EditorStep({
           minRows={1}
           maxRows={4}
           maxLength={WORK_ACTIVITY_MAX}
+          aria-invalid={missingActivity}
           value={doc.header.work_activity}
           onChange={(event) =>
             onChange({
@@ -347,11 +356,14 @@ export function EditorStep({
 
       {incomplete ? (
         <p className="mt-6 text-sm text-danger-text">
-          {missingSupervisor && missingSteps
-            ? "กรุณากรอกชื่อหัวหน้างาน และกรอกขั้นตอนการทำงานที่ยังไม่ได้กรอกให้ครบ (ดูเครื่องหมายเตือนสีแดงด้านบน) ก่อนสร้างเอกสาร"
-            : missingSupervisor
-              ? "กรุณากรอกชื่อหัวหน้างานก่อนสร้างเอกสาร"
-              : "มีขั้นตอนที่ยังไม่ได้กรอกชื่อ (ดูเครื่องหมายเตือนสีแดงด้านบน) กรุณากรอกให้ครบก่อนสร้างเอกสาร"}
+          กรุณากรอก
+          {[
+            missingActivity && "งาน/กิจกรรม",
+            missingSupervisor && "ชื่อหัวหน้างาน",
+            missingSteps && "ขั้นตอนการทำงานที่ยังไม่ได้กรอก",
+          ]
+            .filter((label): label is string => !!label)
+            .join(" ") + " ให้ครบ (ดูเครื่องหมายเตือนสีแดงด้านบน) ก่อนสร้างเอกสาร"}
         </p>
       ) : null}
 

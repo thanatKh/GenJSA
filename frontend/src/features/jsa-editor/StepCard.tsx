@@ -458,8 +458,23 @@ export function StepCard({
             </div>
 
             {step.hazards.length > 1 ? (
+              // ghost + danger hover, matching the desktop table's own
+              // ลบอันตรายนี้ button (see its "shrink-0 text-muted
+              // hover:bg-danger-soft hover:text-danger-text" a few lines
+              // above) — previously variant="destructive" (solid red,
+              // full-width) here only, giving hazard deletion more visual
+              // weight on mobile than deleting the whole step gets, with no
+              // functional reason for the two platforms to disagree: the
+              // action is exactly as reversible either way (see UndoToast in
+              // EditorStep.tsx — 6s undo window on both step and hazard
+              // deletion), so it doesn't need extra shouting on mobile only.
               <div className="mt-2 flex justify-end">
-                <Button variant="destructive" onClick={() => onRemoveHazard(hazardIndex)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onRemoveHazard(hazardIndex)}
+                  className="text-muted hover:bg-danger-soft hover:text-danger-text"
+                >
                   <Trash2 className="size-4" aria-hidden="true" />
                   ลบอันตรายนี้
                 </Button>
@@ -469,7 +484,11 @@ export function StepCard({
         ))}
 
         <div>
-          <Button variant="outline" onClick={addHazard}>
+          {/* ghost, matching the desktop table's own เพิ่มอันตราย button —
+              previously variant="outline" here only, a heavier treatment on
+              mobile than desktop for the same purely-additive action with no
+              reason for the two to differ. */}
+          <Button type="button" variant="ghost" onClick={addHazard}>
             <Plus className="size-4" aria-hidden="true" />
             เพิ่มอันตราย
           </Button>

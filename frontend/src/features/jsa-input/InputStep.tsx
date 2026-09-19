@@ -378,7 +378,19 @@ export function InputStep({
           {/* Secondary on the left, primary on the right, both auto-width —
               matches EditorStep's footer (เริ่มใหม่ / สร้าง PDF) so the two
               most consequential actions in the app share one convention
-              instead of each page inventing its own button arrangement */}
+              instead of each page inventing its own button arrangement.
+              "สร้างเอกสาร" rather than "สร้าง JSA" — this already produces
+              either one or two documents depending on withProcedure, and
+              "สร้างเอกสาร" is the label the rest of the app already uses for
+              exactly that generic case (ProcedureEditorStep's own submit
+              button, PdfDeliveryCard's in-flight/error states), so this
+              matches instead of inventing a JSA-specific and
+              JSA+procedure-specific pair of labels. A prior version tried
+              swapping in the full "สร้าง JSA และขั้นตอนปฏิบัติงาน" label when
+              withProcedure was checked — correct in principle, but it forced
+              a full-width, two-line-tall button at narrow widths that read as
+              disproportionate next to ล้างฟอร์ม for no real gain over the
+              checkbox above it already saying the same thing. */}
           <div className="flex items-center justify-between gap-2">
             <Button
               type="button"
@@ -392,7 +404,7 @@ export function InputStep({
             </Button>
             <Button type="submit" size="lg">
               <Sparkles className="size-5" aria-hidden="true" />
-              สร้าง JSA
+              สร้างเอกสาร
             </Button>
           </div>
 

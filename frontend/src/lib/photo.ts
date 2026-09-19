@@ -6,8 +6,9 @@
  * several megabytes, and embedding a handful of those makes the generated PDF
  * huge and jsPDF's addImage slow, for detail nobody can see on an A4 page.
  *
- * Deliberately no persistence anywhere in this path — see StepPhoto in
- * lib/pdf/layout.ts for why photos live in memory only.
+ * No persistence in this file itself — decoding/resizing only. See StepPhoto
+ * in lib/pdf/layout.ts and lib/photoStore.ts for where the result actually
+ * gets saved (IndexedDB, via App.tsx's updatePhoto).
  *
  * jsPDF-free on purpose: the editor imports this eagerly, and the PDF builders
  * are behind a dynamic import (see the bundle note in lib/pdf/engine.ts).

@@ -4,10 +4,12 @@
  * or on a desktop with a screenshot in the clipboard: drag-and-drop, Ctrl-V
  * paste, and the file picker (which offers the camera directly on mobile).
  *
- * Photos are downscaled on the way in (lib/photo.ts) and held in memory only —
- * they are never written to sessionStorage or history, so they do not survive a
- * refresh. That is a deliberate trade, and the note below says so where the
- * user will actually read it: the exported PDF is the permanent copy.
+ * Photos are downscaled on the way in (lib/photo.ts), then persisted in
+ * IndexedDB (lib/photoStore.ts) so an accidental refresh on a phone mid-review
+ * doesn't lose them — they still never reach the backend, never reach
+ * ProcedureDocument or history.ts's own JSON (see StepPhoto in
+ * lib/pdf/layout.ts for why), and are still tied to this device's browser
+ * only, same as the rest of history.ts.
  */
 
 import { useRef, useState } from "react";
@@ -69,7 +71,8 @@ export function StepPhotoField({
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted">
-          รูปภาพจะไม่ถูกบันทึกไว้ในประวัติ กรุณาบันทึกไฟล์ PDF เพื่อเก็บไว้
+          รูปภาพนี้ถูกเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น หากลบประวัติงานนี้
+          รูปภาพจะหายไปด้วย — บันทึกไฟล์ PDF เพื่อเก็บไว้ถาวร
         </p>
       </div>
     );
@@ -79,7 +82,17 @@ export function StepPhotoField({
     <div className="mt-3 border-t border-line pt-3">
       {/* A div, not a button: it holds its own button and a file input, and a
           button inside a button is invalid. Click and keyboard activation are
-          wired explicitly instead. */}
+          wired explicitly instead.
+          onClick here opens the same file picker the inner button does — the
+          helper text right below promises "...หรือกดเพื่อเลือกไฟล์" (or click
+          to select a file), but until this was added only the small inner
+          button actually did anything; clicking the surrounding dashed box
+          (most of the tap target, and the natural place to click after
+          reading "click to select") silently did nothing. Guarded against
+          double-firing: a click on the inner Button already opens the picker
+          itself and then bubbles up to this handler too, so it's skipped
+          here via closest("button") rather than opening two file dialogs
+          (browsers only ever show one, but there's no reason to ask twice). */}
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -96,12 +109,17 @@ export function StepPhotoField({
         // fileToStepPhoto and gets a real error, rather than this doing
         // nothing and leaving the user wondering if the paste landed at all.
         onPaste={(event) => void accept(fileFrom(event.clipboardData))}
+        onClick={(event) => {
+          if (busy) return;
+          if ((event.target as HTMLElement).closest("button")) return;
+          inputRef.current?.click();
+        }}
         tabIndex={0}
         role="group"
         aria-label={`เพิ่มรูปภาพประกอบขั้นตอนที่ ${stepNo}`}
         className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius)]
                     border border-dashed p-3 text-sm transition-colors
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
+                    cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
                     ${dragging ? "border-navy bg-navy-soft" : "border-line"}`}
       >
         <Button
