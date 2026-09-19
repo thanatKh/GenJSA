@@ -306,6 +306,12 @@ export async function createEngine(L: PdfLayout) {
    */
   const drawFrames = () => {
     pageFrames.forEach((frame, index) => {
+      // top === bottom is the documented "no frame on this page" placeholder
+      // (pushed to keep this array's index aligned with the physical page
+      // number — see drawSignature's and buildProcedurePdf's cover page use
+      // of it) — draw nothing rather than a zero-height rect, which jsPDF
+      // renders as a visible stray horizontal line.
+      if (frame.bottom === frame.top) return;
       doc.setPage(index + 1);
       doc.setLineWidth(L.table.outer_border_width_pt);
       doc.setDrawColor(...border);

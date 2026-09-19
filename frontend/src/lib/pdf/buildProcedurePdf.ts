@@ -56,7 +56,7 @@ export async function buildProcedurePdf(
   const photos = options.photos ?? {};
 
   const E = await createEngine(L);
-  const { doc, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines } = E;
+  const { doc, pageW, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines, logo, border } = E;
 
   const headingPt = L.font.body_pt + 2;
   const headingLineH = headingPt * L.font.line_height;
@@ -150,17 +150,6 @@ export async function buildProcedurePdf(
     });
   };
 
-  /** A step's photo, drawn as one atomic block under its sub-steps.
-   *
-   * Deliberately not routed through drawFlowing: that advances one text line at
-   * a time and would happily split an image across a page boundary. An image
-   * either fits on the current page or moves whole to the next one.
-   *
-   * The height clamp is load-bearing. Without it a portrait photo can be taller
-   * than the usable body area, and then need() flips to a fresh page where it
-   * STILL doesn't fit — drawing off the bottom of every page forever. Clamping
-   * to the body height (and re-deriving the width from the clamped height)
-   * guarantees termination and preserves the aspect ratio either way. */
   /** Drawn size of a photo: fits inside BOTH a width and a height budget,
    * preserving aspect ratio.
    *
@@ -187,16 +176,113 @@ export async function buildProcedurePdf(
     return { w, h };
   };
 
-  /** One atomic block — never split across pages, unlike drawFlowing's text. */
+  /** One atomic block — never split across pages, unlike drawFlowing's text.
+   * Centered in the text column rather than flush-left: a narrow (portrait or
+   * panorama) image left-aligned at the sub-step indent reads as accidentally
+   * placed, especially once its width is well short of maxW. */
   const drawPhoto = (photo: StepPhoto) => {
     const { w, h } = photoSize(photo);
+    const maxW = contentW - subIndent;
+    const x = mL + subIndent + (maxW - w) / 2;
+
     y += photoGap;
     need(h);
-    doc.addImage(photo.data, "JPEG", mL + subIndent, y, w, h);
+    doc.addImage(photo.data, "JPEG", x, y, w, h);
     y += h;
   };
 
-  y = drawHeader(y);
+  // ------------------------------------------------------------- cover --
+  /** A dedicated title page before the content starts: logo, document title,
+   * the job name, then the header fields laid out spaciously and centered —
+   * a report cover, not another copy of the bordered header block.
+   *
+   * Pushes a zero-height pageFrames entry for itself. pageFrames is indexed
+   * by page number (drawFrames below does doc.setPage(index + 1)), so
+   * skipping this page here would shift every later frame onto the wrong
+   * physical page — same trick drawSignature already uses for a page with no
+   * frame of its own, just made explicit here since this isn't the last page. */
+  const drawCoverPage = () => {
+    E.pageFrames.push({ top: mT, bottom: mT });
+
+    const centerX = pageW / 2;
+    let cursor = mT + mmToPt(30);
+
+    if (logo) {
+      // A masthead-sized logo, not the compact title-bar one (L.logo is sized
+      // for a slim header row) — this is the one page where the logo is the
+      // visual anchor, not a corner mark.
+      const logoH = mmToPt(28);
+      const logoW = Math.min(logoH * logo.ratio, contentW * 0.5);
+      doc.addImage(logo.data, "PNG", centerX - logoW / 2, cursor, logoW, logoH);
+      cursor += logoH + mmToPt(14);
+    }
+
+    E.setFont("bold", L.font.title_th_pt + 10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(P.titleTh, centerX, cursor, { align: "center" });
+    cursor += (L.font.title_th_pt + 10) * 1.3;
+
+    if (P.titleEn) {
+      E.setFont("normal", L.font.title_en_pt + 4);
+      doc.text(P.titleEn, centerX, cursor, { align: "center" });
+      cursor += (L.font.title_en_pt + 4) * 1.3;
+    }
+
+    // A rule under the title, sized to the longer of the two title lines
+    // rather than the full page width — a full-width rule this high up reads
+    // as a header bar, not a title page's own accent.
+    cursor += mmToPt(6);
+    const ruleW = mmToPt(60);
+    doc.setDrawColor(...border);
+    doc.setLineWidth(1.2);
+    doc.line(centerX - ruleW / 2, cursor, centerX + ruleW / 2, cursor);
+    cursor += mmToPt(16);
+
+    // The job name — the one piece of content worth setting larger than body
+    // text on a cover, since it's the answer to "which job is this for"
+    const activityPt = L.font.title_en_pt;
+    const activityLines = wrap(
+      procedure.header.work_activity,
+      contentW * 0.8,
+      "bold",
+      activityPt,
+    );
+    const activityLineH = activityPt * L.font.line_height;
+    activityLines.forEach((line) => {
+      E.setFont("bold", activityPt);
+      doc.text(line.text, centerX, cursor, { align: "center", maxWidth: contentW * 0.8 });
+      cursor += activityLineH;
+    });
+    cursor += mmToPt(12);
+
+    // Supervisor / date, centered as a simple two-line summary rather than
+    // the bordered field boxes the content pages use — those boxes are a
+    // form convention, and this page is deliberately not a form.
+    const infoPt = L.font.header_label_pt;
+    const infoLineH = infoPt * L.font.line_height;
+    const infoLine = (label: string, value: string) => {
+      if (!value.trim()) return;
+      E.setFont("bold", infoPt);
+      const labelText = `${label}: `;
+      const labelW = doc.getTextWidth(labelText);
+      E.setFont("normal", infoPt);
+      const valueW = doc.getTextWidth(value);
+      const startX = centerX - (labelW + valueW) / 2;
+      E.setFont("bold", infoPt);
+      doc.text(labelText, startX, cursor);
+      E.setFont("normal", infoPt);
+      doc.text(value, startX + labelW, cursor);
+      cursor += infoLineH;
+    };
+    infoLine(D.labels.supervisor, procedure.header.supervisor);
+    infoLine(P.labels.date, formatThaiDate(procedure.header.analysis_date));
+
+    doc.addPage();
+  };
+
+  drawCoverPage();
+
+  y = drawHeader(mT);
 
   // Every page repeats the same header, so the first one's height is the height
   // on all of them — i.e. this is exactly what a fresh page has room for, and
