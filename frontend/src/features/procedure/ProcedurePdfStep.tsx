@@ -102,16 +102,40 @@ export function ProcedurePdfStep({
         กลับไปหน้าเอกสาร JSA
       </button>
 
-      <h1 className="text-[1.75rem] font-semibold text-navy">เอกสารขั้นตอนปฏิบัติงาน</h1>
+      <h1 className="text-[1.75rem] font-semibold text-navy">
+        เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)
+      </h1>
       <p className="mt-1.5 text-muted">
         {procedureDelivery.savePickerSupported
           ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
           : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
       </p>
 
+      {/* JSA first — it's the document that was actually finished first (this
+          page's own procedure is generated FROM a completed JSA), so leading
+          with it matches the order everywhere else in the app rather than
+          putting the newer document ahead of the one it depends on. Its own
+          card, not folded into the procedure's: they're two separate files
+          with two separate blobs. Both cards' titles read identically (same
+          job, same work_activity), so the kicker is what actually tells them
+          apart at a glance rather than relying on the metadata rows alone. */}
       <PdfDeliveryCard
         className="mt-6"
-        kicker="เอกสารขั้นตอนปฏิบัติงาน"
+        kicker="เอกสาร JSA"
+        title={doc.header.work_activity}
+        summary={[
+          { label: "หัวหน้างาน", value: doc.header.supervisor },
+          { label: "วันที่วิเคราะห์", value: formatThaiDate(doc.header.analysis_date) },
+          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
+        ]}
+        delivery={jsaDelivery}
+      />
+
+      {/* The procedure this page is actually about — offered second, after
+          the JSA it was generated from. */}
+      <PdfDeliveryCard
+        className="mt-4"
+        kicker="เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)"
         title={procedure.header.work_activity}
         summary={[
           { label: "หัวหน้างาน", value: procedure.header.supervisor },
@@ -122,26 +146,6 @@ export function ProcedurePdfStep({
           },
         ]}
         delivery={procedureDelivery}
-      />
-
-      {/* The JSA this procedure came from, offered here too — by this point
-          the user has finished both documents, and having only the procedure
-          downloadable on the final screen meant a detour back through
-          "กลับไปหน้าเอกสาร JSA" just to get the JSA's own PDF. Its own card,
-          not folded into the one above: they're two separate files with two
-          separate blobs. Both cards' titles read identically (same job, same
-          work_activity), so the kicker is what actually tells them apart at
-          a glance rather than relying on the metadata rows alone. */}
-      <PdfDeliveryCard
-        className="mt-4"
-        kicker="เอกสาร JSA"
-        title={doc.header.work_activity}
-        summary={[
-          { label: "หัวหน้างาน", value: doc.header.supervisor },
-          { label: "วันที่วิเคราะห์", value: formatThaiDate(doc.header.analysis_date) },
-          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
-        ]}
-        delivery={jsaDelivery}
       />
 
       {/* Only "กลับไปแก้ไข" here — the way back to the JSA moved above the H1,

@@ -102,7 +102,9 @@ export function PdfStep({
         <div className="flex items-start gap-3">
           <ListOrdered className="size-6 shrink-0 text-muted" aria-hidden="true" />
           <div className="min-w-0">
-            <h2 className="font-display font-semibold text-ink">ขั้นตอนปฏิบัติงาน</h2>
+            <h2 className="font-display font-semibold text-ink">
+              ขั้นตอนปฏิบัติงาน (Work Procedure)
+            </h2>
             <p className="mt-1 text-sm text-muted">
               {hasProcedure
                 ? "คุณสร้างขั้นตอนปฏิบัติงานจาก JSA นี้ไว้แล้ว เปิดเพื่อตรวจทานหรือสร้างเอกสาร"

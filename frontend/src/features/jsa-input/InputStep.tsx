@@ -163,10 +163,12 @@ export function InputStep({
   // the sessionStorage draft: every fresh JSA should start on the fast
   // default, not silently inherit whatever the user last toggled
   const [detailed, setDetailed] = useState(false);
-  // "สร้างขั้นตอนปฏิบัติงานด้วย" — same reasoning: unchecked by default so this
-  // never silently doubles the wait for someone who didn't ask for it, and so
-  // the checkbox itself does the discoverability work of showing every
-  // first-time visitor that GenJSA can produce both documents.
+  // "สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)" — same reasoning: unchecked
+  // by default so this never silently doubles the wait for someone who
+  // didn't ask for it, and so the checkbox itself does the discoverability
+  // work of showing every first-time visitor that GenJSA can produce both
+  // documents. The doubled-wait warning lives in GeneratingPanel once busy
+  // starts (typicalMin/MaxSeconds), not repeated here.
   const [withProcedure, setWithProcedure] = useState(false);
 
   const {
@@ -366,9 +368,9 @@ export function InputStep({
               {withProcedure ? <Check className="size-3.5" aria-hidden="true" /> : null}
             </button>
             <span className="text-ink">
-              สร้างขั้นตอนปฏิบัติงานด้วย
+              สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)
               <span className="block text-muted">
-                ขยายแต่ละขั้นตอนใน JSA เป็นวิธีปฏิบัติงานอย่างละเอียด ใช้เวลาเพิ่มขึ้นประมาณเท่าตัว
+                ขยายแต่ละขั้นตอนใน JSA เป็นวิธีปฏิบัติงานอย่างละเอียด
               </span>
             </span>
           </label>

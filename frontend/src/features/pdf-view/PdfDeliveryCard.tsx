@@ -52,8 +52,12 @@ export function PdfDeliveryCard({
           <FileText className="size-6 shrink-0 text-muted" aria-hidden="true" />
         )}
         <div className="min-w-0">
+          {/* No uppercase transform — kicker text can carry Latin letters now
+              (e.g. "(Work Procedure)"), and CSS uppercase would shout an
+              English gloss that reads fine in mixed case. It was a no-op on
+              pure Thai anyway, which has no letter case to transform. */}
           {kicker ? (
-            <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wide text-navy">
+            <span className="mb-0.5 block text-xs font-semibold tracking-wide text-navy">
               {kicker}
             </span>
           ) : null}
