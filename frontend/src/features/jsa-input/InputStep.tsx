@@ -138,7 +138,7 @@ export function InputStep({
   busy,
   error,
 }: {
-  onGenerate: (values: InputForm, detailed: boolean, withProcedure: boolean) => void;
+  onGenerate: (values: InputForm, withProcedure: boolean) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
   ) => void;
@@ -159,11 +159,9 @@ export function InputStep({
   const [placeholder] = useState(
     () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)],
   );
-  // "วิเคราะห์อย่างละเอียด" — deliberately local state, not part of InputForm/
-  // the sessionStorage draft: every fresh JSA should start on the fast
-  // default, not silently inherit whatever the user last toggled
-  const [detailed, setDetailed] = useState(false);
-  // "สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)" — same reasoning: unchecked
+  // "สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)" — deliberately local state,
+  // not part of InputForm/the sessionStorage draft: every fresh JSA should
+  // start unchecked
   // by default so this never silently doubles the wait for someone who
   // didn't ask for it, and so the checkbox itself does the discoverability
   // work of showing every first-time visitor that GenJSA can produce both
@@ -233,12 +231,23 @@ export function InputStep({
         </button>
       ) : null}
 
+      {/* Swaps to a dedicated "กำลังสร้าง…" heading while busy, matching how
+          App.tsx's two procedure-generation call sites already do it
+          (กำลังสร้างขั้นตอนปฏิบัติงาน / …ใหม่) — this page used to keep its
+          idle title showing through the whole generate, the one place JSA
+          and procedure loading didn't read as the same pattern. */}
       <h1 className="text-[1.75rem] font-semibold text-navy">
-        วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
+        {busy
+          ? withProcedure
+            ? "กำลังสร้าง JSA และขั้นตอนปฏิบัติงาน"
+            : "กำลังสร้าง JSA"
+          : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
       </h1>
-      <p className="mt-1.5 text-muted">
-        อธิบายว่าจะทำงานอะไร แล้วระบบจะร่าง JSA ให้ตรวจทาน
-      </p>
+      {busy ? null : (
+        <p className="mt-1.5 text-muted">
+          อธิบายว่าจะทำงานอะไร แล้วระบบจะร่าง JSA ให้ตรวจทาน
+        </p>
+      )}
 
       {busy ? (
         // Replace the form entirely while generating — fields are disabled anyway,
@@ -255,7 +264,7 @@ export function InputStep({
         />
       ) : (
         <form
-          onSubmit={handleSubmit((values) => onGenerate(values, detailed, withProcedure))}
+          onSubmit={handleSubmit((values) => onGenerate(values, withProcedure))}
           className="mt-6 grid gap-5"
           noValidate
         >
@@ -323,36 +332,13 @@ export function InputStep({
           {/* Plain button[role=checkbox] rather than a native <input
               type="checkbox"> — keeps the same brand-styled square as the
               rest of the app's hand-rolled controls instead of an unstyled
-              OS checkbox, with no new shadcn component needed for one field. */}
-          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={detailed}
-              onClick={() => setDetailed((v) => !v)}
-              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                detailed
-                  ? "border-navy bg-navy text-white"
-                  : "border-line bg-surface"
-              }`}
-            >
-              {detailed ? <Check className="size-3.5" aria-hidden="true" /> : null}
-            </button>
-            <span className="text-ink">
-              วิเคราะห์อย่างละเอียด
-              <span className="block text-muted">
-                ระบบจะพิจารณาอันตรายและมาตรการป้องกันอย่างละเอียดมากขึ้น
-              </span>
-            </span>
-          </label>
-
-          {/* A second checkbox, not a separate section — this is one more
-              choice about what to generate, same weight as "วิเคราะห์อย่างละเอียด"
-              above. Unchecked by default: the procedure is still an optional
-              power feature, not something every JSA should carry. Its real
-              job is discoverability — every first-time visitor now SEES this
-              capability exists on the very first screen, which a card buried
-              on the PDF page three stages later never achieved. */}
+              OS checkbox, with no new shadcn component needed for one field.
+              Not a separate section — this is a choice about what to
+              generate. Unchecked by default: the procedure is still an
+              optional power feature, not something every JSA should carry.
+              Its real job is discoverability — every first-time visitor now
+              SEES this capability exists on the very first screen, which a
+              card buried on the PDF page three stages later never achieved. */}
           <label className="flex cursor-pointer items-start gap-2.5 text-sm">
             <button
               type="button"

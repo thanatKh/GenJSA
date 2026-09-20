@@ -10,10 +10,9 @@ import { InputStep } from "./features/jsa-input/InputStep";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
-import type { StepPhoto } from "./lib/pdf/layout";
+import { usePhotos } from "./features/procedure/usePhotos";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
-import * as photoStore from "./lib/photoStore";
 import {
   ApiError,
   CancelledError,
@@ -53,6 +52,57 @@ function buildBlankDocument(
 // for why they don't get their own step in the progress bar.
 type Stage = 0 | 1 | 2 | 3 | 4;
 
+/** What <main> actually renders, computed once from (stage, doc, procedure,
+ * busy, procedureBusy) instead of re-derived at each of 7 separate JSX
+ * "stage === N && doc && ..." conditions.
+ *
+ * Before this existed, the rule "what does stage 2 show" was written out
+ * twice (once for `procedureBusy`, once for `!procedureBusy`) and had to be
+ * kept in sync by hand with the three useEffect guards below that patch up
+ * invalid (stage, doc, procedure) combinations after the fact — nearly every
+ * commit that's touched this file's render section (procedure flow, photo
+ * feature, stepper branch) had to update both places and cross-check they
+ * still agreed. Computing `view` once here doesn't change what CAN happen —
+ * the guard effects and state setters are untouched — it only gives the
+ * render decision one owner instead of several copies that could drift.
+ *
+ * Deliberately not a reducer/discriminated-union replacement of stage/doc/
+ * procedure themselves — that's a bigger, riskier change to the state shape
+ * and handler call sites. This only centralizes what's rendered, computed
+ * fresh every render so it can never itself go stale.
+ */
+type View =
+  | { kind: "input" }
+  | { kind: "editing"; doc: JsaDocument }
+  | { kind: "procedureGenerating"; doc: JsaDocument; heading: string }
+  | { kind: "pdf"; doc: JsaDocument }
+  | { kind: "procedureEditing"; doc: JsaDocument; procedure: ProcedureDocument }
+  | { kind: "procedurePdf"; doc: JsaDocument; procedure: ProcedureDocument };
+
+function computeView(
+  stage: Stage,
+  doc: JsaDocument | null,
+  procedure: ProcedureDocument | null,
+  procedureBusy: boolean,
+): View | null {
+  if (stage === 0) return { kind: "input" };
+  if (stage === 1) return doc ? { kind: "editing", doc } : null;
+  if (stage === 2) {
+    if (!doc) return null;
+    return procedureBusy
+      ? { kind: "procedureGenerating", doc, heading: "กำลังสร้างขั้นตอนปฏิบัติงาน" }
+      : { kind: "pdf", doc };
+  }
+  if (stage === 3) {
+    if (!doc || !procedure) return null;
+    return procedureBusy
+      ? { kind: "procedureGenerating", doc, heading: "กำลังสร้างขั้นตอนปฏิบัติงานใหม่" }
+      : { kind: "procedureEditing", doc, procedure };
+  }
+  // stage === 4
+  return doc && procedure ? { kind: "procedurePdf", doc, procedure } : null;
+}
+
 export default function App() {
   const [stage, setStage] = useState<Stage>(0);
   const [doc, setDoc] = useState<JsaDocument | null>(() => docDraft.load());
@@ -62,18 +112,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [procedureBusy, setProcedureBusy] = useState(false);
   const [procedureError, setProcedureError] = useState<string | null>(null);
-  /* Photos attached to procedure steps, keyed by ProcedureStep.no. This is
-   * the in-memory copy the editor/PDF actually read from; lib/photoStore.ts
-   * (IndexedDB) is the persisted copy that survives a refresh, kept in sync
-   * with this map rather than replacing it — see updatePhoto below for the
-   * write side and the effect below that for the load-on-mount side.
-   *
-   * Held here rather than inside ProcedureDocument on purpose. That type
-   * mirrors the backend model and is written to sessionStorage on every
-   * keystroke (see updateProcedure), so megabytes of base64 inside it would be
-   * both a schema lie and a typing-lag bug. Keeping them separate also means a
-   * regenerate replaces the document while the photos stay put. */
-  const [photos, setPhotos] = useState<Record<number, StepPhoto>>({});
   const [error, setError] = useState<string | null>(null);
   const [appName, setAppName] = useState("GenJSA");
   const [config, setConfig] = useState<PublicConfig | null>(null);
@@ -92,6 +130,14 @@ export default function App() {
   const [historyId, setHistoryId] = useState<string | null>(() =>
     currentHistoryId.load(),
   );
+  // Owns the photos map AND keeping it synced with lib/photoStore.ts
+  // (IndexedDB) — see usePhotos.ts's own header for why this used to be 4
+  // separate hand-synced call sites in this file. Re-keys to whatever job
+  // `historyId` currently points at; the hook's own effect handles loading
+  // that job's persisted photos (covers both a refresh mid-review and
+  // opening a history entry).
+  const { photos, setPhoto: updatePhoto, discardAll: discardAllPhotos, pruneToLiveSteps } =
+    usePhotos(historyId);
 
   // If a draft JSA is left over (refresh mid-flow), jump straight back to the editor step
   useEffect(() => {
@@ -113,27 +159,6 @@ export default function App() {
   useEffect(() => {
     if (stage >= 3 && !procedure) setStage(2);
   }, [stage, procedure]);
-
-  // Recover photos from IndexedDB whenever historyId points at a real entry —
-  // covers both a refresh mid-review (historyId restored from
-  // currentHistoryId's sessionStorage draft on mount, procedure restored the
-  // same way, photos now recoverable too instead of just gone) and opening a
-  // history entry from HistoryList. Merged into the in-memory map rather than
-  // replacing it outright, though in practice photos is always {} at the two
-  // moments this actually fires (mount, or right after openHistoryEntry sets
-  // both historyId and discards/replaces photos) — merging is what stays
-  // correct if that ever stops being true, at no extra cost when it is.
-  useEffect(() => {
-    if (!historyId) return;
-    let cancelled = false;
-    void photoStore.loadForHistoryId(historyId).then((loaded) => {
-      if (cancelled || Object.keys(loaded).length === 0) return;
-      setPhotos((current) => ({ ...loaded, ...current }));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [historyId]);
 
   // Keep the history entry in step with the document being edited
   useEffect(() => {
@@ -183,30 +208,20 @@ export default function App() {
     setProcedure(null);
     setProcedureError(null);
     procedureDraft.clear();
-    // Required, not tidiness: photos are keyed by step number, so leaving them
-    // behind would attach this job's images to the next job's steps 1, 2, 3…
-    setPhotos({});
-    // Also drop this job's persisted photos, not just the in-memory map — the
-    // caller is about to move on to a different job (a new JSA, "เริ่มใหม่",
-    // or opening a different history entry), and the current historyId is
-    // still whatever job is being left behind at the moment this runs.
-    if (historyId) void photoStore.clearForHistoryId(historyId);
+    // Required, not tidiness: photos are keyed by step number, so leaving
+    // them behind would attach this job's images to the next job's steps
+    // 1, 2, 3… — see usePhotos.ts for why this now clears both the
+    // in-memory map and the persisted copy in one call.
+    discardAllPhotos();
   };
 
-  const handleGenerate = async (
-    values: InputForm,
-    detailed: boolean,
-    withProcedure: boolean,
-  ) => {
+  const handleGenerate = async (values: InputForm, withProcedure: boolean) => {
     setBusy(true);
     setError(null);
     const controller = new AbortController();
     generateController.current = controller;
     try {
-      const generated = await generateJsa(
-        { ...values, detailed },
-        { signal: controller.signal },
-      );
+      const generated = await generateJsa(values, { signal: controller.signal });
       setDoc(generated);
       docDraft.save(generated);
       // A new JSA means any procedure on screen describes a different job
@@ -367,25 +382,11 @@ export default function App() {
       setProcedure(generated);
       procedureDraft.save(generated);
       // Photos survive a regenerate — they're the user's own work, not the
-      // AI's, and the step they illustrate usually still exists. Drop only the
-      // ones whose step number is gone from the new draft, so repeated
-      // redrafts in one session can't accumulate unreachable images.
-      setPhotos((current) => {
-        const live = new Set(generated.steps.map((step) => step.no));
-        const orphaned = Object.keys(current)
-          .map(Number)
-          .filter((no) => !live.has(no));
-        // Same pruning applied to the persisted copy, or an orphan dropped
-        // from the in-memory map here would simply reappear the next time
-        // this historyId's photos are loaded from IndexedDB (on refresh, or
-        // reopening this entry from history).
-        if (historyId && orphaned.length) {
-          void Promise.all(orphaned.map((no) => photoStore.remove(historyId, no)));
-        }
-        return Object.fromEntries(
-          Object.entries(current).filter(([no]) => live.has(Number(no))),
-        );
-      });
+      // AI's, and the step they illustrate usually still exists. Drop only
+      // the ones whose step number is gone from the new draft, so repeated
+      // redrafts in one session can't accumulate unreachable images (both
+      // the in-memory map and the persisted copy — see usePhotos.ts).
+      pruneToLiveSteps(generated.steps.map((step) => step.no));
       goto(3);
     } catch (caught) {
       // Cancelled via ยกเลิก on the busy panel — not a failure, so no error
@@ -419,27 +420,6 @@ export default function App() {
     procedureDraft.save(next);
   };
 
-  /** Attach or clear one step's photo. Never touches the document.
-   *
-   * Also writes through to photoStore.ts (IndexedDB) so the photo survives a
-   * refresh — fire-and-forget, same as every other call into that module,
-   * since a failed persist here is never worse than this feature not
-   * existing at all. Skipped when there's no historyId yet (shouldn't happen
-   * in practice: a procedure can't exist before startHistoryEntry() has run,
-   * per handleCreateProcedure's own guard) — there'd be nothing to key the
-   * write by. */
-  const updatePhoto = (stepNo: number, photo: StepPhoto | null) => {
-    setPhotos((current) => {
-      const next = { ...current };
-      if (photo) next[stepNo] = photo;
-      else delete next[stepNo];
-      return next;
-    });
-    if (!historyId) return;
-    if (photo) void photoStore.save(historyId, stepNo, photo);
-    else void photoStore.remove(historyId, stepNo);
-  };
-
   const goto = (next: Stage) => {
     setStage(next);
     window.scrollTo({ top: 0 });
@@ -450,6 +430,15 @@ export default function App() {
   // resync, which would throw away the user's own edits to the procedure
   const procedureStale =
     !!doc && !!procedure && stepFingerprint(doc) !== stepFingerprint(procedure);
+
+  // null here means "stage doesn't match what's actually in state" — e.g. a
+  // fresh mount on stage 1 before the very first effect below has run, or a
+  // frame between setDoc(null) and the guard effect reacting to it. Never
+  // rendered as an error: the effects below always resolve it to a real
+  // stage on the next render, so <main> just renders nothing that one frame,
+  // the same "briefly blank, never wrong" behavior the old JSX had by
+  // falling through every condition.
+  const view = computeView(stage, doc, procedure, procedureBusy);
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface">
@@ -508,7 +497,7 @@ export default function App() {
           />
         </div>
 
-        {stage === 0 ? (
+        {view?.kind === "input" ? (
           // Below xl: unchanged — single 45rem column, history stacked below
           // the form. From xl up, with real desktop width to spare: history
           // moves beside the form as its own column instead of competing for
@@ -545,9 +534,9 @@ export default function App() {
             keeps this stage's body flush with AppBar's edges (both share
             <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
             and off-center under a wider title bar. */}
-        {stage === 1 && doc ? (
+        {view?.kind === "editing" ? (
           <EditorStep
-            doc={doc}
+            doc={view.doc}
             onChange={setDoc}
             onContinue={() => goto(2)}
             onStartOver={startOver}
@@ -558,20 +547,20 @@ export default function App() {
         {/* The procedure takes as long as the JSA did, so it gets the same
             honest wait — elapsed counter and all — rather than a lone spinner
             on a button. Replaces the page content for the same reason
-            InputStep does: the wait should be the only thing on screen. */}
-        {stage === 2 && doc && procedureBusy ? (
+            InputStep does: the wait should be the only thing on screen.
+            Covers both stage 2's first-time draft and stage 3's regenerate —
+            computeView picks the right heading for whichever stage this is. */}
+        {view?.kind === "procedureGenerating" ? (
           <div className="mx-auto max-w-[45rem]">
-            <h1 className="text-[1.75rem] font-semibold text-navy">
-              กำลังสร้างขั้นตอนปฏิบัติงาน
-            </h1>
+            <h1 className="text-[1.75rem] font-semibold text-navy">{view.heading}</h1>
             <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
           </div>
         ) : null}
 
-        {stage === 2 && doc && !procedureBusy ? (
+        {view?.kind === "pdf" ? (
           <div className="mx-auto max-w-[45rem]">
             <PdfStep
-              doc={doc}
+              doc={view.doc}
               config={config}
               onBack={() => goto(1)}
               onNewJsa={startOver}
@@ -587,20 +576,12 @@ export default function App() {
             first-time draft, for the same reason: the old sub-steps must not
             stay on screen and editable while a response that's about to
             overwrite them is in flight — the AI's reply silently wins that
-            race, so nothing here may be edited until it lands. */}
-        {stage === 3 && procedure && procedureBusy ? (
-          <div className="mx-auto max-w-[45rem]">
-            <h1 className="text-[1.75rem] font-semibold text-navy">
-              กำลังสร้างขั้นตอนปฏิบัติงานใหม่
-            </h1>
-            <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
-          </div>
-        ) : null}
-
-        {stage === 3 && procedure && !procedureBusy ? (
+            race, so nothing here may be edited until it lands. (The busy
+            state itself renders above, under "procedureGenerating".) */}
+        {view?.kind === "procedureEditing" ? (
           <div className="mx-auto max-w-[45rem]">
             <ProcedureEditorStep
-              procedure={procedure}
+              procedure={view.procedure}
               onChange={updateProcedure}
               photos={photos}
               onPhotoChange={updatePhoto}
@@ -613,11 +594,11 @@ export default function App() {
           </div>
         ) : null}
 
-        {stage === 4 && procedure && doc ? (
+        {view?.kind === "procedurePdf" ? (
           <div className="mx-auto max-w-[45rem]">
             <ProcedurePdfStep
-              procedure={procedure}
-              doc={doc}
+              procedure={view.procedure}
+              doc={view.doc}
               photos={photos}
               config={config}
               onBack={() => goto(3)}

@@ -39,8 +39,8 @@ def render_prompt(filename: str, **context: object) -> str:
     return Template(path.read_text(encoding="utf-8")).render(**context)
 
 
-def _load_system_prompt(settings: Settings, *, detailed: bool = False) -> str:
-    return render_prompt("jsa-generate.md", rules=settings.rules, detailed=detailed)
+def _load_system_prompt(settings: Settings) -> str:
+    return render_prompt("jsa-generate.md", rules=settings.rules)
 
 
 def _build_user_prompt(request: GenerateRequest) -> str:
@@ -108,16 +108,10 @@ async def generate_jsa(
     provider: LLMProvider,
     settings: Settings,
 ) -> JsaDocument:
-    # "วิเคราะห์อย่างละเอียด" — falls back to the default model/prompt if
-    # detailed_model isn't configured, so leaving it blank in config/ai.yaml
-    # no-ops the toggle entirely (same model AND same prompt)
-    use_detailed = bool(request.detailed and settings.ai.detailed_model)
-    model = settings.ai.detailed_model if use_detailed else settings.ai.model
-
     payload = await generate_validated(
-        system_prompt=_load_system_prompt(settings, detailed=use_detailed),
+        system_prompt=_load_system_prompt(settings),
         user_prompt=_build_user_prompt(request),
-        model=model,
+        model=settings.ai.model,
         payload_model=AiJsaPayload,
         provider=provider,
         settings=settings,

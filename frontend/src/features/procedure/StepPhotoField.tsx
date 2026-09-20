@@ -104,7 +104,16 @@ export function StepPhotoField({
           setDragging(false);
           void accept(fileFrom(event.dataTransfer));
         }}
-        // Paste needs focus to land here, so the zone is focusable and says so.
+        // Paste needs focus to land here, so the zone is focusable and says
+        // so. On a procedure with several steps, each one has its own zone —
+        // Ctrl+V always pastes into whichever is currently FOCUSED, never
+        // "whichever the user is looking at", so it's essential this zone
+        // visibly shows when it's the one that will receive a paste (below:
+        // the same navy border/bg the drag-over state already uses, kept
+        // showing for as long as real DOM focus sits here — not just
+        // :focus-visible, which browsers suppress for a plain mouse click,
+        // exactly the interaction someone would use to "arm" a zone before
+        // pasting a screenshot).
         // Not MIME-filtered here — a pasted non-image file still reaches
         // fileToStepPhoto and gets a real error, rather than this doing
         // nothing and leaving the user wondering if the paste landed at all.
@@ -116,10 +125,11 @@ export function StepPhotoField({
         }}
         tabIndex={0}
         role="group"
-        aria-label={`เพิ่มรูปภาพประกอบขั้นตอนที่ ${stepNo}`}
+        aria-label={`เพิ่มรูปภาพประกอบขั้นตอนที่ ${stepNo} — คลิกเพื่อวางรูปด้วย Ctrl+V ที่ขั้นตอนนี้`}
         className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius)]
                     border border-dashed p-3 text-sm transition-colors
-                    cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
+                    cursor-pointer outline-none focus:border-navy focus:bg-navy-soft
+                    focus-visible:ring-2 focus-visible:ring-ring/50
                     ${dragging ? "border-navy bg-navy-soft" : "border-line"}`}
       >
         <Button
@@ -137,7 +147,7 @@ export function StepPhotoField({
           เพิ่มรูปภาพ (ไม่บังคับ)
         </Button>
         <span className="text-xs text-muted">
-          ลากรูปมาวาง วางด้วย Ctrl+V หรือกดเพื่อเลือกไฟล์
+          ลากรูปมาวาง คลิกที่นี่แล้ววางด้วย Ctrl+V หรือกดเพื่อเลือกไฟล์
         </span>
 
         <input

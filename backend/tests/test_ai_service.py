@@ -54,7 +54,7 @@ def settings():
     """A private deep copy of the real settings.
 
     get_settings() is lru_cached, so mutating what it returns would leak into
-    every other test in the session (several tests here set detailed_model /
+    every other test in the session (tests here set detailed_model /
     max_attempts). Copying keeps the real config as the source of truth without
     letting these tests scribble on it.
     """
@@ -158,7 +158,13 @@ async def test_generate_jsa_keeps_request_owned_header_fields(settings):
     assert doc.header.analyst == "สมหญิง"
 
 
-async def test_generate_jsa_uses_detailed_model_when_requested(settings):
+async def test_generate_jsa_always_uses_the_plain_model(settings):
+    """JSA generation used to have a "วิเคราะห์อย่างละเอียด" toggle that switched
+    to settings.ai.detailed_model — removed because the qwen model it used
+    there wrote unnaturally over-detailed steps, not how a human actually
+    writes a JSA. generate_jsa must never read detailed_model at all now,
+    however it's set — that model is still used elsewhere (procedure_service),
+    so this guards against JSA generation accidentally being re-wired to it."""
     settings.ai.detailed_model = "detailed-test-model"
     raw = """{"work_activity": "งาน", "steps": [{"no": 1, "procedure": "ขั้นตอน",
               "details": "", "hazards": []}], "assumptions": []}"""
@@ -166,39 +172,9 @@ async def test_generate_jsa_uses_detailed_model_when_requested(settings):
     request = GenerateRequest(
         supervisor="สมชาย",
         analysis_date=date(2026, 8, 12),
-        work_description="ทดสอบโหมดวิเคราะห์อย่างละเอียด",
-        detailed=True,
+        work_description="ทดสอบว่าไม่ใช้ detailed_model",
     )
 
     await generate_jsa(request, provider, settings)
 
-    assert provider.calls[0]["model"] == "detailed-test-model"
-
-
-async def test_detailed_flag_noops_when_no_detailed_model_configured(settings):
-    """Blanking detailed_model in config must disable the toggle completely —
-    same model and same prompt as a normal request."""
-    settings.ai.detailed_model = ""
-    raw = """{"work_activity": "งาน", "steps": [{"no": 1, "procedure": "ขั้นตอน",
-              "details": "", "hazards": []}], "assumptions": []}"""
-
-    plain = FakeProvider(raw)
-    await generate_jsa(
-        GenerateRequest(
-            supervisor="ส", analysis_date=date(2026, 8, 12),
-            work_description="ทดสอบโหมดปกติเพื่อเทียบ prompt", detailed=False,
-        ),
-        plain, settings,
-    )
-
-    detailed = FakeProvider(raw)
-    await generate_jsa(
-        GenerateRequest(
-            supervisor="ส", analysis_date=date(2026, 8, 12),
-            work_description="ทดสอบโหมดปกติเพื่อเทียบ prompt", detailed=True,
-        ),
-        detailed, settings,
-    )
-
-    assert detailed.calls[0]["model"] == plain.calls[0]["model"] == settings.ai.model
-    assert detailed.calls[0]["system_prompt"] == plain.calls[0]["system_prompt"]
+    assert provider.calls[0]["model"] == settings.ai.model

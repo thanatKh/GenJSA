@@ -123,6 +123,17 @@ export function Stepper({
     isCurrent: boolean;
   };
 }) {
+  // Labels for all 4 nodes share one row only once `branch` is set — 3
+  // labels alone already fit comfortably at every width the app supports (no
+  // label-hiding needed there), but a 4th squeezed into the same row at
+  // 360-430px truncated every label illegibly (e.g. "กรอ…" for "กรอกข้อมูล"),
+  // confirmed by measuring scrollWidth > clientWidth on every label span at
+  // that width. Hiding all labels below sm: only in the branch case is the
+  // fix — the page's own <h1> already names where the user is, so nothing
+  // is lost, and circles + connectors alone still show progress
+  // unambiguously. The plain 3-step case (branch undefined) is untouched.
+  const hideLabelsBelowSm = !!branch;
+
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
       {/* Each step is its own natural width and the connector lines between them
@@ -151,7 +162,12 @@ export function Stepper({
                                focus-visible:ring-ring/50 sm:gap-2"
                   >
                     <StepCircle n={index + 1} done={done} filled={done || active} />
-                    <span className="truncate text-xs text-muted hover:text-navy sm:text-sm">
+                    <span
+                      className={[
+                        "truncate text-xs text-muted hover:text-navy sm:text-sm",
+                        hideLabelsBelowSm ? "hidden sm:inline" : "",
+                      ].join(" ")}
+                    >
                       {label}
                     </span>
                   </button>
@@ -164,11 +180,15 @@ export function Stepper({
                         midpoints off-center from what the eye expects, making
                         circle 2 look mis-centered even though the flex math was
                         technically correct. Equal-width items keep the circles
-                        landing at true equal thirds of the track. */}
+                        landing at true equal thirds of the track.
+                        (This still holds at sm: and up even in the branch
+                        case — hideLabelsBelowSm only drops labels below that,
+                        where 4 of them no longer fit one row at all.) */}
                     <span
                       className={[
                         "truncate text-xs sm:text-sm",
                         active ? "font-semibold text-navy" : "text-muted",
+                        hideLabelsBelowSm ? "hidden sm:inline" : "",
                       ].join(" ")}
                       aria-current={active ? "step" : undefined}
                     >
@@ -207,7 +227,7 @@ export function Stepper({
                 <>
                   <BranchCircle />
                   <span
-                    className="truncate text-xs font-semibold text-navy sm:text-sm"
+                    className="hidden truncate text-xs font-semibold text-navy sm:inline sm:text-sm"
                     aria-current="step"
                   >
                     {branch.label}
@@ -223,7 +243,7 @@ export function Stepper({
                              focus-visible:ring-ring/50 sm:gap-2"
                 >
                   <BranchCircle />
-                  <span className="truncate text-xs font-semibold text-navy sm:text-sm">
+                  <span className="hidden truncate text-xs font-semibold text-navy sm:inline sm:text-sm">
                     {branch.label}
                   </span>
                 </button>

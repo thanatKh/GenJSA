@@ -67,7 +67,11 @@ class AiRetry(BaseModel):
 class AiConfig(BaseModel):
     provider: str = "thaillm"
     model: str
-    # Used for "วิเคราะห์อย่างละเอียด" (detailed analysis) requests — blank disables the option
+    # The work-procedure model (procedure_service.py) — writing usable how-to
+    # detail is a more demanding task than drafting the JSA, so it always uses
+    # this thorough model when one is configured; falls back to `model` above
+    # when blank. Not used for JSA generation itself — see jsa-generate.md's
+    # own history if this ever needs reviving for that path.
     detailed_model: str = ""
     api: AiApi
     request_json_mode: bool = True

@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, History, Search, Trash2, X } from "lucide-react";
+import { ChevronRight, History, ListOrdered, Search, Trash2, X } from "lucide-react";
 
 import { Button, ConfirmDialog, Input, UndoToast } from "../../components/ui";
 import * as historyStore from "../../history";
@@ -172,14 +172,9 @@ export function HistoryList({
                   // a long list's stagger doesn't drag on for a full second.
                   delay: searching ? 0 : Math.min(index, 10) * 0.04,
                 }}
-                className="group grid grid-cols-[1fr_auto] items-center gap-2 border-b border-line"
+                className="group border-b border-line py-1"
               >
-                {/* The row button and the procedure badge share this cell so
-                    the badge never competes with the title for width — at
-                    360px its own grid column truncated the title to a useless
-                    "เปลี่ยน mech…". Below sm the badge sits under the metadata
-                    line; from sm up there's room for it inline. */}
-                <div className="flex min-w-0 flex-col py-1 sm:flex-row sm:items-center sm:gap-2">
+                <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onOpen(entry)}
@@ -203,47 +198,51 @@ export function HistoryList({
                     </span>
                   </button>
 
-                  {/* Its own button, a sibling of the row (never nested —
-                      nested buttons are invalid HTML). It used to be an inert
-                      <span> inside the row's metadata line, which made it a
-                      lie: it advertised a second document but the click it sat
-                      inside always landed on the JSA editor. Only rendered
-                      when there IS a procedure — a "no procedure" marker on
-                      every other row would be noise to flag the exception. */}
-                  {entry.procedure ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenProcedure(entry)}
-                      aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                      // Full 44px tap height below sm (always visible and
-                      // touch-tapped there, like the delete button); compact
-                      // once it moves inline on desktop hover targets.
-                      className="ml-2 self-start whitespace-nowrap rounded-full bg-surface
-                                 px-2.5 text-xs text-navy hover:bg-navy-soft
-                                 focus-visible:outline-none focus-visible:ring-2
-                                 focus-visible:ring-ring/50
-                                 max-sm:flex max-sm:h-11 max-sm:items-center
-                                 sm:ml-0 sm:self-auto sm:py-0.5"
-                    >
-                      + ขั้นตอนปฏิบัติงาน
-                    </button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={() => deleteEntry(entry)}
+                    aria-label={`ลบ ${entryTitle(entry)}`}
+                    // max-sm:size-11 — this button is a destructive action and,
+                    // unlike on desktop (hover-gated, mouse-precise), it's
+                    // always visible and touch-tapped below sm, so it gets the
+                    // app's full 44px minimum there instead of icon-lg's
+                    // stock 36px; desktop keeps the more compact hover size.
+                    className="text-muted opacity-100 transition-opacity hover:text-danger max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  onClick={() => deleteEntry(entry)}
-                  aria-label={`ลบ ${entryTitle(entry)}`}
-                  // max-sm:size-11 — this button is a destructive action and,
-                  // unlike on desktop (hover-gated, mouse-precise), it's
-                  // always visible and touch-tapped below sm, so it gets the
-                  // app's full 44px minimum there instead of icon-lg's
-                  // stock 36px; desktop keeps the more compact hover size.
-                  className="text-muted opacity-100 transition-opacity hover:text-danger max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </Button>
+
+                {/* Its own full-width strip below the title row, not a badge
+                    sharing the title's text block — it used to sit right under
+                    the date/metadata line with the same plain-text weight,
+                    which read as one more fact about the row ("...7 ขั้นตอน +
+                    ขั้นตอนปฏิบัติงาน") rather than a second, differently-
+                    destined button. A tinted background + its own icon +
+                    chevron gives it the same "this is a control" signals the
+                    row button above already has, so the two clicks stop
+                    looking like one continuous block of text.
+                    Own button, a sibling of the row (never nested — nested
+                    buttons are invalid HTML). Only rendered when there IS a
+                    procedure — a "no procedure" marker on every other row
+                    would be noise to flag the exception. */}
+                {entry.procedure ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenProcedure(entry)}
+                    aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                    className="mb-1.5 flex w-full items-center gap-1.5 rounded-md bg-navy-soft
+                               px-2.5 py-2 text-xs font-medium text-navy hover:bg-navy-soft/70
+                               focus-visible:outline-none focus-visible:ring-2
+                               focus-visible:ring-ring/50"
+                  >
+                    <ListOrdered className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">ขั้นตอนปฏิบัติงาน</span>
+                    <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
+                  </button>
+                ) : null}
               </motion.li>
             ))}
           </AnimatePresence>

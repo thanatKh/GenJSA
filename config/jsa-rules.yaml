@@ -13,9 +13,7 @@ generation:
   steps_suggest_split_above: 20
   # Users can specify their own steps in work_description — the AI must follow them
   respect_user_defined_steps: true
-  # Reasonable number of hazards per step — same cap in "วิเคราะห์อย่างละเอียด"
-  # (detailed analysis) mode too; that mode adds depth to `details`, not more
-  # hazard entries (see prompts/jsa-generate.md's detailed-mode block)
+  # Reasonable number of hazards per step
   hazards_per_step_min: 1
   hazards_per_step_max: 4
 

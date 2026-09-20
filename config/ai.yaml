@@ -6,10 +6,15 @@ provider: "thaillm"
 
 model: "openthaigpt"
 
-# Used when the user opts into "วิเคราะห์อย่างละเอียด" (detailed analysis) —
-# slower/more thorough than the default model above. Chosen after comparing
-# real JSA output side-by-side (see scripts/model_bench.py); leave blank to
-# disable the option and always use `model` above.
+# Used for work-procedure generation only (backend/app/services/
+# procedure_service.py) — writing usable how-to detail is a more demanding
+# task than drafting the JSA itself, so that path always uses this thorough
+# model when one is configured, falling back to `model` above when blank.
+#
+# JSA generation used to have its own "วิเคราะห์อย่างละเอียด" toggle that
+# switched to this model too — removed because it wrote unnaturally
+# over-detailed steps for a JSA, not how a human writes one for real work.
+# JSA generation (ai_service.py) never reads this setting now.
 detailed_model: "qwen3.6-35b-a3b"
 
 api:

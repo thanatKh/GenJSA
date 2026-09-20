@@ -45,8 +45,6 @@ export type GenerateInput = {
   supervisor: string;
   analysis_date: string;
   work_description: string;
-  // "วิเคราะห์อย่างละเอียด" — see InputStep.tsx for why this isn't part of InputForm/the draft
-  detailed?: boolean;
 };
 
 /** POST JSON to a generate endpoint, with the shared timeout/abort handling. */

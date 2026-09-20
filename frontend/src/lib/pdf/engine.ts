@@ -357,17 +357,31 @@ export async function createEngine(L: PdfLayout) {
           .replace("{total}", String(total));
         const labelW = doc.getTextWidth(label);
 
-        // Center the page number in the actual gap between the left/right
-        // footer text, not a fixed pageW/2 — config/company.yaml's name is
-        // meant to be edited by non-developers, so a longer department name
-        // must never silently start overlapping the page number
+        // True page center (pageW / 2) first — that's what "centered" means
+        // to anyone looking at the page, and it's correct whenever either
+        // side is short enough (or empty, as buildProcedurePdf's footerLeft
+        // always is — see drawFooter's own doc comment) to leave room there.
+        // Only when the true center would land inside either side's text
+        // (a long company name, or a long form-code/footer-text pair) do we
+        // fall back to centering in the gap between them instead — that
+        // gap-centering used to be the ONLY behavior, which is what put the
+        // page number visibly off true-center on any page with an empty
+        // side (the procedure PDF, always): centering "in the gap" against
+        // one truly empty side and one populated side just reproduces that
+        // side's own off-center skew, it doesn't cancel it out.
         const gapBuffer = mmToPt(3);
         const footerLeftW = footerLeft ? doc.getTextWidth(footerLeft) : 0;
         const footerRightW = footerRight ? doc.getTextWidth(footerRight) : 0;
         const gapStart = mL + footerLeftW + gapBuffer;
         const gapEnd = pageW - mR - footerRightW - gapBuffer;
 
-        if (gapEnd - gapStart >= labelW) {
+        const trueCenter = pageW / 2;
+        const trueCenterFits =
+          trueCenter - labelW / 2 >= gapStart && trueCenter + labelW / 2 <= gapEnd;
+
+        if (trueCenterFits) {
+          doc.text(label, trueCenter, baseline, { align: "center" });
+        } else if (gapEnd - gapStart >= labelW) {
           doc.text(label, (gapStart + gapEnd) / 2, baseline, { align: "center" });
         } else if (gapEnd > gapStart) {
           // Not enough room to center it — left-align in whatever's left rather than overlap

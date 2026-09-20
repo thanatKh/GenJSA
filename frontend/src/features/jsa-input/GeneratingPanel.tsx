@@ -19,31 +19,36 @@
 import { useEffect, useState } from "react";
 import { CircleCheck, LoaderCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { SkeletonCard } from "../../components/ui";
 import { JSA_STAGES } from "./generatingStages";
 
 // How long each log line stays "active" (spinning) before the next one
-// appears and this one flips to done. Shorter than the old STAGE_MS (12s)
-// on purpose — there are ~2x as many lines now (see generatingStages.ts), so
-// pacing them at roughly the same total-list-consumed-by duration keeps the
-// overall rhythm similar rather than doubling how long the log takes to
-// exhaust.
-const LINE_MS = 7000;
+// appears and this one flips to done. 8 lines (JSA_STAGES) x 3.5s ≈ 28s of
+// log to reveal against a real measured wait of ~10-30s (see
+// TYPICAL_MIN/MAX_SECONDS below) — paced to spend the log's full length
+// across a typical run instead of exhausting it in the first few seconds
+// and sitting on the last line, spinning, for most of the wait.
+const LINE_MS = 3500;
 
-// The range quoted to the user, in seconds. This file used to claim 10-60s;
-// a timed run against the real ThaiLLM endpoint took 133s, so that was wrong
-// and the panel was calling itself "slower than usual" during a perfectly
-// normal wait. Quoting minutes also stops the number reading like a stopwatch
-// the user should be counting against.
+// The range quoted to the user, in seconds. Measured against the real
+// ThaiLLM endpoint on 2026-09-20 via two independent methods that agreed:
+//   `python scripts/model_bench.py -n 5` against config/ai.yaml's live
+//   model (openthaigpt) — 5 rounds, 5.9-10.8s, median 8.6s — and a live
+//   timed run through the actual app for detailed_model (qwen3.6-35b-a3b,
+//   used when "วิเคราะห์อย่างละเอียด" is checked) — 10.1s twice. 10-30s
+//   covers both with real headroom for a slow round (the same bench run
+//   saw one candidate model spike to 36.5s) without overselling how long
+//   this now actually takes.
 //
-// This is ONE sample, so treat it as a floor on how long to promise, not a
-// measured distribution. Re-measure with `python scripts/model_bench.py -n 10`
-// (it reports latency per model) and update these whenever config/ai.yaml's
-// model changes.
+// This file used to claim 60-180s, based on one much older sample (133s)
+// against a since-changed model — re-measure with the command above and
+// update these whenever config/ai.yaml's model changes, or the panel starts
+// quietly lying about the wait again in either direction.
 // Exported so callers that chain a second AI call (see COMBINED_STAGES) can
 // derive an honest doubled range instead of re-declaring their own numbers
 // that could drift from these.
-export const TYPICAL_MIN_SECONDS = 60;
-export const TYPICAL_MAX_SECONDS = 180;
+export const TYPICAL_MIN_SECONDS = 10;
+export const TYPICAL_MAX_SECONDS = 30;
 
 /** 90 -> "1 นาที 30 วินาที", 45 -> "45 วินาที" */
 function formatDuration(totalSeconds: number): string {
@@ -53,10 +58,20 @@ function formatDuration(totalSeconds: number): string {
   return seconds ? `${minutes} นาที ${seconds} วินาที` : `${minutes} นาที`;
 }
 
-/** 60,180 -> "1–3 นาที" — the unit is said once, not on both ends */
+/** 60,180 -> "1–3 นาที"; 10,30 -> "10–30 วินาที" — the unit is said once, not
+ * on both ends. Two cases share that shape (whole minutes on both sides, or
+ * plain seconds on both sides — the only two this app's real values ever
+ * take: TYPICAL_MIN/MAX_SECONDS below, and COMBINED_STAGES' doubled range);
+ * anything mixed (a minutes value paired with a seconds one) falls back to
+ * formatDuration on each side, which does repeat the unit — an honest range
+ * still beats a wrong compact one for a shape this file doesn't expect. */
 function formatRange(minSeconds: number, maxSeconds: number): string {
-  const bothWholeMinutes = minSeconds % 60 === 0 && maxSeconds % 60 === 0;
-  if (bothWholeMinutes) return `${minSeconds / 60}–${maxSeconds / 60} นาที`;
+  if (minSeconds % 60 === 0 && maxSeconds % 60 === 0) {
+    return `${minSeconds / 60}–${maxSeconds / 60} นาที`;
+  }
+  if (minSeconds < 60 && maxSeconds < 60) {
+    return `${minSeconds}–${maxSeconds} วินาที`;
+  }
   return `${formatDuration(minSeconds)}–${formatDuration(maxSeconds)}`;
 }
 
@@ -170,7 +185,7 @@ export function GeneratingPanel({
   return (
     <section className="mt-6" aria-busy="true">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-medium text-ink">กำลังร่างเอกสารด้วย AI</p>
+        <p className="font-medium text-ink">กำลังร่างเอกสาร</p>
 
         {onCancel ? (
           // Plain text link (not a Button) — matches the de-emphasized
@@ -233,6 +248,18 @@ export function GeneratingPanel({
           ))}
         </AnimatePresence>
       </ul>
+
+      {/* Brought back: a skeleton of the document that's about to appear,
+          shimmering for the whole wait — the activity log above says what's
+          plausibly happening, this says "and here's roughly the shape of
+          what you'll get", the same second reassurance every other loading
+          state in the app gives (SkeletonCard, components/ui.tsx). Dropped
+          when this panel was rebuilt as the activity-stream log; re-added
+          because the log alone read as thinner than the rest of the app's
+          own loading conventions once compared side by side. */}
+      <div className="mt-4 grid gap-3">
+        <SkeletonCard />
+      </div>
     </section>
   );
 }

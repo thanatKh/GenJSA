@@ -241,7 +241,7 @@ first, then hand-merge.
 | AI model | `config/ai.yaml` → `model` |
 | ThaiLLM endpoint / timeout / retry | `config/ai.yaml` |
 | Company name / department | `config/company.yaml` |
-| Logo | Overwrite `frontend/src/assets/logo.png` (the app and the PDF both import from there — `assets/logo.png` at the repo root is an unused duplicate) |
+| Logo | Overwrite `frontend/src/assets/logo.png` (the app and the PDF both import from there) |
 | Tab icon (favicon) | `frontend/public/favicon.svg`, then regenerate `favicon.ico` via `scripts/build_icons.mjs` (see its header comment) |
 | Form number / effective-date text | `config/document.yaml` |
 | Header field labels / column names | `config/document.yaml` |

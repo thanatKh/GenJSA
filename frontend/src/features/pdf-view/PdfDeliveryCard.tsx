@@ -8,7 +8,7 @@
  * only renders what that hook returns.
  */
 
-import { CircleCheck, FileText, LoaderCircle, Save, Share2 } from "lucide-react";
+import { CircleCheck, FileText, Save, Share2 } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
 
@@ -116,11 +116,21 @@ export function PdfDeliveryCard({
             </a>
           </Button>
         ) : (
-          <Button disabled className="col-span-2">
-            {error ? null : (
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-            )}
-            {error ? "สร้างเอกสารไม่สำเร็จ" : "กำลังสร้างเอกสาร…"}
+          // status, not a hand-rolled spinner + bare `disabled` — this was
+          // the one button on the page still built the pre-status-prop way
+          // (a raw <LoaderCircle className="animate-spin">, no whileHover/
+          // whileTap at all since disabled also gates those). Routing it
+          // through Button's own status="loading"/"error" gives it the same
+          // animated icon-swap (AnimatePresence, not a static icon) every
+          // other button on this card already has, rather than a plain spin
+          // that looks inert next to them.
+          <Button
+            disabled
+            className="col-span-2"
+            status={error ? "error" : "loading"}
+            errorText="สร้างเอกสารไม่สำเร็จ"
+          >
+            กำลังสร้างเอกสาร…
           </Button>
         )}
 

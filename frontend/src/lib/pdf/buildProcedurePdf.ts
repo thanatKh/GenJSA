@@ -196,38 +196,85 @@ export async function buildProcedurePdf(
    * the job name, then the header fields laid out spaciously and centered —
    * a report cover, not another copy of the bordered header block.
    *
-   * Pushes a zero-height pageFrames entry for itself. pageFrames is indexed
-   * by page number (drawFrames below does doc.setPage(index + 1)), so
-   * skipping this page here would shift every later frame onto the wrong
-   * physical page — same trick drawSignature already uses for a page with no
-   * frame of its own, just made explicit here since this isn't the last page. */
+   * Pushes a full-page pageFrames entry for itself (mT to bodyBottom) so it
+   * gets the same thick outer border every content page gets — a bare title
+   * page with no frame at all read as an unfinished draft next to the framed
+   * pages that follow it, unlike drawSignature's own zero-height convention,
+   * which is for a page that's genuinely just an overflow tail with no frame
+   * of its own. pageFrames is indexed by page number (drawFrames below does
+   * doc.setPage(index + 1)), so every page must push exactly one entry,
+   * whether real or the zero-height placeholder — skipping this page's push
+   * entirely would shift every later frame onto the wrong physical page. */
   const drawCoverPage = () => {
-    E.pageFrames.push({ top: mT, bottom: mT });
+    E.pageFrames.push({ top: mT, bottom: bodyBottom });
 
     const centerX = pageW / 2;
-    let cursor = mT + mmToPt(30);
+
+    // ---- measure the whole block's height first, so it can be centered on
+    // the page rather than started at a fixed offset from the top. A fixed
+    // mT + 30mm start left the block sitting in the upper third on a normal
+    // A4 page — short content, most of the page unused below it — instead of
+    // looking centered the way a title page should. ----
+    const titleThPt = L.font.title_th_pt + 24;
+    const titleEnPt = L.font.title_en_pt + 8;
+    const activityPt = L.font.title_en_pt + 6;
+    const activityLineH = activityPt * L.font.line_height;
+    const infoPt = L.font.header_label_pt;
+    const infoLineH = infoPt * L.font.line_height;
+
+    const logoH = logo ? mmToPt(16) : 0;
+    const logoGap = logo ? mmToPt(12) : 0;
+
+    const activityLines = wrap(procedure.header.work_activity, contentW * 0.8, "bold", activityPt);
+
+    const supervisorShown = !!procedure.header.supervisor?.trim();
+    const dateShown = !!procedure.header.analysis_date?.trim();
+    const authorName = procedure.header.analyst?.trim() || procedure.header.supervisor?.trim();
+    const authorShown = !!authorName && authorName !== procedure.header.supervisor?.trim();
+    const infoLinesCount = [supervisorShown, dateShown, authorShown].filter(Boolean).length;
+
+    const blockH =
+      logoH +
+      logoGap +
+      titleThPt * 1.3 +
+      (P.titleEn ? titleEnPt * 1.3 : 0) +
+      mmToPt(6 + 16) + // rule gap above + below
+      activityLines.length * activityLineH +
+      mmToPt(12) + // gap after activity name
+      infoLinesCount * infoLineH;
+
+    // Centered between the page's top and bottom margins, then nudged
+    // further down — a title page reads better slightly below true center
+    // than dead-centered, and "move it down a bit" was the explicit ask.
+    const available = bodyBottom - mT;
+    let cursor = mT + Math.max((available - blockH) / 2, mmToPt(16)) + mmToPt(18);
 
     if (logo) {
-      // Bigger than the compact title-bar logo (L.logo is sized for a slim
-      // header row) since this is the one page where it's the visual anchor,
-      // not a corner mark — but not so big it reads as the whole page's
-      // subject. 16mm keeps it clearly the largest single element while
-      // staying well under the title text's own visual weight below it.
-      const logoH = mmToPt(16);
+      // A masthead-sized logo, not the compact title-bar one (L.logo is sized
+      // for a slim header row) — this is the one page where the logo is a
+      // visual anchor, not a corner mark. Not larger than this, though: at
+      // 28mm it visually outweighed the title below it, reading as the
+      // page's actual subject instead of a mark above one — 16mm keeps it
+      // clearly present without competing with the document title's own
+      // weight.
       const logoW = Math.min(logoH * logo.ratio, contentW * 0.5);
       doc.addImage(logo.data, "PNG", centerX - logoW / 2, cursor, logoW, logoH);
-      cursor += logoH + mmToPt(10);
+      cursor += logoH + logoGap;
     }
 
-    E.setFont("bold", L.font.title_th_pt + 10);
+    // +24/+8, not the old +10/+4 — the document title is this page's actual
+    // subject and needs to read as clearly larger than the job name below it
+    // (title_en_pt + a smaller step), which a shrunk logo no longer does the
+    // job of announcing on its own.
+    E.setFont("bold", titleThPt);
     doc.setTextColor(0, 0, 0);
     doc.text(P.titleTh, centerX, cursor, { align: "center" });
-    cursor += (L.font.title_th_pt + 10) * 1.3;
+    cursor += titleThPt * 1.3;
 
     if (P.titleEn) {
-      E.setFont("normal", L.font.title_en_pt + 4);
+      E.setFont("normal", titleEnPt);
       doc.text(P.titleEn, centerX, cursor, { align: "center" });
-      cursor += (L.font.title_en_pt + 4) * 1.3;
+      cursor += titleEnPt * 1.3;
     }
 
     // A rule under the title, sized to the longer of the two title lines
@@ -241,15 +288,11 @@ export async function buildProcedurePdf(
     cursor += mmToPt(16);
 
     // The job name — the one piece of content worth setting larger than body
-    // text on a cover, since it's the answer to "which job is this for"
-    const activityPt = L.font.title_en_pt;
-    const activityLines = wrap(
-      procedure.header.work_activity,
-      contentW * 0.8,
-      "bold",
-      activityPt,
-    );
-    const activityLineH = activityPt * L.font.line_height;
+    // text on a cover, since it's the answer to "which job is this for".
+    // +6 over title_en_pt (was title_en_pt exactly, same size as the small
+    // English subtitle above it — too quiet for the answer to the cover's
+    // most-asked question) without approaching the document title's own
+    // size, which stays the clearly biggest element on the page.
     activityLines.forEach((line) => {
       E.setFont("bold", activityPt);
       doc.text(line.text, centerX, cursor, { align: "center", maxWidth: contentW * 0.8 });
@@ -260,8 +303,6 @@ export async function buildProcedurePdf(
     // Supervisor / date, centered as a simple two-line summary rather than
     // the bordered field boxes the content pages use — those boxes are a
     // form convention, and this page is deliberately not a form.
-    const infoPt = L.font.header_label_pt;
-    const infoLineH = infoPt * L.font.line_height;
     const infoLine = (label: string, value: string) => {
       if (!value.trim()) return;
       E.setFont("bold", infoPt);
@@ -278,6 +319,17 @@ export async function buildProcedurePdf(
     };
     infoLine(D.labels.supervisor, procedure.header.supervisor);
     infoLine(P.labels.date, formatThaiDate(procedure.header.analysis_date));
+
+    // ผู้จัดทำ — moved here from the sign-off that used to close the document
+    // after the last step, so the "who made this" credit sits with the rest
+    // of the cover's summary instead of trailing off after the content.
+    // Same analyst-falls-back-to-supervisor rule the old sign-off used, but
+    // only printed when it's a genuinely different name from the supervisor
+    // line just above — an identical repeat would read as a copy-paste
+    // mistake, not a second name worth stating.
+    if (authorShown) {
+      infoLine(P.labels.author, authorName!);
+    }
 
     doc.addPage();
   };
@@ -427,10 +479,10 @@ export async function buildProcedurePdf(
     y += blockGap;
   });
 
-  // ---------------------------------------------------------- sign-off --
-  const authorName =
-    procedure.header.analyst?.trim() || procedure.header.supervisor?.trim();
-  E.drawSignature(P.labels.author, authorName, y);
+  // ผู้จัดทำ used to be printed here as a sign-off after the last step —
+  // moved to the cover page's info summary instead (drawCoverPage above),
+  // so the document now simply ends after its last step, the same way
+  // buildJsaPdf.ts ends after its last table row.
 
   E.drawFrames();
   // skipPage1: the cover page prints no footer/page-number of its own,

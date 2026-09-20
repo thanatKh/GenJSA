@@ -85,11 +85,7 @@ async def generate(request: Request, body: GenerateRequest) -> JsaDocument:
 
     provider = request.app.state.llm_provider
     # Don't log the work description content — just its length, for debugging payload issues
-    logger.info(
-        "generate requested (%d chars, detailed=%s)",
-        len(body.work_description),
-        body.detailed,
-    )
+    logger.info("generate requested (%d chars)", len(body.work_description))
     return await generate_jsa(body, provider, settings)
 
 
