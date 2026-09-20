@@ -229,6 +229,8 @@ export function usePdfDelivery({
     canShareFile,
     saving,
     sharing,
+    savedFlash,
+    sharedFlash,
     handleSave,
     handleShare,
   };

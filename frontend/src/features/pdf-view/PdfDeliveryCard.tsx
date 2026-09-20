@@ -35,13 +35,27 @@ export function PdfDeliveryCard({
     canShareFile: boolean;
     saving: boolean;
     sharing: boolean;
+    /** Transient post-success flash — see usePdfDelivery's own doc comment
+     * on the state for why this exists (no confirmation at all otherwise). */
+    savedFlash: boolean;
+    sharedFlash: boolean;
     handleSave: () => void;
     handleShare: () => void;
   };
   className?: string;
 }) {
-  const { url, error, canSavePicker, canShareFile, saving, sharing, handleSave, handleShare } =
-    delivery;
+  const {
+    url,
+    error,
+    canSavePicker,
+    canShareFile,
+    saving,
+    sharing,
+    savedFlash,
+    sharedFlash,
+    handleSave,
+    handleShare,
+  } = delivery;
 
   return (
     <Card className={className}>
@@ -111,14 +125,32 @@ export function PdfDeliveryCard({
         )}
 
         {/* Exactly one of these two ever renders — see usePdfDelivery's
-            header for why the picker is checked first */}
+            header for why the picker is checked first.
+            status={savedFlash ? "success" : undefined} rather than always
+            passing a status: `loading` alone already covers the in-flight
+            state (Button derives status="loading" from it when `status` is
+            left undefined — see components/ui/button.tsx), so this only
+            needs to layer the post-success flash on top, for the couple of
+            seconds it's actually true. */}
         {canSavePicker ? (
-          <Button variant="outline" onClick={handleSave} loading={saving}>
+          <Button
+            variant="outline"
+            onClick={handleSave}
+            loading={saving}
+            status={savedFlash ? "success" : undefined}
+            successText="บันทึกแล้ว"
+          >
             <Save className="size-4" aria-hidden="true" />
             บันทึกไฟล์
           </Button>
         ) : canShareFile ? (
-          <Button variant="outline" onClick={handleShare} loading={sharing}>
+          <Button
+            variant="outline"
+            onClick={handleShare}
+            loading={sharing}
+            status={sharedFlash ? "success" : undefined}
+            successText="แชร์แล้ว"
+          >
             <Share2 className="size-4" aria-hidden="true" />
             แชร์ / บันทึกไฟล์
           </Button>
