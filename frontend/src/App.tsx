@@ -507,7 +507,13 @@ export default function App() {
           // so anything narrower than xl only leaves the side column ~300px
           // wide: enough to break, not enough to look right (heading wraps,
           // search placeholder truncates).
-          <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:items-start xl:gap-x-12 xl:gap-y-0">
+          //
+          // Grid's default stretch (no xl:items-start override) — the history
+          // column now matches the form's full height so its own scroll area
+          // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
+          // list), instead of sizing to its own short content and floating
+          // next to a much taller form.
+          <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
             <InputStep
               onGenerate={handleGenerate}
               onSkipToManual={handleSkipToManual}

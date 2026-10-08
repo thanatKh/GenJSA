@@ -36,7 +36,10 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:duration-150",
+        // ease-[cubic-bezier(...)] is --ease-smooth-out (transitions.dev #06
+        // modal) — see dialog.tsx's DialogOverlay for why tw-animate-css's
+        // animate-in/animate-out keyframes need it spelled out per class.
+        "fixed inset-0 z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:duration-150",
         className
       )}
       {...props}
@@ -58,7 +61,11 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius)] border border-line bg-popover p-4 text-popover-foreground outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:duration-150",
+          // zoom-in-96/zoom-out-96, not the generated -95 — matches
+          // --scale-large (0.96). ease-[...] is --ease-smooth-out — see
+          // dialog.tsx's DialogOverlay for why tw-animate-css needs it
+          // spelled out per class.
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius)] border border-line bg-popover p-4 text-popover-foreground outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-96 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-96 data-closed:duration-150",
           className
         )}
         {...props}

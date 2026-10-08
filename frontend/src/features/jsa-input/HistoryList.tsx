@@ -16,10 +16,15 @@ import { formatThaiDate, isoFromDate } from "../../lib/thaidate";
 // Below this many entries, scanning the list beats typing — the search box
 // would just be one more control in the way
 const SEARCH_THRESHOLD = 5;
-// Past this many, the list scrolls in a fixed-height area instead of
-// growing the page — roughly 5-6 rows' worth, so the whole list is still
-// reachable without the page itself getting tall on a long history
-const SCROLL_MAX_HEIGHT = "22rem";
+// Past this many, the list scrolls instead of growing the page — stacked
+// below the form (below xl), there's no second column to size against, so a
+// fixed 22rem cap (below, as the literal Tailwind class "max-h-[22rem]" — see
+// its own comment for why it can't be this constant) is still the right call
+// there: roughly 5-6 rows' worth, so the whole list stays reachable without
+// the page itself getting tall on a long history. From xl up this cap is
+// overridden (xl:max-h-none) — App.tsx's grid stretches this component's own
+// <section> to the form's full height, and the list grows to fill it
+// (xl:flex-1 + xl:min-h-0) instead.
 const SCROLL_THRESHOLD = 6;
 // Same undo window as EditorStep's step/hazard deletion
 const UNDO_TIMEOUT_MS = 6000;
@@ -99,7 +104,15 @@ export function HistoryList({
     // (narrow/stacked layout) — from xl up, App.tsx places this as its own
     // side column next to the form instead (see its own comment for why xl,
     // not lg), where a rule implying "continued from above" would be wrong.
-    <section className="mt-10 border-t border-line pt-6 xl:mt-0 xl:border-t-0 xl:pt-0">
+    //
+    // xl:flex xl:h-full xl:flex-col — App.tsx's grid stretches this
+    // component's grid cell to the form's full height; without becoming a
+    // flex column itself and claiming that height, the <section> would just
+    // sit at its own content's height inside a taller, mostly-empty cell,
+    // which looks identical to the bug this is fixing. The scrollable <ul>
+    // below is the one piece that grows (flex-1 + min-h-0) — header, search
+    // box and footer note all keep their natural height.
+    <section className="mt-10 flex flex-col border-t border-line pt-6 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
           <History className="size-5 shrink-0" aria-hidden="true" />
@@ -131,16 +144,39 @@ export function HistoryList({
             aria-label="ค้นหางานที่เคยวิเคราะห์"
             className="pl-9 pr-9"
           />
-          {searching ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="ล้างคำค้นหา"
-              className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-navy"
-            >
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          ) : null}
+          {/* Used to be a bare {searching ? <button> : null} — appeared and
+              vanished with no transition at all, which read as a layout
+              glitch next to the search icon that's always there. Fade+scale
+              (transitions.dev's tooltip-appear shape — a small transient
+              affordance near an input, not a full icon swap) on the same
+              --duration-quick/--ease-smooth-out tokens the rest of the app's
+              motion already uses. exit uses AnimatePresence so unmounting is
+              animated too, not just the mount.
+              Vertical centering moved from the Tailwind -translate-y-1/2
+              class (used everywhere else in this file, e.g. the Search icon
+              above) to Motion's own y: "-50%" — Motion's animate prop writes
+              the element's whole `transform`, so a static Tailwind translate
+              class here would simply be clobbered by whatever `scale` Motion
+              computes, snapping the button off-center for the animation's
+              duration. Keeping both the resting translate AND the animated
+              scale in the same `animate`/`exit`/`initial` objects is what
+              keeps centering correct through every frame. */}
+          <AnimatePresence>
+            {searching ? (
+              <motion.button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="ล้างคำค้นหา"
+                initial={{ opacity: 0, scale: 0.98, y: "-50%" }}
+                animate={{ opacity: 1, scale: 1, y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.98, y: "-50%" }}
+                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute right-2 top-1/2 flex size-7 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-navy"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </motion.button>
+            ) : null}
+          </AnimatePresence>
         </div>
       ) : null}
 
@@ -150,11 +186,30 @@ export function HistoryList({
         // Fixed-height scroll area once the list is long enough, rather than
         // an expand-in-place button — the whole list stays one scroll away
         // instead of growing the page under a long history. overflow-y-auto
-        // only actually engages once content exceeds SCROLL_MAX_HEIGHT, so
+        // only actually engages once content exceeds the 22rem cap below, so
         // this is a no-op below the threshold.
+        //
+        // The cap is a literal Tailwind class ("max-h-[22rem]"), not an
+        // inline style — Tailwind's static scanner needs the exact class
+        // string present in source to generate its CSS, so this can't be
+        // built from a JS constant at runtime (a template-interpolated class
+        // like `max-h-[${SOME_CONST}]` would never match anything; no CSS
+        // rule gets generated for it at build time). An inline style would
+        // work for the base case but always beat xl:max-h-none on
+        // specificity, which needs to win once xl's flex layout takes over.
+        // xl:flex-1 xl:max-h-none: at xl the <section> is already stretched
+        // to the form's height (see its own comment), so here the list
+        // should grow to fill whatever's left under the header/search box
+        // rather than stop at the same cap used in the stacked, below-xl
+        // layout. min-h-0 is required for a flex child to actually shrink
+        // below its content size — without it flex-1 alone would let this
+        // <ul> overflow the section instead of scrolling.
         <ul
-          className="mt-3 grid list-none gap-0 overflow-y-auto p-0"
-          style={scrollable ? { maxHeight: SCROLL_MAX_HEIGHT } : undefined}
+          className={[
+            "mt-3 grid list-none gap-0 overflow-y-auto p-0",
+            scrollable ? "max-h-[22rem]" : "",
+            "xl:min-h-0 xl:flex-1 xl:max-h-none",
+          ].join(" ")}
         >
           <AnimatePresence initial={false}>
             {matches.map((entry, index) => (
