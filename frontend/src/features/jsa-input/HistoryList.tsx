@@ -204,9 +204,16 @@ export function HistoryList({
         // layout. min-h-0 is required for a flex child to actually shrink
         // below its content size — without it flex-1 alone would let this
         // <ul> overflow the section instead of scrolling.
+        //
+        // content-start: once xl:flex-1 makes this grid taller than its rows
+        // (a short history next to a tall form), a grid's default
+        // align-content: stretch hands that extra height to the rows
+        // themselves — every entry gets a big empty strip under it. This
+        // keeps rows at their natural height and leaves the spare space as
+        // one block at the bottom instead.
         <ul
           className={[
-            "mt-3 grid list-none gap-0 overflow-y-auto p-0",
+            "mt-3 grid content-start list-none gap-0 overflow-y-auto p-0",
             scrollable ? "max-h-[22rem]" : "",
             "xl:min-h-0 xl:flex-1 xl:max-h-none",
           ].join(" ")}
