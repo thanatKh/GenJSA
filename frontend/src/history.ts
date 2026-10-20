@@ -16,9 +16,9 @@
  * App.tsx, which resets the wizard without discarding past work.
  *
  * Also the lifecycle owner for lib/photoStore.ts (IndexedDB, step photos):
- * every path below that drops an entry — remove(), clear(), and readRaw()'s
- * own silent age/quota pruning — also deletes that entry's photos, so a
- * photo never outlives the history row it illustrates. photoStore.ts itself
+ * every path below that drops an entry — remove(), clear(), readRaw()'s
+ * corrupt-record pruning and the MAX_ENTRIES cap — also deletes that entry's
+ * photos, so a photo never outlives the history row it illustrates. photoStore.ts itself
  * has no expiry logic of its own; it only reacts to what happens here.
  */
 
@@ -31,15 +31,13 @@ import {
 import { clearForHistoryIds } from "./lib/photoStore";
 
 const KEY = "genjsa.history.v1";
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Entries older than this are dropped on the next read. Shown in the UI. */
-export const RETENTION_DAYS = 365;
-
-// Quota guard — localStorage throws when full rather than evicting anything,
-// so cap the list ourselves. At 365 days it's usually this, not the age limit,
-// that bounds the list.
-const MAX_ENTRIES = 100;
+// No age limit: entries are kept until the user deletes them (there used to
+// be a 365-day expiry). This cap is the only automatic removal — a quota
+// guard, since localStorage throws when full rather than evicting anything.
+// Past it, saving a job drops the OLDEST entry (and its photos). Shown in
+// the UI, so the "kept forever" note never overpromises.
+export const MAX_ENTRIES = 100;
 
 export type HistoryEntry = {
   id: string;
@@ -55,9 +53,9 @@ type HistoryFile = { v: 1; entries: HistoryEntry[] };
 
 /** Reads and validates, newest first. `pruned` = something was dropped on the
  * way — droppedIds names exactly which entries so the caller can clean up
- * their photos in photoStore.ts too (age expiry and corrupt records both
- * silently drop entries here, and neither had a caller-visible hook before
- * photoStore.ts existed — this is that hook). */
+ * their photos in photoStore.ts too (corrupt records are silently dropped
+ * here, which had no caller-visible hook before photoStore.ts existed —
+ * this is that hook). */
 function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: string[] } {
   try {
     const raw = localStorage.getItem(KEY);
@@ -67,14 +65,9 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: stri
 
     // Validate rather than cast: these records outlive schema changes, and one
     // corrupt entry must not blank the whole list
-    const cutoff = Date.now() - RETENTION_DAYS * DAY_MS;
     const droppedIds: string[] = [];
     const entries = parsed.entries.flatMap((entry) => {
       if (typeof entry?.id !== "string" || typeof entry?.savedAt !== "number") return [];
-      if (entry.savedAt < cutoff) {
-        droppedIds.push(entry.id);
-        return [];
-      }
       const doc = jsaDocumentSchema.safeParse(entry.doc);
       if (!doc.success) {
         droppedIds.push(entry.id);
@@ -129,7 +122,7 @@ function writeRaw(entries: HistoryEntry[]): void {
   }
 }
 
-/** Newest first. Prunes expired/corrupt records, writing back if anything changed. */
+/** Newest first. Prunes corrupt records, writing back if anything changed. */
 export function list(): HistoryEntry[] {
   const { entries, pruned, droppedIds } = readRaw();
   if (pruned) {
@@ -168,7 +161,17 @@ function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "proc
     doc,
     ...(procedure ? { procedure } : {}),
   };
-  writeRaw([next, ...others].slice(0, MAX_ENTRIES));
+  writeCapped([next, ...others]);
+}
+
+/** Write newest-first `entries`, dropping whatever falls past MAX_ENTRIES —
+ * and those entries' photos with them. Without the photo cleanup, every job
+ * that aged out of the cap would leave its images in IndexedDB forever, with
+ * no history row left to show or delete them from. */
+function writeCapped(entries: HistoryEntry[]): void {
+  writeRaw(entries.slice(0, MAX_ENTRIES));
+  const overflow = entries.slice(MAX_ENTRIES).map((entry) => entry.id);
+  if (overflow.length) void clearForHistoryIds(overflow);
 }
 
 /** Save the JSA for `id`, keeping any procedure already stored alongside it. */
@@ -198,7 +201,7 @@ export function remove(id: string): void {
 export function restore(entry: HistoryEntry): void {
   const others = readRaw().entries.filter((other) => other.id !== entry.id);
   const next = [entry, ...others].sort((a, b) => b.savedAt - a.savedAt);
-  writeRaw(next.slice(0, MAX_ENTRIES));
+  writeCapped(next);
 }
 
 export function clear(): void {

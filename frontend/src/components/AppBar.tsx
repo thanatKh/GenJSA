@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import logoUrl from "../assets/logo.png";
-import { RETENTION_DAYS } from "../history";
+import { MAX_ENTRIES } from "../history";
 import type { DocumentMeta } from "../lib/pdf/layout";
 import { Button, InfoDialog } from "./ui";
 
@@ -161,7 +161,7 @@ export function AppBar({
             <p>
               ระบบนี้ไม่เก็บข้อมูล JSA หรือขั้นตอนปฏิบัติงานไว้บนเซิร์ฟเวอร์
               ยกเว้นรายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
-              ที่เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น เป็นเวลา {RETENTION_DAYS} วัน
+              ที่เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น โดยไม่มีวันหมดอายุ (สูงสุด {MAX_ENTRIES} งานล่าสุด)
               และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
             </p>
           </div>

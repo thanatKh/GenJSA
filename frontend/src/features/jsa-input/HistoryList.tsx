@@ -6,7 +6,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, History, ListOrdered, Search, Trash2, X } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  History,
+  ListOrdered,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button, ConfirmDialog, Input, UndoToast } from "../../components/ui";
 import * as historyStore from "../../history";
@@ -31,6 +40,15 @@ const UNDO_TIMEOUT_MS = 6000;
 
 const UNTITLED = "JSA ไม่มีชื่องาน";
 
+// The two "open this document" buttons on each row — tinted so they read as
+// controls, not one more line of the row's metadata
+// (border-transparent: same box as the dashed "create" button beside it, so
+// every row is the same height)
+const docButton =
+  "flex min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-navy-soft px-2.5 py-2 text-xs " +
+  "font-medium text-navy hover:bg-navy-soft/70 focus-visible:outline-none " +
+  "focus-visible:ring-2 focus-visible:ring-ring/50";
+
 function entryTitle(entry: HistoryEntry): string {
   return entry.doc.header.work_activity.trim() || UNTITLED;
 }
@@ -38,12 +56,15 @@ function entryTitle(entry: HistoryEntry): string {
 export function HistoryList({
   onOpen,
   onOpenProcedure,
+  onCreateProcedure,
 }: {
   onOpen: (entry: HistoryEntry) => void;
   /** Open the entry's work procedure directly, skipping the JSA editor. Only
-   * ever called for entries that have one — the badge that triggers it isn't
-   * rendered otherwise. */
+   * ever called for entries that have one. */
   onOpenProcedure: (entry: HistoryEntry) => void;
+  /** Draft a work procedure for an entry that doesn't have one yet — the
+   * same AI call as the button on the JSA PDF page, started from here. */
+  onCreateProcedure: (entry: HistoryEntry) => void;
 }) {
   const [entries, setEntries] = useState<HistoryEntry[]>(() => historyStore.list());
   const [query, setQuery] = useState("");
@@ -277,34 +298,51 @@ export function HistoryList({
                   </Button>
                 </div>
 
-                {/* Its own full-width strip below the title row, not a badge
-                    sharing the title's text block — it used to sit right under
-                    the date/metadata line with the same plain-text weight,
-                    which read as one more fact about the row ("...7 ขั้นตอน +
-                    ขั้นตอนปฏิบัติงาน") rather than a second, differently-
-                    destined button. A tinted background + its own icon +
-                    chevron gives it the same "this is a control" signals the
-                    row button above already has, so the two clicks stop
-                    looking like one continuous block of text.
-                    Own button, a sibling of the row (never nested — nested
-                    buttons are invalid HTML). Only rendered when there IS a
-                    procedure — a "no procedure" marker on every other row
-                    would be noise to flag the exception. */}
-                {entry.procedure ? (
+                {/* The job's two documents side by side, the same two columns
+                    on every row: JSA on the left, work procedure on the right.
+                    Without a procedure the right-hand slot becomes the button
+                    that drafts one, instead of being left out — that used to
+                    make rows different heights and left the procedure
+                    reachable only from the JSA's PDF page. Dashed and unfilled
+                    so "create" never reads as "open": it starts a 1-3 minute
+                    AI draft rather than opening something that exists. */}
+                <div className="mb-1.5 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => onOpenProcedure(entry)}
-                    aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                    className="mb-1.5 flex w-full items-center gap-1.5 rounded-md bg-navy-soft
-                               px-2.5 py-2 text-xs font-medium text-navy hover:bg-navy-soft/70
-                               focus-visible:outline-none focus-visible:ring-2
-                               focus-visible:ring-ring/50"
+                    onClick={() => onOpen(entry)}
+                    aria-label={`เปิด JSA ของ ${entryTitle(entry)}`}
+                    className={docButton}
                   >
-                    <ListOrdered className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="truncate">ขั้นตอนปฏิบัติงาน</span>
+                    <FileText className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">JSA</span>
                     <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
                   </button>
-                ) : null}
+                  {entry.procedure ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenProcedure(entry)}
+                      aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                      className={docButton}
+                    >
+                      <ListOrdered className="size-3.5 shrink-0" aria-hidden="true" />
+                      <span className="truncate">ขั้นตอนปฏิบัติงาน</span>
+                      <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onCreateProcedure(entry)}
+                      aria-label={`สร้างขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                      className="flex min-w-0 items-center gap-1.5 rounded-md border border-dashed
+                                 border-navy/40 px-2.5 py-2 text-xs font-medium text-navy
+                                 hover:border-navy hover:bg-navy-soft focus-visible:outline-none
+                                 focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+                      <span className="truncate">สร้างขั้นตอนปฏิบัติงาน</span>
+                    </button>
+                  )}
+                </div>
               </motion.li>
             ))}
           </AnimatePresence>
@@ -312,8 +350,8 @@ export function HistoryList({
       )}
 
       <p className="mt-4 text-sm text-muted">
-        เก็บไว้ในเบราว์เซอร์ของเครื่องนี้ {historyStore.RETENTION_DAYS} วัน
-        ไม่ถูกส่งขึ้นเซิร์ฟเวอร์
+        เก็บไว้ในเบราว์เซอร์ของเครื่องนี้โดยไม่มีวันหมดอายุ (สูงสุด{" "}
+        {historyStore.MAX_ENTRIES} งานล่าสุด) ไม่ถูกส่งขึ้นเซิร์ฟเวอร์
       </p>
 
       <UndoToast

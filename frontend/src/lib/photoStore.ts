@@ -16,7 +16,13 @@
  * updateProcedure in App.tsx). This is a THIRD store, parallel to
  * history.ts and store.ts, not a merge into either.
  *
- * Keyed by (historyId, stepNo), not stepNo alone. The in-memory `photos` map
+ * Keyed by (historyId, stepNo), not stepNo alone. Despite the field's name,
+ * `stepNo` now holds a sub-step key — photoKey() from lib/pdf/layout.ts,
+ * e.g. "1.2" — since photos moved from main steps to sub-steps. IndexedDB
+ * keys may be strings or numbers, so this needed no schema change or
+ * DB_VERSION bump: rows written before the move still carry a plain number
+ * (the main step), and loadForHistoryId reports them separately as `legacy`
+ * so usePhotos.ts can move them onto a sub-step. The in-memory `photos` map
  * in App.tsx can get away with stepNo alone because only one job is ever open
  * at a time, but this store persists across reloads and across jobs, so it
  * needs the same job identity history.ts itself keys by — otherwise loading
@@ -44,7 +50,9 @@ const STORE = "photos";
 
 export type StoredPhoto = {
   historyId: string;
-  stepNo: number;
+  /** Sub-step key ("1.2"), or a number on rows from before the move to
+   * sub-steps — see the header comment. */
+  stepNo: string | number;
   data: string;
   ratio: number;
   savedAt: number;
@@ -107,15 +115,20 @@ function withStore<T>(
   );
 }
 
-/** All photos saved for one job, keyed by stepNo — the shape App.tsx's
- * in-memory `photos` map already uses, so a caller can drop this straight
- * into setPhotos(). Empty object (never throws) if the DB is unavailable or
- * the job has no saved photos. */
+type Photo = { data: string; ratio: number };
+
+/** All photos saved for one job. `photos` is keyed by sub-step key ("1.2"),
+ * the shape usePhotos.ts's in-memory map uses. `legacy` holds rows saved
+ * before photos moved to sub-steps, keyed by main step number — the caller
+ * decides which sub-step each belongs on, then saves it under its new key
+ * and removes the old one. Both empty (never throws) if the DB is
+ * unavailable or the job has no saved photos. */
 export async function loadForHistoryId(
   historyId: string,
-): Promise<Record<number, { data: string; ratio: number }>> {
+): Promise<{ photos: Record<string, Photo>; legacy: Record<number, Photo> }> {
+  const empty = { photos: {}, legacy: {} };
   const db = await openDb();
-  if (!db) return {};
+  if (!db) return empty;
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE, "readonly");
@@ -123,33 +136,41 @@ export async function loadForHistoryId(
       const request = index.getAll(IDBKeyRange.only(historyId));
       request.onsuccess = () => {
         const rows = (request.result ?? []) as StoredPhoto[];
-        resolve(
-          Object.fromEntries(rows.map((row) => [row.stepNo, { data: row.data, ratio: row.ratio }])),
-        );
+        const result: { photos: Record<string, Photo>; legacy: Record<number, Photo> } = {
+          photos: {},
+          legacy: {},
+        };
+        for (const row of rows) {
+          const photo = { data: row.data, ratio: row.ratio };
+          if (typeof row.stepNo === "number") result.legacy[row.stepNo] = photo;
+          else result.photos[row.stepNo] = photo;
+        }
+        resolve(result);
       };
-      request.onerror = () => resolve({});
+      request.onerror = () => resolve(empty);
     } catch {
-      resolve({});
+      resolve(empty);
     }
   });
 }
 
-/** Save or overwrite one step's photo. Fire-and-forget from the caller's
+/** Save or overwrite one sub-step's photo. Fire-and-forget from the caller's
  * perspective (App.tsx doesn't await this) — a failed write here is never
  * worse than the pre-existing memory-only behaviour, so it fails quiet. */
 export function save(
   historyId: string,
-  stepNo: number,
+  key: string,
   photo: { data: string; ratio: number },
 ): Promise<void> {
   return withStore("readwrite", (store) =>
-    store.put({ historyId, stepNo, data: photo.data, ratio: photo.ratio, savedAt: Date.now() }),
+    store.put({ historyId, stepNo: key, data: photo.data, ratio: photo.ratio, savedAt: Date.now() }),
   ).then(() => undefined);
 }
 
-/** Remove one step's photo (the user deleted it in the editor). */
-export function remove(historyId: string, stepNo: number): Promise<void> {
-  return withStore("readwrite", (store) => store.delete([historyId, stepNo])).then(() => undefined);
+/** Remove one photo — a sub-step key, or a legacy main-step number once
+ * usePhotos.ts has moved that photo onto a sub-step. */
+export function remove(historyId: string, key: string | number): Promise<void> {
+  return withStore("readwrite", (store) => store.delete([historyId, key])).then(() => undefined);
 }
 
 /** Remove every photo saved for one job — discardProcedure, startOver, and

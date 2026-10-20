@@ -157,7 +157,10 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
 };
 
 /* ------------------------------------------------------------- photos --
- * An optional photo attached to one main step of a work procedure.
+ * An optional photo attached to one sub-step (1.1, 1.2, 3.2…) of a work
+ * procedure. Used to be one per main step; moved down a level so a photo
+ * sits next to the exact action it shows. Old per-step photos are moved onto
+ * that step's last sub-step when loaded — see usePhotos.ts.
  *
  * Deliberately NOT part of ProcedureDocument: that type mirrors
  * backend/app/models/procedure.py field for field, and photos never reach the
@@ -178,6 +181,16 @@ export type StepPhoto = {
   /** naturalWidth / naturalHeight, for aspect-preserving placement */
   ratio: number;
 };
+
+/** Photos for one procedure, keyed by photoKey(step.no, sub.no). Positional,
+ * like the numbers printed on the document: deleting sub-step 1.1 means the
+ * old 1.2's photo has to move to "1.1" with it — ProcedureEditorStep's
+ * removeSub does that shift. */
+export type PhotoMap = Record<string, StepPhoto>;
+
+export function photoKey(stepNo: number, subNo: number): string {
+  return `${stepNo}.${subNo}`;
+}
 
 /** Photos are downscaled on ingest, before they ever reach state.
  *

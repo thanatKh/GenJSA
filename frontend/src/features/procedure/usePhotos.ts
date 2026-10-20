@@ -1,4 +1,4 @@
-/* Step photos, kept in memory and synced to lib/photoStore.ts (IndexedDB).
+/* Sub-step photos, kept in memory and synced to lib/photoStore.ts (IndexedDB).
  *
  * Deepens what used to be 4 separate call sites in App.tsx that each had to
  * remember, by hand, to touch BOTH the in-memory `photos` map and
@@ -11,43 +11,102 @@
  * path to the in-memory map that can skip the persisted one.
  *
  * Keyed by `historyId`, not by a caller-supplied setter — matching
- * photoStore.ts's own (historyId, stepNo) key, and matching why photos
- * cross-job-leak was a real bug before: the in-memory map has no identity of
- * its own beyond "whatever's currently loaded", so this hook owns exactly
- * one job's worth of photos, keyed by whichever historyId it's given.
+ * photoStore.ts's own (historyId, key) key. The in-memory map holds exactly
+ * one job's photos: it resets the moment historyId changes (see below), so
+ * moving to another job can never show this job's images on that job's 1.1,
+ * 1.2…
+ *
+ * Leaving a job only forgets its photos IN MEMORY. They stay in IndexedDB
+ * for as long as the job's history entry exists, so reopening it from
+ * HistoryList brings them back along with its text. The only thing that
+ * deletes photos from disk is deleting the history entry itself
+ * (history.ts's onEntriesRemoved). This hook used to delete them from disk
+ * on every "leave this job" — เริ่มใหม่, the logo, a new JSA, opening another
+ * entry — which is why a reopened job came back with its text but no
+ * photos.
+ *
+ * Photos are keyed per sub-step (photoKey in lib/pdf/layout.ts, "1.2"). They
+ * used to be one per main step; photos saved that way are moved onto that
+ * step's LAST sub-step the first time the job is loaded — the old photo
+ * printed after all of a step's sub-steps, so the last one keeps the PDF
+ * looking the same.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { StepPhoto } from "../../lib/pdf/layout";
+import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import * as photoStore from "../../lib/photoStore";
+import type { ProcedureDocument } from "../../lib/schema";
 
-export function usePhotos(historyId: string | null) {
-  const [photos, setPhotos] = useState<Record<number, StepPhoto>>({});
+/** Every key in `photos` that belongs to main step `stepNo` */
+function keysOfStep(photos: PhotoMap, stepNo: number): string[] {
+  const prefix = `${stepNo}.`;
+  return Object.keys(photos).filter((key) => key.startsWith(prefix));
+}
+
+export function usePhotos(historyId: string | null, procedure: ProcedureDocument | null) {
+  const [photos, setPhotos] = useState<PhotoMap>({});
+  // The latest map, for replaceStepPhotos — it's also called from undo
+  // closures created several renders earlier, whose own `photos` is stale.
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+
+  // Reset during render, not in an effect — React's pattern for "state that
+  // belongs to one value of a prop": an effect would let one render show the
+  // previous job's photos against the new job's steps first.
+  const [photosFor, setPhotosFor] = useState(historyId);
+  if (photosFor !== historyId) {
+    setPhotosFor(historyId);
+    setPhotos({});
+  }
+
+  // Read inside the async load below, after the await — by then the render
+  // that set historyId has also set this job's procedure, whichever order
+  // the two arrived in.
+  const procedureRef = useRef(procedure);
+  procedureRef.current = procedure;
 
   // Recover photos from IndexedDB whenever historyId points at a real entry
   // — covers both a refresh mid-review (historyId restored from
   // currentHistoryId's sessionStorage draft on mount, procedure restored the
-  // same way, photos now recoverable too instead of just gone) and opening a
-  // history entry from HistoryList. Merged into the in-memory map rather
-  // than replacing it outright, though in practice photos is always {} at
-  // the two moments this actually fires (mount, or right after
-  // openHistoryEntry sets both historyId and discards/replaces photos) —
-  // merging is what stays correct if that ever stops being true, at no
-  // extra cost when it is.
+  // same way) and opening a history entry from HistoryList. Merged under
+  // whatever is already in memory: the map was just reset for this
+  // historyId, so anything there is a photo the user attached in the moment
+  // before this load finished, and theirs wins.
   useEffect(() => {
     if (!historyId) return;
     let cancelled = false;
-    void photoStore.loadForHistoryId(historyId).then((loaded) => {
-      if (cancelled || Object.keys(loaded).length === 0) return;
-      setPhotos((current) => ({ ...loaded, ...current }));
+    void photoStore.loadForHistoryId(historyId).then(({ photos: loaded, legacy }) => {
+      if (cancelled) return;
+
+      // Old per-step photos → that step's last sub-step. Skipped when that
+      // sub-step already has a photo of its own (can't happen for data
+      // written before the move, but never overwrite the user's photo).
+      // A step with no sub-steps at all gets "N.1": nothing shows until a
+      // sub-step exists, but the photo isn't thrown away either.
+      const moved: PhotoMap = {};
+      for (const [stepNoText, photo] of Object.entries(legacy)) {
+        const stepNo = Number(stepNoText);
+        const step = procedureRef.current?.steps.find((candidate) => candidate.no === stepNo);
+        const lastSubNo = step?.sub_steps.length ? step.sub_steps[step.sub_steps.length - 1].no : 1;
+        const key = photoKey(stepNo, lastSubNo);
+        if (!(key in loaded) && !(key in moved)) {
+          moved[key] = photo;
+          void photoStore.save(historyId, key, photo);
+        }
+        void photoStore.remove(historyId, stepNo);
+      }
+
+      const all = { ...loaded, ...moved };
+      if (Object.keys(all).length === 0) return;
+      setPhotos((current) => ({ ...all, ...current }));
     });
     return () => {
       cancelled = true;
     };
   }, [historyId]);
 
-  /** Attach or clear one step's photo. Never touches the document.
+  /** Attach or clear one sub-step's photo. Never touches the document.
    *
    * Also writes through to photoStore.ts (IndexedDB) so the photo survives a
    * refresh — fire-and-forget, same as every other call into that module,
@@ -55,52 +114,65 @@ export function usePhotos(historyId: string | null) {
    * existing at all. Skipped when there's no historyId yet (shouldn't
    * happen in practice: a procedure can't exist before a history entry has
    * been started) — there'd be nothing to key the write by. */
-  const setPhoto = (stepNo: number, photo: StepPhoto | null) => {
+  const setPhoto = (key: string, photo: StepPhoto | null) => {
     setPhotos((current) => {
       const next = { ...current };
-      if (photo) next[stepNo] = photo;
-      else delete next[stepNo];
+      if (photo) next[key] = photo;
+      else delete next[key];
       return next;
     });
     if (!historyId) return;
-    if (photo) void photoStore.save(historyId, stepNo, photo);
-    else void photoStore.remove(historyId, stepNo);
+    if (photo) void photoStore.save(historyId, key, photo);
+    else void photoStore.remove(historyId, key);
   };
 
-  /** Drop every photo for the current job, in memory and on disk. Required,
-   * not tidiness: photos are keyed by step number, so leaving them behind
-   * would attach this job's images to the next job's steps 1, 2, 3… — the
-   * caller is about to move on to a different job (a new JSA, "เริ่มใหม่", or
-   * opening a different history entry). Uses whichever historyId this hook
-   * currently has, i.e. the job being left behind, not whatever the caller
-   * is about to switch to. */
-  const discardAll = () => {
-    setPhotos({});
-    if (historyId) void photoStore.clearForHistoryId(historyId);
+  /** Replace every photo of one main step at once — `next` holds only that
+   * step's keys. This is how ProcedureEditorStep keeps photos with their
+   * sub-steps when one is deleted (the old 1.3's photo becomes 1.2's) and
+   * puts them back on undo: a single swap, so the step's photos never pass
+   * through a half-shifted state.
+   *
+   * The disk diff is taken against photosRef (the latest render's map), not
+   * this render's `photos`: undo calls this from a closure made when the
+   * sub-step was deleted, and diffing against that older map skipped the
+   * very writes undo needs — the photo came back on screen but not on disk.
+   * Kept outside the setPhotos updater so the IndexedDB writes happen
+   * exactly once (an updater can run twice under StrictMode). */
+  const replaceStepPhotos = (stepNo: number, next: PhotoMap) => {
+    const current = photosRef.current;
+    const removed = keysOfStep(current, stepNo).filter((key) => !(key in next));
+    const changed = Object.entries(next).filter(([key, photo]) => current[key] !== photo);
+
+    setPhotos((latest) => {
+      const merged = { ...latest };
+      for (const key of keysOfStep(latest, stepNo)) delete merged[key];
+      return { ...merged, ...next };
+    });
+
+    if (!historyId) return;
+    for (const key of removed) void photoStore.remove(historyId, key);
+    for (const [key, photo] of changed) void photoStore.save(historyId, key, photo);
   };
 
-  /** After a regenerate, drop photos whose step number no longer exists in
-   * the new draft — repeated redrafts in one session can't accumulate
+  /** After a regenerate, drop photos whose sub-step no longer exists in the
+   * new draft — repeated redrafts in one session can't accumulate
    * unreachable images. Photos survive a regenerate at all (unlike the
-   * document itself) because they're the user's own work, not the AI's, and
-   * the step they illustrate usually still exists.
+   * document itself) because they're the user's own work, not the AI's.
    *
    * Same pruning applied to the persisted copy, or an orphan dropped from
    * the in-memory map here would simply reappear the next time this
    * historyId's photos are loaded from IndexedDB (on refresh, or reopening
    * this entry from history). */
-  const pruneToLiveSteps = (liveStepNos: readonly number[]) => {
+  const pruneToLiveKeys = (liveKeys: readonly string[]) => {
     setPhotos((current) => {
-      const live = new Set(liveStepNos);
-      const orphaned = Object.keys(current)
-        .map(Number)
-        .filter((no) => !live.has(no));
+      const live = new Set(liveKeys);
+      const orphaned = Object.keys(current).filter((key) => !live.has(key));
       if (historyId && orphaned.length) {
-        void Promise.all(orphaned.map((no) => photoStore.remove(historyId, no)));
+        void Promise.all(orphaned.map((key) => photoStore.remove(historyId, key)));
       }
-      return Object.fromEntries(Object.entries(current).filter(([no]) => live.has(Number(no))));
+      return Object.fromEntries(Object.entries(current).filter(([key]) => live.has(key)));
     });
   };
 
-  return { photos, setPhoto, discardAll, pruneToLiveSteps };
+  return { photos, setPhoto, replaceStepPhotos, pruneToLiveKeys };
 }

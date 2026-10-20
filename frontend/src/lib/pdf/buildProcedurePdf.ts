@@ -27,6 +27,8 @@ import {
   type CompanyMeta,
   type DocumentMeta,
   type PdfLayout,
+  type PhotoMap,
+  photoKey,
   type ProcedureMeta,
   type StepPhoto,
 } from "./layout";
@@ -36,10 +38,10 @@ export type BuildProcedureOptions = {
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
   company?: CompanyMeta;
-  /** Optional photo per main step, keyed by ProcedureStep.no. Held outside the
-   * document because it never reaches the backend and is never persisted —
-   * see StepPhoto in layout.ts. */
-  photos?: Record<number, StepPhoto>;
+  /** Optional photo per sub-step, keyed by photoKey(step.no, sub.no). Held
+   * outside the document because it never reaches the backend — see
+   * StepPhoto in layout.ts. */
+  photos?: PhotoMap;
 };
 
 export async function buildProcedurePdf(
@@ -411,70 +413,60 @@ export async function buildProcedurePdf(
       L.font.body_pt,
       `${stepsHeadingNo}.${step.no}`,
     );
-    const photo = photos[step.no];
+
+    const subLines = step.sub_steps.map((sub) =>
+      wrap(
+        sub.action,
+        contentW - subIndent,
+        "normal",
+        L.font.body_pt,
+        `${stepsHeadingNo}.${step.no}.${sub.no}`,
+      ),
+    );
+    const subPhotos = step.sub_steps.map((sub) => photos[photoKey(step.no, sub.no)]);
 
     // Keep a step title with its first sub-step — a heading alone at the foot
     // of a page is the one pagination problem a flowing layout still has.
     // Only reserved for the title's first line plus the first sub-step's
     // first line: a title or sub-step longer than that flows and paginates
     // itself via drawFlowing below, same as the section paragraphs above.
-    const firstSub = step.sub_steps[0];
-    const firstSubH = firstSub
-      ? Math.min(
-          wrap(firstSub.action, contentW - subIndent, "normal", L.font.body_pt, "0.0.0").length,
-          1,
-        ) * lineH
-      : 0;
-
-    // A photo is part of the step it illustrates, so try to keep the whole
-    // step — title, sub-steps and photo — together. Without this the photo
-    // lands alone at the top of the next page while its title stays behind on
-    // the previous one, which reads as an unrelated image.
-    //
-    // Only when the step genuinely fits a page: a long step is going to break
-    // across pages regardless, and reserving room it can never have would push
-    // every such step onto a fresh page for nothing.
-    let keepTogether = Math.min(titleLines.length, 1) * lineH + firstSubH;
-    if (photo) {
-      const stepH =
-        titleLines.length * lineH +
-        step.sub_steps.reduce(
-          (total, sub) =>
-            total +
-            wrap(
-              sub.action,
-              contentW - subIndent,
-              "normal",
-              L.font.body_pt,
-              `${stepsHeadingNo}.${step.no}.${sub.no}`,
-            ).length *
-              lineH,
-          0,
-        ) +
-        photoGap +
-        photoSize(photo).h;
-      if (stepH <= usableBodyH) keepTogether = stepH;
+    // When that first sub-step has a photo, the reservation covers the
+    // whole sub-step and its photo instead — otherwise the per-sub-step
+    // keep-together below would carry them to the next page and strand the
+    // title on this one anyway.
+    let keepTogether = Math.min(titleLines.length, 1) * lineH;
+    if (subLines.length) {
+      const firstPhoto = subPhotos[0];
+      const withPhoto = firstPhoto
+        ? titleLines.length * lineH + subLines[0].length * lineH + photoGap + photoSize(firstPhoto).h
+        : 0;
+      keepTogether =
+        firstPhoto && withPhoto <= usableBodyH ? withPhoto : keepTogether + Math.min(subLines[0].length, 1) * lineH;
     }
     need(keepTogether);
 
     drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent);
 
-    step.sub_steps.forEach((sub) => {
-      const marker = `${stepsHeadingNo}.${step.no}.${sub.no}`;
-      const actionLines = wrap(
-        sub.action,
-        contentW - subIndent,
-        "normal",
-        L.font.body_pt,
-        marker,
-      );
+    step.sub_steps.forEach((_, subIndex) => {
+      const actionLines = subLines[subIndex];
+      const photo = subPhotos[subIndex];
+
+      // A photo belongs to the sub-step it shows, so keep the two together
+      // when they fit one page — otherwise the photo lands alone at the top
+      // of the next page while its text stays behind, which reads as an
+      // unrelated image. A sub-step too long for that is going to break
+      // across pages regardless, so nothing is reserved for it.
+      if (photo) {
+        const blockH = actionLines.length * lineH + photoGap + photoSize(photo).h;
+        if (blockH <= usableBodyH) need(blockH);
+      }
 
       drawFlowing(actionLines, mL + subIndent, contentW - subIndent);
-    });
 
-    // After the sub-steps: the photo illustrates the step as a whole, so it
-    // reads as the result of the instructions rather than interrupting them.
-    if (photo) drawPhoto(photo);
+      // Right under its own line, so it reads as "this is what that action
+      // looks like" rather than a picture of the step as a whole.
+      if (photo) drawPhoto(photo);
+    });
 
     y += blockGap;
   });

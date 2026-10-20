@@ -21,6 +21,7 @@ import {
   generateProcedure,
   type PublicConfig,
 } from "./lib/api";
+import { photoKey } from "./lib/pdf/layout";
 import {
   stepFingerprint,
   type InputForm,
@@ -119,8 +120,9 @@ export default function App() {
   // never rendered — a state setter here would just cause an extra re-render
   // every generate call for no visual purpose
   const generateController = useRef<AbortController | null>(null);
-  // Same reasoning, separate controller: handleCreateProcedure runs from two
-  // different stages (2: first draft, 3: regenerate) and is never in flight
+  // Same reasoning, separate controller: generateProcedureFrom runs from two
+  // different stages (2: first draft, from the PDF page or a history row;
+  // 3: regenerate) and is never in flight
   // at the same time as handleGenerate's own controller above, but keeping
   // them separate avoids one cancel button ever accidentally reaching into
   // the other flow's request.
@@ -135,9 +137,14 @@ export default function App() {
   // separate hand-synced call sites in this file. Re-keys to whatever job
   // `historyId` currently points at; the hook's own effect handles loading
   // that job's persisted photos (covers both a refresh mid-review and
-  // opening a history entry).
-  const { photos, setPhoto: updatePhoto, discardAll: discardAllPhotos, pruneToLiveSteps } =
-    usePhotos(historyId);
+  // opening a history entry). Also given the procedure, so photos saved
+  // before they moved to sub-steps can be placed on the right sub-step.
+  const {
+    photos,
+    setPhoto: updatePhoto,
+    replaceStepPhotos,
+    pruneToLiveKeys,
+  } = usePhotos(historyId, procedure);
 
   // If a draft JSA is left over (refresh mid-flow), jump straight back to the editor step
   useEffect(() => {
@@ -203,16 +210,13 @@ export default function App() {
   };
 
   /** Drop the procedure from screen and draft storage. The copy already in
-   * history stays: it belongs to whatever entry it was generated for. */
+   * history stays: it belongs to whatever entry it was generated for — and
+   * so do its photos. Every caller also moves to another historyId (or
+   * none), which is what clears photos from the screen; see usePhotos.ts. */
   const discardProcedure = () => {
     setProcedure(null);
     setProcedureError(null);
     procedureDraft.clear();
-    // Required, not tidiness: photos are keyed by step number, so leaving
-    // them behind would attach this job's images to the next job's steps
-    // 1, 2, 3… — see usePhotos.ts for why this now clears both the
-    // in-memory map and the persisted copy in one call.
-    discardAllPhotos();
   };
 
   const handleGenerate = async (values: InputForm, withProcedure: boolean) => {
@@ -366,27 +370,45 @@ export default function App() {
    * From the PDF page this reopens an existing one rather than spending
    * another AI call; `force` is the editor's "regenerate" path, which has
    * already confirmed that the user's edits are being discarded. */
-  const handleCreateProcedure = async ({ force = false } = {}) => {
+  const handleCreateProcedure = ({ force = false } = {}) => {
     if (!doc) return;
     if (procedure && !force) {
       goto(3);
       return;
     }
+    void generateProcedureFrom(doc);
+  };
 
+  /** "สร้างขั้นตอนปฏิบัติงาน" on a history row with no procedure yet: open
+   * that job on its JSA PDF page and start drafting straight away. Stage 2
+   * is where the wait already lives (computeView shows the busy panel there),
+   * and it's also where a cancel or a failed draft leaves the user — on the
+   * job's own PDF page, with PdfStep showing the error and its retry button.
+   *
+   * Passes entry.doc rather than relying on `doc`: openHistoryEntry's state
+   * updates haven't rendered yet when this runs. */
+  const handleCreateHistoryProcedure = (entry: HistoryEntry) => {
+    openHistoryEntry(entry, 2);
+    void generateProcedureFrom(entry.doc);
+  };
+
+  const generateProcedureFrom = async (source: JsaDocument) => {
     setProcedureBusy(true);
     setProcedureError(null);
     const controller = new AbortController();
     procedureController.current = controller;
     try {
-      const generated = await generateProcedure(doc, { signal: controller.signal });
+      const generated = await generateProcedure(source, { signal: controller.signal });
       setProcedure(generated);
       procedureDraft.save(generated);
       // Photos survive a regenerate — they're the user's own work, not the
-      // AI's, and the step they illustrate usually still exists. Drop only
-      // the ones whose step number is gone from the new draft, so repeated
-      // redrafts in one session can't accumulate unreachable images (both
-      // the in-memory map and the persisted copy — see usePhotos.ts).
-      pruneToLiveSteps(generated.steps.map((step) => step.no));
+      // AI's. Drop only the ones whose sub-step number is gone from the new
+      // draft, so repeated redrafts in one session can't accumulate
+      // unreachable images (both the in-memory map and the persisted copy —
+      // see usePhotos.ts).
+      pruneToLiveKeys(
+        generated.steps.flatMap((step) => step.sub_steps.map((sub) => photoKey(step.no, sub.no))),
+      );
       goto(3);
     } catch (caught) {
       // Cancelled via ยกเลิก on the busy panel — not a failure, so no error
@@ -409,8 +431,8 @@ export default function App() {
     }
   };
 
-  // "ยกเลิก" on the busy panel shown for both handleCreateProcedure paths
-  // (first draft from stage 2, regenerate from stage 3) — aborts the
+  // "ยกเลิก" on the busy panel shown for every generateProcedureFrom path
+  // (first draft at stage 2, regenerate at stage 3) — aborts the
   // in-flight fetch so the wait actually stops, same reasoning as
   // cancelGenerate above.
   const cancelCreateProcedure = () => procedureController.current?.abort();
@@ -531,6 +553,7 @@ export default function App() {
               <HistoryList
                 onOpen={handleOpenHistory}
                 onOpenProcedure={handleOpenHistoryProcedure}
+                onCreateProcedure={handleCreateHistoryProcedure}
               />
             )}
           </div>
@@ -570,7 +593,7 @@ export default function App() {
               config={config}
               onBack={() => goto(1)}
               onNewJsa={startOver}
-              onCreateProcedure={() => void handleCreateProcedure()}
+              onCreateProcedure={() => handleCreateProcedure()}
               procedureBusy={procedureBusy}
               procedureError={procedureError}
               hasProcedure={!!procedure}
@@ -591,9 +614,10 @@ export default function App() {
               onChange={updateProcedure}
               photos={photos}
               onPhotoChange={updatePhoto}
+              onStepPhotosReplace={replaceStepPhotos}
               onContinue={() => goto(4)}
               onBack={() => goto(2)}
-              onRegenerate={() => void handleCreateProcedure({ force: true })}
+              onRegenerate={() => handleCreateProcedure({ force: true })}
               stale={procedureStale}
               error={procedureError}
             />

@@ -16,7 +16,7 @@ import { ArrowLeft, FilePlus2 } from "lucide-react";
 
 import { pdfFileName, procedurePdfFileName } from "../../lib/pdf/fileName";
 import { formatThaiDate } from "../../lib/thaidate";
-import type { StepPhoto } from "../../lib/pdf/layout";
+import type { PhotoMap } from "../../lib/pdf/layout";
 import type { JsaDocument, ProcedureDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { PdfDeliveryCard } from "../pdf-view/PdfDeliveryCard";
@@ -38,8 +38,8 @@ export function ProcedurePdfStep({
    * finishing the procedure doesn't mean detouring back through onBackToJsa
    * just to download the JSA. */
   doc: JsaDocument;
-  /** Step photos, keyed by step number — persisted in IndexedDB, see App.tsx / lib/photoStore.ts */
-  photos: Record<number, StepPhoto>;
+  /** Sub-step photos, keyed by photoKey(step.no, sub.no) — persisted in IndexedDB, see usePhotos.ts */
+  photos: PhotoMap;
   config: PublicConfig | null;
   onBack: () => void;
   onBackToJsa: () => void;

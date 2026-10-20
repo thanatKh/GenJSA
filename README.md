@@ -25,7 +25,7 @@ JSA.
 |---|---|
 | **No database** | No DB, no login, no server-side storage |
 | **No document content persistence on the server** | Data lives in memory only for the duration of one request, then it's gone |
-| **History stays on your PC** | Finished documents (not PDFs) are kept in this browser's `localStorage` for 365 days, deletable at any time, never uploaded |
+| **History stays on your PC** | Finished documents (not PDFs) are kept in this browser's `localStorage` with no expiry (newest 100 jobs), deletable at any time, never uploaded |
 | **No content logging** | Logs capture only error/status level — never work descriptions or JSA content |
 | **AI drafts, humans review** | No automated review system — the supervisor reviews and is responsible |
 | **Config, not code, changes behavior** | No admin UI — everything changeable lives in `config/` |

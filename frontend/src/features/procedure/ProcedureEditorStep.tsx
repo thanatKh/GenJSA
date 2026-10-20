@@ -27,9 +27,10 @@ import {
   Label,
   UndoToast,
 } from "../../components/ui";
-import type { StepPhoto } from "../../lib/pdf/layout";
+import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
-import { StepPhotoField } from "./StepPhotoField";
+import { PhotoButton, PhotoPreview } from "./SubStepPhoto";
+import { usePhotoInput } from "./usePhotoInput";
 
 // Same undo window as EditorStep's step/hazard deletion
 const UNDO_TIMEOUT_MS = 6000;
@@ -41,6 +42,7 @@ export function ProcedureEditorStep({
   onChange,
   photos,
   onPhotoChange,
+  onStepPhotosReplace,
   onContinue,
   onBack,
   onRegenerate,
@@ -49,11 +51,14 @@ export function ProcedureEditorStep({
 }: {
   procedure: ProcedureDocument;
   onChange: (next: ProcedureDocument) => void;
-  /** Step photos keyed by step number. Kept outside ProcedureDocument — they
-   * never reach the backend, and persist in IndexedDB rather than this
-   * document (see App.tsx / lib/photoStore.ts). */
-  photos: Record<number, StepPhoto>;
-  onPhotoChange: (stepNo: number, photo: StepPhoto | null) => void;
+  /** Sub-step photos keyed by photoKey(step.no, sub.no). Kept outside
+   * ProcedureDocument — they never reach the backend, and persist in
+   * IndexedDB rather than this document (see usePhotos.ts /
+   * lib/photoStore.ts). */
+  photos: PhotoMap;
+  onPhotoChange: (key: string, photo: StepPhoto | null) => void;
+  /** Swap all of one main step's photos at once — see removeSub */
+  onStepPhotosReplace: (stepNo: number, next: PhotoMap) => void;
   onContinue: () => void;
   onBack: () => void;
   // App.tsx unmounts this component entirely while a regenerate is in
@@ -118,15 +123,35 @@ export function ProcedureEditorStep({
       { no: 0, action: "" },
     ]);
 
+  /** Photos are keyed by position ("1.3"), like the printed numbers, so
+   * deleting a sub-step shifts every later sub-step's photo up one with it —
+   * otherwise the old 1.3's photo would end up shown under the new 1.3. The
+   * deleted sub-step's own photo is dropped, and undo puts the step's
+   * photos back exactly as they were along with its text. */
   const removeSub = (stepIndex: number, subIndex: number) => {
-    const before = procedure.steps[stepIndex].sub_steps;
+    const step = procedure.steps[stepIndex];
+    const before = step.sub_steps;
+
+    const photosBefore: PhotoMap = {};
+    const photosAfter: PhotoMap = {};
+    before.forEach((sub, i) => {
+      const photo = photos[photoKey(step.no, sub.no)];
+      if (!photo) return;
+      photosBefore[photoKey(step.no, sub.no)] = photo;
+      if (i !== subIndex) photosAfter[photoKey(step.no, i < subIndex ? i + 1 : i)] = photo;
+    });
+
     patchStep(
       stepIndex,
       before.filter((_, i) => i !== subIndex),
     );
+    onStepPhotosReplace(step.no, photosAfter);
     armUndo({
       label: "ลบขั้นตอนย่อยแล้ว",
-      restore: () => patchStep(stepIndex, before),
+      restore: () => {
+        patchStep(stepIndex, before);
+        onStepPhotosReplace(step.no, photosBefore);
+      },
     });
   };
 
@@ -253,6 +278,13 @@ export function ProcedureEditorStep({
       <p className="mt-1 text-sm text-muted">
         ชื่อขั้นตอนหลักมาจาก JSA — แก้ไขได้ที่หน้าตรวจทาน JSA
       </p>
+      {/* Said once here rather than under every photo — with a photo on
+          each sub-step, a per-photo note would repeat down the whole page */}
+      <p className="mt-1 text-sm text-muted">
+        แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อย (ปุ่มรูปภาพ ลากรูปมาวาง หรือวางด้วย
+        Ctrl+V ในช่องข้อความ) — รูปภาพเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น
+        หากลบประวัติงานนี้รูปภาพจะหายไปด้วย บันทึกไฟล์ PDF เพื่อเก็บไว้ถาวร
+      </p>
 
       <ul className="mt-4 grid list-none gap-4 p-0">
         {procedure.steps.map((step, stepIndex) => (
@@ -264,33 +296,15 @@ export function ProcedureEditorStep({
 
               <ul className="mt-3 grid list-none gap-3 p-0">
                 {step.sub_steps.map((sub, subIndex) => (
-                  <li
+                  <SubStepItem
                     key={subIndex}
-                    className="grid grid-cols-[auto_1fr_auto] items-start gap-2 border-t border-line pt-3"
-                  >
-                    <span className="pt-2.5 text-sm text-muted tabular-nums">
-                      {stepIndex + 1}.{subIndex + 1}
-                    </span>
-                    <AutoGrowTextarea
-                      minRows={1}
-                      value={sub.action}
-                      placeholder="สิ่งที่ต้องลงมือทำ"
-                      aria-label={`ขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1}`}
-                      onChange={(event) =>
-                        patchSub(stepIndex, subIndex, { action: event.target.value })
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-lg"
-                      aria-label={`ลบขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1}`}
-                      onClick={() => removeSub(stepIndex, subIndex)}
-                      className="mt-1 text-muted hover:text-danger"
-                    >
-                      <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
-                  </li>
+                    label={`${stepIndex + 1}.${subIndex + 1}`}
+                    sub={sub}
+                    photo={photos[photoKey(step.no, sub.no)]}
+                    onTextChange={(action) => patchSub(stepIndex, subIndex, { action })}
+                    onPhotoChange={(photo) => onPhotoChange(photoKey(step.no, sub.no), photo)}
+                    onRemove={() => removeSub(stepIndex, subIndex)}
+                  />
                 ))}
               </ul>
 
@@ -306,13 +320,6 @@ export function ProcedureEditorStep({
                 </Button>
               </div>
 
-              {/* Keyed by step.no, the same key buildProcedurePdf draws from —
-                  the backend renumbers steps 1..n so it tracks position */}
-              <StepPhotoField
-                stepNo={step.no}
-                photo={photos[step.no]}
-                onChange={(photo) => onPhotoChange(step.no, photo)}
-              />
             </Card>
           </li>
         ))}
@@ -397,5 +404,83 @@ export function ProcedureEditorStep({
         onCancel={() => setConfirmRegenerate(false)}
       />
     </section>
+  );
+}
+
+/** One sub-step row: number, text, photo + delete buttons, and the photo
+ * (if any) under the text. Its own component so each row gets its own
+ * usePhotoInput state — busy spinner, error, drag highlight. */
+function SubStepItem({
+  label,
+  sub,
+  photo,
+  onTextChange,
+  onPhotoChange,
+  onRemove,
+}: {
+  /** "1.2" as shown on screen */
+  label: string;
+  sub: SubStep;
+  photo: StepPhoto | undefined;
+  onTextChange: (action: string) => void;
+  onPhotoChange: (photo: StepPhoto | null) => void;
+  onRemove: () => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const input = usePhotoInput(onPhotoChange);
+
+  return (
+    <li
+      {...input.dropProps(setDragging)}
+      className={`grid grid-cols-[auto_1fr_auto] items-start gap-2 border-t border-line pt-3 transition-colors ${
+        dragging ? "rounded-[var(--radius)] bg-navy-soft" : ""
+      }`}
+    >
+      <span className="pt-2.5 text-sm text-muted tabular-nums">{label}</span>
+      <div className="min-w-0">
+        <AutoGrowTextarea
+          minRows={1}
+          value={sub.action}
+          placeholder="สิ่งที่ต้องลงมือทำ"
+          aria-label={`ขั้นตอนย่อยที่ ${label}`}
+          onChange={(event) => onTextChange(event.target.value)}
+          onPaste={input.onPaste}
+        />
+        {photo ? (
+          <PhotoPreview
+            photo={photo}
+            label={`รูปภาพประกอบขั้นตอนย่อยที่ ${label}`}
+            onRemove={() => onPhotoChange(null)}
+          />
+        ) : null}
+        {input.error ? <p className="mt-2 text-sm text-danger">{input.error}</p> : null}
+      </div>
+      <div className="flex">
+        {/* Replacing a photo goes through ลบรูปภาพ first — one photo per
+            sub-step, so the button only appears while the slot is empty.
+            Its space stays reserved (size-9 = icon-lg) so every row's text
+            box keeps the same width whether or not it has a photo. */}
+        {photo ? (
+          <span className="mt-1 size-9 shrink-0" aria-hidden="true" />
+        ) : (
+          <PhotoButton
+            label={`เพิ่มรูปภาพประกอบขั้นตอนย่อยที่ ${label}`}
+            busy={input.busy}
+            onClick={input.openPicker}
+          />
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-lg"
+          aria-label={`ลบขั้นตอนย่อยที่ ${label}`}
+          onClick={onRemove}
+          className="mt-1 text-muted hover:text-danger"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+      {input.fileInput}
+    </li>
   );
 }

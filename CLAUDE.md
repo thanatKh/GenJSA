@@ -46,8 +46,9 @@ against them before adding anything:
   endpoint that wants a whole document back needs the same justification.
 - **Browser-local history is the one deliberate storage exception** — finished
   documents (never PDFs) are kept in `localStorage` by
-  `frontend/src/history.ts`: this browser on this PC, 365-day expiry,
-  deletable per-entry or all at once, never uploaded. It exists so a user can
+  `frontend/src/history.ts`: this browser on this PC, no expiry (capped at
+  the newest `MAX_ENTRIES`), deletable per-entry or all at once, never
+  uploaded. It exists so a user can
   reopen yesterday's JSA instead of regenerating it. One entry holds the JSA
   and, when one was generated, its work procedure — written by two different
   pages, so `upsertDoc`/`upsertProcedure` merge rather than replace (writing a
@@ -187,7 +188,7 @@ circle would imply the JSA is unfinished without a procedure, and most users
 will stop at the JSA.
 
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
-- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Clicking one loads it into `EditorStep`; entries that also have a procedure are badged.
+- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Each row has two buttons side by side: JSA (loads it into `EditorStep`) and the work procedure — which opens the procedure editor, or, when the job has none yet, drafts one straight from the list.
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
 - `features/pdf-view/PdfStep.tsx` — the JSA PDF, plus the card that starts a work procedure.
 - `features/pdf-view/usePdfDelivery.ts` — **shared by both PDF pages**: builds the blob and routes save/share by browser capability. Its header documents the popup-blocking, iOS-viewer and user-activation constraints behind every rule in it; each one is a fix for something that actually broke. Read it before changing how those buttons behave, and don't reimplement it inline for a third document.
@@ -197,7 +198,7 @@ will stop at the JSA.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
 - `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
-- `history.ts` — localStorage-backed history of finished documents, per-PC and 365-day capped (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
+- `history.ts` — localStorage-backed history of finished documents, per-PC, no expiry, capped at `MAX_ENTRIES` (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
 
 ⚠️ **Bundle boundary**: `engine.ts` statically imports jsPDF (~230KB with its
 transitive deps), so it must only ever be reached through a dynamic
@@ -253,7 +254,7 @@ first, then hand-merge.
 | Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |
 | How the AI writes the procedure | `prompts/procedure-generate.md` |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
-| History retention / entry cap | `frontend/src/history.ts` → `RETENTION_DAYS` / `MAX_ENTRIES` |
+| History entry cap | `frontend/src/history.ts` → `MAX_ENTRIES` |
 | Request size / rate limit / CORS | `config/app.yaml` |
 
 ## Fonts
