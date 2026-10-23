@@ -17,6 +17,7 @@ export function PdfDeliveryCard({
   title,
   summary,
   delivery,
+  secondary = false,
   className,
 }: {
   /** Small label above the title naming which document this is — e.g.
@@ -42,6 +43,10 @@ export function PdfDeliveryCard({
     handleSave: () => void;
     handleShare: () => void;
   };
+  /** Outline "เปิดเอกสาร PDF" instead of solid — for a supporting document
+   * on a page that's about another one (the JSA on ProcedurePdfStep), so
+   * the page has one solid button, on its own document. */
+  secondary?: boolean;
   className?: string;
 }) {
   const {
@@ -75,7 +80,7 @@ export function PdfDeliveryCard({
               {kicker}
             </span>
           ) : null}
-          <h2 className="font-display font-semibold text-ink break-words">{title}</h2>
+          <h2 className="font-display text-base font-semibold text-ink break-words">{title}</h2>
           <dl className="mt-2 grid gap-1 text-sm">
             {summary.map((row) => (
               <div key={row.label} className="flex gap-1.5">
@@ -108,6 +113,7 @@ export function PdfDeliveryCard({
           // Safari's popup blocking.
           <Button
             asChild
+            variant={secondary ? "outline" : "default"}
             className={canSavePicker || canShareFile ? undefined : "col-span-2"}
           >
             <a href={url} target="_blank" rel="noopener">

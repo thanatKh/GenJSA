@@ -44,11 +44,17 @@
  * history.ts's onEntriesRemoved hook.
  */
 
+/** The one non-photo row per job: that document's company logo (see
+ * lib/companyLogo.ts). Same table, so it's deleted with the job's photos by
+ * clearForHistoryId — no second lifecycle to keep in step. loadForHistoryId
+ * skips it, so it never shows up as a sub-step photo. */
+export const COMPANY_LOGO_KEY = "company-logo";
+
 const DB_NAME = "genjsa-photos";
 const DB_VERSION = 1;
 const STORE = "photos";
 
-export type StoredPhoto = {
+type StoredPhoto = {
   historyId: string;
   /** Sub-step key ("1.2"), or a number on rows from before the move to
    * sub-steps — see the header comment. */
@@ -141,6 +147,7 @@ export async function loadForHistoryId(
           legacy: {},
         };
         for (const row of rows) {
+          if (row.stepNo === COMPANY_LOGO_KEY) continue;
           const photo = { data: row.data, ratio: row.ratio };
           if (typeof row.stepNo === "number") result.legacy[row.stepNo] = photo;
           else result.photos[row.stepNo] = photo;
@@ -176,7 +183,7 @@ export function remove(historyId: string, key: string | number): Promise<void> {
 /** Remove every photo saved for one job — discardProcedure, startOver, and
  * history.ts's own deletion/expiry all need this so photos never outlive the
  * entry they illustrate. */
-export async function clearForHistoryId(historyId: string): Promise<void> {
+async function clearForHistoryId(historyId: string): Promise<void> {
   const db = await openDb();
   if (!db) return;
   return new Promise((resolve) => {
@@ -205,4 +212,14 @@ export async function clearForHistoryId(historyId: string): Promise<void> {
  * pass, so this avoids opening one transaction per id. */
 export async function clearForHistoryIds(historyIds: string[]): Promise<void> {
   await Promise.all(historyIds.map((id) => clearForHistoryId(id)));
+}
+
+/** This job's company logo, or null (none saved, or storage unavailable) */
+export async function loadCompanyLogo(
+  historyId: string,
+): Promise<{ data: string; ratio: number } | null> {
+  const row = await withStore<StoredPhoto>("readonly", (store) =>
+    store.get([historyId, COMPANY_LOGO_KEY]),
+  );
+  return row ? { data: row.data, ratio: row.ratio } : null;
 }

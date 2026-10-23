@@ -15,7 +15,9 @@
 import { ArrowLeft, FilePlus2 } from "lucide-react";
 
 import { pdfFileName, procedurePdfFileName } from "../../lib/pdf/fileName";
+import { FALLBACK_DOCUMENT, FALLBACK_PROCEDURE } from "../../lib/pdf/layout";
 import { formatThaiDate } from "../../lib/thaidate";
+import type { CompanyLogo } from "../../lib/companyLogo";
 import type { PhotoMap } from "../../lib/pdf/layout";
 import type { JsaDocument, ProcedureDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
@@ -26,6 +28,7 @@ export function ProcedurePdfStep({
   procedure,
   doc,
   photos,
+  companyLogo,
   config,
   onBack,
   onBackToJsa,
@@ -40,6 +43,8 @@ export function ProcedurePdfStep({
   doc: JsaDocument;
   /** Sub-step photos, keyed by photoKey(step.no, sub.no) — persisted in IndexedDB, see usePhotos.ts */
   photos: PhotoMap;
+  /** The document's company logo (browser-only) — printed opposite the OR logo */
+  companyLogo: CompanyLogo | null;
   config: PublicConfig | null;
   onBack: () => void;
   onBackToJsa: () => void;
@@ -48,6 +53,9 @@ export function ProcedurePdfStep({
    * several taps back through กลับไปแก้ไข / กลับไปหน้าเอกสาร JSA. */
   onNewJsa: () => void;
 }) {
+  // Same wording as the printed PDFs (config/document.yaml, config/procedure.yaml)
+  const labels = (config?.document ?? FALLBACK_DOCUMENT).labels;
+  const procedureLabels = (config?.procedure ?? FALLBACK_PROCEDURE).labels;
   const procedureDelivery = usePdfDelivery({
     build: async () => {
       const { buildProcedurePdf } = await import("../../lib/pdf/buildProcedurePdf");
@@ -57,12 +65,13 @@ export function ProcedurePdfStep({
         procedure: config?.procedure,
         company: config?.company,
         photos,
+        companyLogo,
       });
     },
     fileName: procedurePdfFileName(procedure),
-    deps: [procedure, photos, config],
+    deps: [procedure, photos, config, companyLogo],
     buildErrorMessage:
-      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูลขั้นตอนปฏิบัติงานของคุณยังอยู่ครบ " +
+      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูลขั้นตอนปฏิบัติงานยังอยู่ครบ " +
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",
   });
 
@@ -75,12 +84,13 @@ export function ProcedurePdfStep({
         layout: config?.pdf,
         document: config?.document,
         company: config?.company,
+        companyLogo,
       });
     },
     fileName: pdfFileName(doc),
-    deps: [doc, config],
+    deps: [doc, config, companyLogo],
     buildErrorMessage:
-      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูล JSA ของคุณยังอยู่ครบ " +
+      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูล JSA ยังอยู่ครบ " +
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",
   });
 
@@ -95,9 +105,10 @@ export function ProcedurePdfStep({
 
   return (
     <section>
-      {/* Above the H1, mirroring ProcedureEditorStep — this is the second
-          document of two, so the way back to the first belongs where the eye
-          starts, not only in the link row past the cards. */}
+      {/* Above the H1 — this is the second document of two, so the way back
+          to the first belongs where the eye starts, not only in the link row
+          past the cards. (The procedure editor doesn't repeat this: its fixed
+          bottom bar already carries the same action.) */}
       <button
         type="button"
         onClick={onBackToJsa}
@@ -107,7 +118,7 @@ export function ProcedurePdfStep({
         กลับไปหน้าเอกสาร JSA
       </button>
 
-      <h1 className="text-[1.75rem] font-semibold text-navy">
+      <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
         เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)
       </h1>
       <p className="mt-1.5 text-muted">
@@ -116,41 +127,40 @@ export function ProcedurePdfStep({
           : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
       </p>
 
-      {/* JSA first — it's the document that was actually finished first (this
-          page's own procedure is generated FROM a completed JSA), so leading
-          with it matches the order everywhere else in the app rather than
-          putting the newer document ahead of the one it depends on. Its own
-          card, not folded into the procedure's: they're two separate files
-          with two separate blobs. Both cards' titles read identically (same
-          job, same work_activity), so the kicker is what actually tells them
-          apart at a glance rather than relying on the metadata rows alone. */}
+      {/* The procedure first — it's what this page is about. It used to come
+          second, after the JSA, with identical solid buttons on both cards,
+          so nothing said which document was the point of the page. */}
       <PdfDeliveryCard
         className="mt-6"
-        kicker="เอกสาร JSA"
-        title={doc.header.work_activity}
-        summary={[
-          { label: "หัวหน้างาน", value: doc.header.supervisor },
-          { label: "วันที่วิเคราะห์", value: formatThaiDate(doc.header.analysis_date) },
-          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
-        ]}
-        delivery={jsaDelivery}
-      />
-
-      {/* The procedure this page is actually about — offered second, after
-          the JSA it was generated from. */}
-      <PdfDeliveryCard
-        className="mt-4"
         kicker="เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)"
         title={procedure.header.work_activity}
         summary={[
-          { label: "หัวหน้างาน", value: procedure.header.supervisor },
-          { label: "วันที่จัดทำ", value: formatThaiDate(procedure.header.analysis_date) },
+          { label: labels.supervisor, value: procedure.header.supervisor },
+          { label: procedureLabels.date, value: formatThaiDate(procedure.header.analysis_date) },
           {
             label: "เนื้อหา",
             value: `${procedure.steps.length} ขั้นตอน · ${subStepCount} ขั้นตอนย่อย`,
           },
         ]}
         delivery={procedureDelivery}
+      />
+
+      {/* The JSA second, as a supporting document: outline buttons, so the
+          procedure above keeps the page's only solid button. Its own card,
+          not folded into the procedure's: two separate files with two
+          separate blobs. Both titles read identically (same job), so the
+          kicker is what tells them apart at a glance. */}
+      <PdfDeliveryCard
+        className="mt-4"
+        secondary
+        kicker="เอกสาร JSA"
+        title={doc.header.work_activity}
+        summary={[
+          { label: labels.supervisor, value: doc.header.supervisor },
+          { label: labels.analysis_date, value: formatThaiDate(doc.header.analysis_date) },
+          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
+        ]}
+        delivery={jsaDelivery}
       />
 
       {/* กลับไปแก้ไข plus สร้าง JSA ใหม่ — the way back to the JSA itself moved

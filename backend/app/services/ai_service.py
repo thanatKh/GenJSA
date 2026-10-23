@@ -123,6 +123,7 @@ async def generate_jsa(
             supervisor=request.supervisor.strip(),
             analysis_date=request.analysis_date,
             analyst=request.analyst.strip(),
+            company=request.company.strip(),
         ),
         steps=payload.steps,
         assumptions=payload.assumptions,

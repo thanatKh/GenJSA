@@ -3,6 +3,9 @@
 
 app:
   name: "GenJSA"
+  # Shown in the "เกี่ยวกับ" dialog — who built and looks after this app
+  developer: "ธนัฐ เข็มทอง"
+  contact_email: "thanat.k@pttor.com"
 
 limits:
   # Max length of the "work description" field (characters) — guards against bloated payloads and long prompt injection

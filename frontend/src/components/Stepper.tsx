@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { ListOrdered } from "lucide-react";
 
 const STEPS = ["กรอกข้อมูล", "ตรวจทานและแก้ไข", "เอกสาร PDF"] as const;
@@ -86,6 +85,67 @@ function BranchCircle() {
   );
 }
 
+// One node: circle on top, title centered under it. `relative` without a
+// z-index: positioned elements paint in DOM order, and the node comes after
+// its column's connector lines, so it already sits above them. A z-10 here
+// also lifted it above the sticky AppBar (also z-10, but earlier in the DOM),
+// so the stepper drew over the bar while scrolling.
+const nodeClass = "relative flex min-w-0 flex-col items-center gap-1.5 px-1";
+const labelClass = "line-clamp-2 text-center text-xs leading-snug sm:text-sm";
+
+/** Thai has no spaces, so the browser picks where a wrapped label breaks,
+ * and on a phone it split the branch label as "ขั้นตอนปฏิบัติ / งาน".
+ * Keeping "ปฏิบัติงาน" unbreakable moves the break to "ขั้นตอน / ปฏิบัติงาน". */
+function keepWordsTogether(label: string) {
+  return label.split(/(ปฏิบัติงาน)/).map((part, i) =>
+    part === "ปฏิบัติงาน" ? (
+      <span key={i} className="whitespace-nowrap">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+/** The two half-lines in one column, at the circles' vertical center (14px =
+ * half of StepCircle's 28px). Each column draws the left half of the line
+ * coming in and the right half of the line going out, so neighbouring halves
+ * meet exactly at the column boundary — every connector ends up the same
+ * length, edge of one circle to edge of the next, with an 8px gap at each
+ * circle. "done" is navy, "todo" gray, "branch" the dashed line to the
+ * optional procedure node. */
+function Connectors({
+  left,
+  right,
+}: {
+  left: "done" | "todo" | "branch" | null;
+  right: "done" | "todo" | "branch" | null;
+}) {
+  const style = (kind: "done" | "todo" | "branch") =>
+    kind === "branch"
+      ? "border-t border-dashed border-navy/50"
+      : kind === "done"
+        ? "border-t border-navy"
+        : "border-t border-line";
+  return (
+    <>
+      {left ? (
+        <span
+          className={`absolute top-[14px] left-0 right-1/2 mr-[22px] ${style(left)}`}
+          aria-hidden="true"
+        />
+      ) : null}
+      {right ? (
+        <span
+          className={`absolute top-[14px] left-1/2 right-0 ml-[22px] ${style(right)}`}
+          aria-hidden="true"
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function Stepper({
   current,
   onNavigate,
@@ -123,23 +183,22 @@ export function Stepper({
     isCurrent: boolean;
   };
 }) {
-  // Labels for all 4 nodes share one row only once `branch` is set — 3
-  // labels alone already fit comfortably at every width the app supports (no
-  // label-hiding needed there), but a 4th squeezed into the same row at
-  // 360-430px truncated every label illegibly (e.g. "กรอ…" for "กรอกข้อมูล"),
-  // confirmed by measuring scrollWidth > clientWidth on every label span at
-  // that width. Hiding all labels below sm: only in the branch case is the
-  // fix — the page's own <h1> already names where the user is, so nothing
-  // is lost, and circles + connectors alone still show progress
-  // unambiguously. The plain 3-step case (branch undefined) is untouched.
-  const hideLabelsBelowSm = !!branch;
+  // Symmetric layout: every node gets an equal-width column (3, or 4 on the
+  // procedure pages), its circle centered at the top and its title centered
+  // underneath. This replaced titles placed BESIDE each circle, where every
+  // step was as wide as its own title — a short "กรอกข้อมูล" and a long
+  // "ตรวจทานและแก้ไข" put the circles at uneven positions with connector lines
+  // of different lengths. Equal columns put every circle at an exact fraction
+  // of the track and make every connector the same length.
+  //
+  // Titles wrap onto at most two centered lines instead of truncating, so
+  // they stay readable even with 4 nodes on a phone (the old side-by-side
+  // layout had to hide every label below sm: in that case).
+  const nodes = branch ? STEPS.length + 1 : STEPS.length;
 
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
-      {/* Each step is its own natural width and the connector lines between them
-          are the flex-1 elements — this spreads the extra space evenly between
-          steps instead of trailing off after the last one */}
-      <ol className="flex items-center">
+      <ol className={`grid ${nodes === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
         {STEPS.map((label, index) => {
           // While on the procedure branch, the JSA truly is finished — all
           // three steps get the checkmark, not just the ones strictly before
@@ -149,107 +208,78 @@ export function Stepper({
           // unfinished on a JSA that's actually complete.
           const done = branch ? index <= current : index < current;
           const active = index === current && !branch;
+          const circle = <StepCircle n={index + 1} done={done} filled={done || active} />;
           return (
-            <Fragment key={label}>
-              <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
-                {done && onNavigate ? (
-                  <button
-                    type="button"
-                    onClick={() => onNavigate(index as 0 | 1 | 2)}
-                    aria-label={`กลับไปขั้นตอน ${label}`}
-                    className="flex min-w-0 items-center gap-1.5 rounded-md
-                               focus-visible:outline-none focus-visible:ring-2
-                               focus-visible:ring-ring/50 sm:gap-2"
+            <li key={label} className="relative flex min-w-0 justify-center">
+              <Connectors
+                left={index > 0 ? (index - 1 < current || !!branch ? "done" : "todo") : null}
+                right={
+                  index < STEPS.length - 1
+                    ? index < current || !!branch
+                      ? "done"
+                      : "todo"
+                    : branch
+                      ? "branch"
+                      : null
+                }
+              />
+              {done && onNavigate ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigate(index as 0 | 1 | 2)}
+                  aria-label={`กลับไปขั้นตอน ${label}`}
+                  className={`${nodeClass} group rounded-md focus-visible:outline-none
+                              focus-visible:ring-2 focus-visible:ring-ring/50`}
+                >
+                  {circle}
+                  <span className={`${labelClass} text-muted group-hover:text-navy`}>
+                    {label}
+                  </span>
+                </button>
+              ) : (
+                <div className={nodeClass}>
+                  {circle}
+                  <span
+                    className={`${labelClass} ${active ? "font-semibold text-navy" : "text-muted"}`}
+                    aria-current={active ? "step" : undefined}
                   >
-                    <StepCircle n={index + 1} done={done} filled={done || active} />
-                    <span
-                      className={[
-                        "truncate text-xs text-muted hover:text-navy sm:text-sm",
-                        hideLabelsBelowSm ? "hidden sm:inline" : "",
-                      ].join(" ")}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                ) : (
-                  <>
-                    <StepCircle n={index + 1} done={done} filled={done || active} />
-                    {/* All three labels always shown — hiding inactive ones made
-                        step 1 (active, with its label) much wider than steps 2/3
-                        (bare circles), which pushed the flex-1 connector lines'
-                        midpoints off-center from what the eye expects, making
-                        circle 2 look mis-centered even though the flex math was
-                        technically correct. Equal-width items keep the circles
-                        landing at true equal thirds of the track.
-                        (This still holds at sm: and up even in the branch
-                        case — hideLabelsBelowSm only drops labels below that,
-                        where 4 of them no longer fit one row at all.) */}
-                    <span
-                      className={[
-                        "truncate text-xs sm:text-sm",
-                        active ? "font-semibold text-navy" : "text-muted",
-                        hideLabelsBelowSm ? "hidden sm:inline" : "",
-                      ].join(" ")}
-                      aria-current={active ? "step" : undefined}
-                    >
-                      {label}
-                    </span>
-                  </>
-                )}
-              </li>
-              {index < STEPS.length - 1 ? (
-                <li
-                  className={[
-                    "mx-1 h-px flex-1 sm:mx-3",
-                    index < current ? "bg-navy" : "bg-line",
-                  ].join(" ")}
-                  aria-hidden="true"
-                />
-              ) : null}
-            </Fragment>
+                    {label}
+                  </span>
+                </div>
+              )}
+            </li>
           );
         })}
 
         {branch ? (
-          <>
-            {/* Dashed, not solid like steps 1-3 — the line style itself signals
-                "branch", readable even before the eye reaches the icon badge. */}
-            <li
-              className="mx-1 h-px flex-1 border-t border-dashed border-navy/50 sm:mx-3"
-              aria-hidden="true"
-            />
-            <li className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-2">
-              {branch.isCurrent ? (
-                // Inert, matching how steps 1-3 render their own active circle
-                // as plain text rather than a button — this node's
-                // aria-current="step" already tells the user they're here, so
-                // it shouldn't also act as a "go back" link on itself.
-                <>
-                  <BranchCircle />
-                  <span
-                    className="hidden truncate text-xs font-semibold text-navy sm:inline sm:text-sm"
-                    aria-current="step"
-                  >
-                    {branch.label}
-                  </span>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={branch.onBack}
-                  aria-label={`${branch.label} — กลับไปหน้าเอกสาร JSA`}
-                  className="flex min-w-0 items-center gap-1.5 rounded-md
-                             focus-visible:outline-none focus-visible:ring-2
-                             focus-visible:ring-ring/50 sm:gap-2"
-                >
-                  <BranchCircle />
-                  <span className="hidden truncate text-xs font-semibold text-navy sm:inline sm:text-sm">
-                    {branch.label}
-                  </span>
-                </button>
-              )}
-            </li>
-          </>
+          <li className="relative flex min-w-0 justify-center">
+            <Connectors left="branch" right={null} />
+            {branch.isCurrent ? (
+              // Inert, matching how steps 1-3 render their own active circle
+              // as plain text rather than a button — this node's
+              // aria-current="step" already tells the user they're here, so
+              // it shouldn't also act as a "go back" link on itself.
+              <div className={nodeClass}>
+                <BranchCircle />
+                <span className={`${labelClass} font-semibold text-navy`} aria-current="step">
+                  {keepWordsTogether(branch.label)}
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={branch.onBack}
+                aria-label={`${branch.label} — กลับไปหน้าเอกสาร JSA`}
+                className={`${nodeClass} rounded-md focus-visible:outline-none
+                            focus-visible:ring-2 focus-visible:ring-ring/50`}
+              >
+                <BranchCircle />
+                <span className={`${labelClass} font-semibold text-navy`}>
+                  {keepWordsTogether(branch.label)}
+                </span>
+              </button>
+            )}
+          </li>
         ) : null}
       </ol>
     </nav>

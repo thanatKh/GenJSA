@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.errors import AppError, Errors
-from app.models.jsa import GenerateRequest
+from app.models.jsa import GenerateRequest, JsaDocument
 from app.providers.llm.base import LLMProvider
 from app.services.ai_service import generate_jsa, generate_validated
 
@@ -148,6 +148,7 @@ async def test_generate_jsa_keeps_request_owned_header_fields(settings):
         analysis_date=date(2026, 8, 12),
         work_description="ทดสอบการสร้าง JSA ด้วยข้อมูลจำลอง",
         analyst="สมหญิง",
+        company="  บจ. เอบีซี เอ็นจิเนียริ่ง  ",
     )
 
     doc = await generate_jsa(request, provider, settings)
@@ -156,6 +157,20 @@ async def test_generate_jsa_keeps_request_owned_header_fields(settings):
     assert doc.header.supervisor == "สมชาย ใจดี"
     assert doc.header.analysis_date == date(2026, 8, 12)
     assert doc.header.analyst == "สมหญิง"
+    assert doc.header.company == "บจ. เอบีซี เอ็นจิเนียริ่ง"
+    # The company is header-only: it must never reach the AI
+    assert all(
+        "เอบีซี" not in call["system_prompt"] + call["user_prompt"] for call in provider.calls
+    )
+
+
+def test_company_is_optional_for_documents_saved_before_it_existed(sample_doc):
+    """History entries and requests from before the company field must still
+    validate — blank company means PTTOR's own document."""
+    data = sample_doc.model_dump(mode="json")
+    data["header"].pop("company", None)
+    doc = JsaDocument.model_validate(data)
+    assert doc.header.company == ""
 
 
 async def test_generate_jsa_always_uses_the_plain_model(settings):

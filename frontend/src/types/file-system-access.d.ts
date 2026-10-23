@@ -2,7 +2,7 @@
  *
  * showSaveFilePicker is not in TypeScript's DOM lib (tsconfig.app.json targets
  * es2023), and @types/wicg-file-system-access would pull in the whole spec for
- * the three symbols PdfStep.tsx actually uses. Declared here instead, narrowed
+ * the three symbols usePdfDelivery.ts actually uses. Declared here instead, narrowed
  * to what we call — if a future feature needs directory handles or
  * showOpenFilePicker, add them here rather than reaching for the package.
  *

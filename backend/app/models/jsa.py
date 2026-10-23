@@ -36,6 +36,11 @@ class JsaHeader(BaseModel):
     # Printed as "ผู้วิเคราะห์ <name>" at the end of the last PDF page.
     # Optional — left blank, the PDF falls back to the supervisor's name.
     analyst: str = Field(default="", max_length=200)
+    # The company that prepared this document, when it isn't PTTOR itself —
+    # a vendor submitting it to PTTOR for a permit to work on site. Optional:
+    # blank means PTTOR's own document, and the PDF prints no company row.
+    # Never sent to the AI; like analyst, it only rides along on the header.
+    company: str = Field(default="", max_length=200)
 
 
 class JsaDocument(BaseModel):
@@ -70,6 +75,7 @@ class GenerateRequest(BaseModel):
     analysis_date: date
     work_description: str = Field(min_length=10, max_length=5000)
     analyst: str = Field(default="", max_length=200)
+    company: str = Field(default="", max_length=200)
 
 
 class AiJsaPayload(BaseModel):

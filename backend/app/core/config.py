@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parents[3]
 CONFIG_DIR = ROOT / "config"
 PROMPTS_DIR = ROOT / "prompts"
-ASSETS_DIR = ROOT / "assets"
 
 
 # --------------------------------------------------------------------------- #
@@ -24,6 +23,8 @@ ASSETS_DIR = ROOT / "assets"
 # --------------------------------------------------------------------------- #
 class AppSection(BaseModel):
     name: str = "GenJSA"
+    developer: str = ""
+    contact_email: str = ""
 
 
 class Limits(BaseModel):
@@ -87,7 +88,6 @@ class CompanySection(BaseModel):
     name_th: str = ""
     department_en: str = ""
     department_th: str = ""
-    logo: str = "assets/logo.png"
 
     @property
     def department(self) -> str:
@@ -111,6 +111,7 @@ class DocLabels(BaseModel):
     supervisor: str = "ชื่อหัวหน้างาน"
     analysis_date: str = "วันที่วิเคราะห์"
     analyst: str = "ผู้วิเคราะห์"
+    company: str = "บริษัท"
 
 
 class DocColumns(BaseModel):
@@ -275,10 +276,6 @@ class Settings(BaseModel):
     rules: JsaRulesConfig
     procedure: ProcedureConfig
     thaillm_api_key: str
-
-    @property
-    def logo_path(self) -> Path:
-        return ROOT / self.company.company.logo
 
 
 def _load_yaml(name: str) -> dict:

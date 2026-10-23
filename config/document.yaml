@@ -16,6 +16,9 @@ document:
     analysis_date: "วันที่วิเคราะห์"
     # Sign-off line printed below the table on the last page
     analyst: "ผู้วิเคราะห์"
+    # Extra header row naming the company that prepared the document — only
+    # printed when the user fills one in (e.g. a vendor working on a PTTOR site)
+    company: "บริษัท"
 
   # Table column names — per the original form
   columns:

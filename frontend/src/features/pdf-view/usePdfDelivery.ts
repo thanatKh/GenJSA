@@ -186,7 +186,7 @@ export function usePdfDelivery({
       // AbortError = the user pressed Cancel, which is a normal outcome
       if (!(caught instanceof Error && caught.name === "AbortError")) {
         setError(
-          "บันทึกไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
+          "บันทึกไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
         );
       }
     } finally {
@@ -211,7 +211,7 @@ export function usePdfDelivery({
       // anything — that's a normal outcome, not a failure to report
       if (!(caught instanceof Error && caught.name === "AbortError")) {
         setError(
-          "แชร์ไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
+          "แชร์ไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
         );
       }
     } finally {

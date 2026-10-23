@@ -24,9 +24,11 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  FieldError,
   Label,
   UndoToast,
 } from "../../components/ui";
+import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
 import { PhotoButton, PhotoPreview } from "./SubStepPhoto";
@@ -43,6 +45,7 @@ export function ProcedureEditorStep({
   photos,
   onPhotoChange,
   onStepPhotosReplace,
+  saveState,
   onContinue,
   onBack,
   onRegenerate,
@@ -59,6 +62,8 @@ export function ProcedureEditorStep({
   onPhotoChange: (key: string, photo: StepPhoto | null) => void;
   /** Swap all of one main step's photos at once — see removeSub */
   onStepPhotosReplace: (stepNo: number, next: PhotoMap) => void;
+  /** This document's save to history, for the "บันทึกแล้ว" indicator */
+  saveState: SaveState;
   onContinue: () => void;
   onBack: () => void;
   // App.tsx unmounts this component entirely while a regenerate is in
@@ -174,23 +179,17 @@ export function ProcedureEditorStep({
 
   return (
     <section>
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-3 flex items-center gap-1 text-sm text-muted hover:text-navy"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        กลับไปหน้าเอกสาร JSA
-      </button>
-
-      <h1 className="text-[1.75rem] font-semibold text-navy">ตรวจทานขั้นตอนปฏิบัติงาน</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานขั้นตอนปฏิบัติงาน</h1>
+        <SaveStatus state={saveState} />
+      </div>
       <p className="mt-1.5 text-muted">
-        ระบบร่างขั้นตอนย่อยจาก JSA ของคุณ กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
+        ระบบร่างขั้นตอนย่อยจาก JSA กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
       </p>
 
       {stale ? (
-        <div className="mt-4 rounded-[var(--radius)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
-          <h2 className="flex items-center gap-2 font-medium text-[var(--warning-text)]">
+        <div className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
             <TriangleAlert className="size-5 text-[var(--warning)]" aria-hidden="true" />
             JSA ถูกแก้ไขหลังจากสร้างเอกสารนี้
           </h2>
@@ -264,7 +263,7 @@ export function ProcedureEditorStep({
               {/* Read-only: generated from the source JSA, not something the
                   user fills in — editing it would only break the link back */}
               <p className="mb-1.5 text-ink">เอกสารอ้างอิง</p>
-              <ul className="grid gap-1 rounded-[var(--radius)] border border-line bg-surface p-3 text-sm text-muted">
+              <ul className="grid gap-1 rounded-field border border-line bg-surface p-3 text-sm text-muted">
                 {procedure.references.map((reference, index) => (
                   <li key={index}>{reference}</li>
                 ))}
@@ -281,16 +280,14 @@ export function ProcedureEditorStep({
       {/* Said once here rather than under every photo — with a photo on
           each sub-step, a per-photo note would repeat down the whole page */}
       <p className="mt-1 text-sm text-muted">
-        แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อย (ปุ่มรูปภาพ ลากรูปมาวาง หรือวางด้วย
-        Ctrl+V ในช่องข้อความ) — รูปภาพเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น
-        หากลบประวัติงานนี้รูปภาพจะหายไปด้วย บันทึกไฟล์ PDF เพื่อเก็บไว้ถาวร
+        แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อย (รูปภาพจะถูกลบหากลบงานนี้ออกจากประวัติ)
       </p>
 
       <ul className="mt-4 grid list-none gap-4 p-0">
         {procedure.steps.map((step, stepIndex) => (
           <li key={stepIndex}>
             <Card>
-              <h3 className="font-display font-semibold text-ink">
+              <h3 className="font-display text-base font-semibold text-ink">
                 {stepIndex + 1}. {step.procedure || "(ไม่มีชื่อขั้นตอน)"}
               </h3>
 
@@ -314,6 +311,7 @@ export function ProcedureEditorStep({
                   variant="ghost"
                   size="sm"
                   onClick={() => addSub(stepIndex)}
+                  className="text-sm"
                 >
                   <Plus className="size-4" aria-hidden="true" />
                   เพิ่มขั้นตอนย่อย
@@ -326,8 +324,8 @@ export function ProcedureEditorStep({
       </ul>
 
       {procedure.assumptions.length > 0 ? (
-        <div className="mt-6 rounded-[var(--radius)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
-          <h2 className="flex items-center gap-2 font-medium text-[var(--warning-text)]">
+        <div className="mt-6 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
             <Info className="size-5 text-[var(--warning)]" aria-hidden="true" />
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
           </h2>
@@ -356,7 +354,7 @@ export function ProcedureEditorStep({
 
       {/* Fixed, matching EditorStep — on a long procedure these actions would
           otherwise only be reachable after scrolling the whole document */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[var(--page-max-w)] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <Button
             type="button"
@@ -395,7 +393,7 @@ export function ProcedureEditorStep({
       <ConfirmDialog
         open={confirmRegenerate}
         title="สร้างขั้นตอนปฏิบัติงานใหม่?"
-        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่คุณแก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้ (รูปภาพที่แนบไว้จะยังอยู่)"
+        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่แก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้ (รูปภาพที่แนบไว้จะยังอยู่)"
         confirmLabel="สร้างใหม่"
         onConfirm={() => {
           setConfirmRegenerate(false);
@@ -433,7 +431,7 @@ function SubStepItem({
     <li
       {...input.dropProps(setDragging)}
       className={`grid grid-cols-[auto_1fr_auto] items-start gap-2 border-t border-line pt-3 transition-colors ${
-        dragging ? "rounded-[var(--radius)] bg-navy-soft" : ""
+        dragging ? "rounded-field bg-navy-soft" : ""
       }`}
     >
       <span className="pt-2.5 text-sm text-muted tabular-nums">{label}</span>
@@ -441,7 +439,7 @@ function SubStepItem({
         <AutoGrowTextarea
           minRows={1}
           value={sub.action}
-          placeholder="สิ่งที่ต้องลงมือทำ"
+          placeholder="รายละเอียดขั้นตอนย่อย"
           aria-label={`ขั้นตอนย่อยที่ ${label}`}
           onChange={(event) => onTextChange(event.target.value)}
           onPaste={input.onPaste}
@@ -453,7 +451,7 @@ function SubStepItem({
             onRemove={() => onPhotoChange(null)}
           />
         ) : null}
-        {input.error ? <p className="mt-2 text-sm text-danger">{input.error}</p> : null}
+        <FieldError>{input.error}</FieldError>
       </div>
       <div className="flex">
         {/* Replacing a photo goes through ลบรูปภาพ first — one photo per
@@ -475,7 +473,7 @@ function SubStepItem({
           size="icon-lg"
           aria-label={`ลบขั้นตอนย่อยที่ ${label}`}
           onClick={onRemove}
-          className="mt-1 text-muted hover:text-danger"
+          className="mt-1 text-muted hover:bg-danger-soft hover:text-danger-text"
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </Button>

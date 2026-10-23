@@ -56,7 +56,7 @@ export async function fileToStepPhoto(file: File): Promise<StepPhoto> {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new PhotoError("เบราว์เซอร์นี้ไม่รองรับการปรับขนาดรูปภาพ");
+    if (!ctx) throw new PhotoError("เบราว์เซอร์นี้ไม่รองรับการเพิ่มรูปภาพ กรุณาใช้เบราว์เซอร์อื่น");
 
     // White ground so a transparent source doesn't turn black once flattened
     ctx.fillStyle = "#ffffff";
@@ -80,8 +80,8 @@ type Decoded = ImageBitmap | HTMLImageElement;
 
 /** createImageBitmap where available (faster, off the main thread, and it
  * applies EXIF orientation so phone photos aren't sideways); an <img> +
- * object URL otherwise. */
-async function decode(file: File): Promise<Decoded> {
+ * object URL otherwise. Also used by companyLogo.ts. */
+export async function decode(file: File): Promise<Decoded> {
   if (typeof createImageBitmap === "function") {
     try {
       return await createImageBitmap(file, { imageOrientation: "from-image" });

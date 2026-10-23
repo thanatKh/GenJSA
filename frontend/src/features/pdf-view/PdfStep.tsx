@@ -13,7 +13,9 @@ import { ArrowLeft, FilePlus2, ListOrdered } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
 import { pdfFileName } from "../../lib/pdf/fileName";
+import { FALLBACK_DOCUMENT } from "../../lib/pdf/layout";
 import { formatThaiDate } from "../../lib/thaidate";
+import type { CompanyLogo } from "../../lib/companyLogo";
 import type { JsaDocument } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { PdfDeliveryCard } from "./PdfDeliveryCard";
@@ -21,6 +23,7 @@ import { usePdfDelivery } from "./usePdfDelivery";
 
 export function PdfStep({
   doc,
+  companyLogo,
   config,
   onBack,
   onNewJsa,
@@ -30,6 +33,8 @@ export function PdfStep({
   hasProcedure,
 }: {
   doc: JsaDocument;
+  /** The document's company logo (browser-only) — printed opposite the OR logo */
+  companyLogo: CompanyLogo | null;
   config: PublicConfig | null;
   onBack: () => void;
   onNewJsa: () => void;
@@ -39,6 +44,8 @@ export function PdfStep({
   /** A procedure already exists for this JSA — the action re-opens it */
   hasProcedure: boolean;
 }) {
+  // Same wording as the printed PDF (config/document.yaml)
+  const labels = (config?.document ?? FALLBACK_DOCUMENT).labels;
   const delivery = usePdfDelivery({
     // Dynamic import: jsPDF drags in html2canvas + dompurify (~230KB) via
     // the .html() plugin, which we never use — load it only once this
@@ -50,12 +57,13 @@ export function PdfStep({
         layout: config?.pdf,
         document: config?.document,
         company: config?.company,
+        companyLogo,
       });
     },
     fileName: pdfFileName(doc),
-    deps: [doc, config],
+    deps: [doc, config, companyLogo],
     buildErrorMessage:
-      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูล JSA ของคุณยังอยู่ครบ " +
+      "สร้างไฟล์ PDF ไม่สำเร็จ ข้อมูล JSA ยังอยู่ครบ " +
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",
   });
 
@@ -66,28 +74,19 @@ export function PdfStep({
 
   return (
     <section>
-      <h1 className="text-[1.75rem] font-semibold text-navy">เอกสาร JSA</h1>
+      <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">เอกสาร JSA</h1>
       <p className="mt-1.5 text-muted">
         {delivery.savePickerSupported
           ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
           : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
-      </p>
-      {/* Names the second document before the user scrolls — the card that
-          offers it sits a full card below, and a reader who stops at the PDF
-          button never learns it exists. Deliberately a plain sentence, not a
-          banner: the procedure is optional and most users stop here. */}
-      <p className="mt-1.5 text-sm text-muted">
-        {hasProcedure
-          ? "เอกสารนี้มี “ขั้นตอนปฏิบัติงาน” ที่สร้างไว้แล้ว เปิดดูได้จากด้านล่าง"
-          : "หากต้องการเอกสารวิธีทำงานอย่างละเอียดสำหรับใช้หน้างาน สร้าง “ขั้นตอนปฏิบัติงาน” ได้จากด้านล่าง"}
       </p>
 
       <PdfDeliveryCard
         className="mt-6"
         title={doc.header.work_activity}
         summary={[
-          { label: "หัวหน้างาน", value: doc.header.supervisor },
-          { label: "วันที่วิเคราะห์", value: formatThaiDate(doc.header.analysis_date) },
+          { label: labels.supervisor, value: doc.header.supervisor },
+          { label: labels.analysis_date, value: formatThaiDate(doc.header.analysis_date) },
           { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
         ]}
         delivery={delivery}
@@ -99,29 +98,32 @@ export function PdfStep({
           separate from the JSA actions above: this produces a second,
           different document rather than another view of this one. */}
       <Card className="mt-4">
+        {/* Icon in a navy tile, the same as the "สร้างขั้นตอนปฏิบัติงานด้วย"
+            card on step 1 — one look for "the procedure" wherever it's
+            offered, instead of a muted gray icon that read as decoration */}
         <div className="flex items-start gap-3">
-          <ListOrdered className="size-6 shrink-0 text-muted" aria-hidden="true" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-navy-soft text-navy">
+            <ListOrdered className="size-5" aria-hidden="true" />
+          </span>
           <div className="min-w-0">
-            <h2 className="font-display font-semibold text-ink">
+            <h2 className="font-display text-base font-semibold text-ink">
               ขั้นตอนปฏิบัติงาน (Work Procedure)
             </h2>
             <p className="mt-1 text-sm text-muted">
               {hasProcedure
-                ? "คุณสร้างขั้นตอนปฏิบัติงานจาก JSA นี้ไว้แล้ว เปิดเพื่อตรวจทานหรือสร้างเอกสาร"
-                : "ขยายแต่ละขั้นตอนใน JSA นี้เป็นวิธีปฏิบัติงานอย่างละเอียด สำหรับใช้หน้างานจริง"}
+                ? "สร้างขั้นตอนปฏิบัติงานจาก JSA นี้ไว้แล้ว เปิดเพื่อตรวจทานหรือสร้างเอกสาร"
+                : "ขยายแต่ละขั้นตอนใน JSA นี้เป็นวิธีทำงานทีละขั้นสำหรับใช้หน้างาน แนบรูปภาพประกอบได้"}
             </p>
           </div>
         </div>
 
         <div className="mt-4 border-t border-line pt-4">
-          {/* Primary weight only when the procedure already exists: that's
-              navigation back to something the user already invested in. While
-              it doesn't, it stays outline — a primary button costing an AI call
-              and a 30s+ wait would read as a required next step, and the JSA
-              PDF above must keep its place as the answer to "I came here to
-              make a JSA". */}
+          {/* Always outline, even when the procedure already exists: as a
+              full-width solid button it outweighed the half-width "เปิดเอกสาร
+              PDF" above — the one action this page exists for. The JSA PDF
+              keeps the only solid button; this stays clearly second. */}
           <Button
-            variant={hasProcedure ? "default" : "outline"}
+            variant="outline"
             onClick={onCreateProcedure}
             loading={procedureBusy}
             className="w-full"

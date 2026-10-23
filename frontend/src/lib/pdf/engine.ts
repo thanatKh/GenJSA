@@ -24,6 +24,7 @@
 import { jsPDF } from "jspdf";
 
 import logoUrl from "../../assets/logo.png";
+import { type CompanyLogo, LOGO_MAX_EDGE_PX, logoFormat } from "../companyLogo";
 import { FONT_NAME, registerThaiFont } from "./fonts";
 import {
   FALLBACK_LAYOUT,
@@ -31,9 +32,6 @@ import {
   mmToPt,
   type PdfLayout,
 } from "./layout";
-
-// Re-exported so document builders don't need a second import just to set a font
-export { FONT_NAME };
 
 export type Weight = "normal" | "bold";
 
@@ -45,16 +43,26 @@ export type Line = {
   indent: number;
 };
 
-export type Logo = { data: string; ratio: number };
+type Logo = { data: string; ratio: number };
 
-/** The drawing context a document builder works against. */
-export type Engine = Awaited<ReturnType<typeof createEngine>>;
+/** Thai word boundaries for splitLines, built once per page load. Null where
+ * the browser has no Intl.Segmenter — splitLines then falls back to jsPDF's
+ * own space-only breaking. */
+const thaiWords =
+  typeof Intl !== "undefined" && "Segmenter" in Intl
+    ? new Intl.Segmenter("th", { granularity: "word" })
+    : null;
 
 /**
  * Create a jsPDF instance with the Thai font registered and every derived
  * geometry value precomputed, plus the drawing helpers that operate on it.
  */
-export async function createEngine(L: PdfLayout) {
+export async function createEngine(
+  L: PdfLayout,
+  /** A document prepared in another company's name prints that company's
+   * logo opposite the OR logo (see lib/companyLogo.ts) */
+  extras: { companyLogo?: CompanyLogo | null } = {},
+) {
   const doc = new jsPDF({
     unit: "pt",
     format: L.page.size.toLowerCase() as "a4",
@@ -81,6 +89,28 @@ export async function createEngine(L: PdfLayout) {
   const fill = hexToRgb(L.table.header_fill);
 
   const logo = await loadLogo();
+  const companyLogo = extras.companyLogo ?? null;
+
+  /** Draw a logo inside a max box, keeping its aspect ratio. The alias makes
+   * jsPDF embed each image ONCE per document however many pages draw it,
+   * instead of a copy per page. */
+  const fitLogo = (ratio: number, maxW: number, maxH: number) => {
+    let h = maxH;
+    let w = h * ratio;
+    if (w > maxW) {
+      w = maxW;
+      h = w / ratio;
+    }
+    return { w, h };
+  };
+  const drawOrLogo = (x: number, y: number, w: number, h: number) => {
+    if (logo) doc.addImage(logo.data, "PNG", x, y, w, h, "or-logo");
+  };
+  const drawCompanyLogo = (x: number, y: number, w: number, h: number) => {
+    if (companyLogo) {
+      doc.addImage(companyLogo.data, logoFormat(companyLogo), x, y, w, h, "company-logo");
+    }
+  };
 
   /** Per-page bounds of the framed area, for the single outer-frame pass at the end */
   const pageFrames: { top: number; bottom: number }[] = [];
@@ -88,6 +118,51 @@ export async function createEngine(L: PdfLayout) {
   const setFont = (weight: Weight, size: number) => {
     doc.setFont(FONT_NAME, weight);
     doc.setFontSize(size);
+  };
+
+  /** Split text into lines no wider than `maxW` at the CURRENT font — the
+   * one line-breaker for everything the PDFs draw.
+   *
+   * Breaks between Thai words, using the browser's built-in Thai word
+   * segmentation (Intl.Segmenter, no dictionary to ship). jsPDF's own
+   * splitTextToSize only breaks at spaces, and Thai puts none between words,
+   * so a long Thai phrase used to be cut wherever it ran out of room —
+   * mid-word ("ระเบีย / บ"). Words are packed greedily, the same as before,
+   * just at word boundaries now.
+   *
+   * Kept from splitTextToSize: explicit newlines start a new line, and a
+   * single "word" wider than the whole line (a long code, URL or part
+   * number) still gets cut by jsPDF per character — the only case a
+   * mid-word break remains. Falls back to splitTextToSize entirely where
+   * Intl.Segmenter doesn't exist (old browsers), never worse than before. */
+  const splitLines = (text: string, maxW: number): string[] => {
+    if (!thaiWords) return doc.splitTextToSize(text, maxW);
+
+    const lines: string[] = [];
+    for (const paragraph of text.split(/\r?\n/)) {
+      let line = "";
+      for (const { segment } of thaiWords.segment(paragraph)) {
+        const blank = !segment.trim();
+        // A wrapped line never starts with the space it broke at
+        if (!line && blank) continue;
+        if (doc.getTextWidth(line + segment) <= maxW) {
+          line += segment;
+          continue;
+        }
+        if (line) lines.push(line.trimEnd());
+        line = "";
+        if (blank) continue;
+        if (doc.getTextWidth(segment) <= maxW) {
+          line = segment;
+          continue;
+        }
+        const pieces: string[] = doc.splitTextToSize(segment, maxW);
+        lines.push(...pieces.slice(0, -1));
+        line = pieces[pieces.length - 1] ?? "";
+      }
+      lines.push(line.trimEnd());
+    }
+    return lines;
   };
 
   /** Wrap text to fit a given width, returning ready-to-draw lines */
@@ -103,7 +178,7 @@ export async function createEngine(L: PdfLayout) {
 
     setFont(weight, size);
     const markerW = marker ? doc.getTextWidth(marker) + mmToPt(1.4) : 0;
-    const parts = doc.splitTextToSize(clean, Math.max(width - markerW, 10));
+    const parts = splitLines(clean, Math.max(width - markerW, 10));
 
     return parts.map((part: string, index: number) => ({
       text: part,
@@ -149,9 +224,9 @@ export async function createEngine(L: PdfLayout) {
   const drawTitleBar = (titleTh: string, titleEn: string, top: number): number => {
     const titleGap = mmToPt(1.2);
     setFont("bold", L.font.title_th_pt);
-    const titleThLines = doc.splitTextToSize(titleTh, contentW * 0.6);
+    const titleThLines = splitLines(titleTh, contentW * 0.6);
     setFont("bold", L.font.title_en_pt);
-    const titleEnLines = titleEn ? doc.splitTextToSize(titleEn, contentW * 0.6) : [];
+    const titleEnLines = titleEn ? splitLines(titleEn, contentW * 0.6) : [];
 
     const titleTextH =
       titleThLines.length * L.font.title_th_pt * 1.3 +
@@ -160,7 +235,11 @@ export async function createEngine(L: PdfLayout) {
 
     const logoH = logo ? mmToPt(L.logo.max_height_mm) : 0;
     const logoW = logo ? Math.min(logoH * logo.ratio, mmToPt(L.logo.max_width_mm)) : 0;
-    const barH = Math.max(titleTextH, logoH) + mmToPt(4);
+    // The company logo gets the same box as the OR logo, mirrored on the right
+    const companyBox = companyLogo
+      ? fitLogo(companyLogo.ratio, mmToPt(L.logo.max_width_mm), mmToPt(L.logo.max_height_mm))
+      : { w: 0, h: 0 };
+    const barH = Math.max(titleTextH, logoH, companyBox.h) + mmToPt(4);
 
     doc.setDrawColor(...border);
     // Thin — this is just the divider between the title bar and whatever sits
@@ -169,9 +248,13 @@ export async function createEngine(L: PdfLayout) {
     doc.setLineWidth(L.table.border_width_pt);
     doc.rect(mL, top, contentW, barH);
 
-    if (logo) {
-      doc.addImage(logo.data, "PNG", mL + mmToPt(3), top + (barH - logoH) / 2, logoW, logoH);
-    }
+    drawOrLogo(mL + mmToPt(3), top + (barH - logoH) / 2, logoW, logoH);
+    drawCompanyLogo(
+      mL + contentW - mmToPt(3) - companyBox.w,
+      top + (barH - companyBox.h) / 2,
+      companyBox.w,
+      companyBox.h,
+    );
 
     let titleY = top + (barH - titleTextH) / 2;
     setFont("bold", L.font.title_th_pt);
@@ -210,7 +293,7 @@ export async function createEngine(L: PdfLayout) {
     setFont("bold", L.font.header_label_pt);
     const labelW = doc.getTextWidth(`${label}:`) + mmToPt(1.5);
     setFont("normal", L.font.header_label_pt);
-    return doc.splitTextToSize(value || "", Math.max(width - pad * 2 - labelW, 10));
+    return splitLines(value || "", Math.max(width - pad * 2 - labelW, 10));
   };
 
   const fieldRowHeight = (lines: string[]) => Math.max(lines.length, 1) * fieldLineH + mmToPt(1);
@@ -238,6 +321,20 @@ export async function createEngine(L: PdfLayout) {
     });
   };
 
+  /** The "บริษัท: …" header row — full width, bordered like the rows above
+   * it. Only for documents prepared in another company's name: callers skip
+   * it when the company is blank, so PTTOR's own documents are unchanged.
+   * Returns the y below it. */
+  const drawCompanyRow = (label: string, company: string, top: number): number => {
+    const lines = measureFieldLines(label, company, contentW);
+    const rowH = fieldRowHeight(lines);
+    doc.setLineWidth(L.table.border_width_pt);
+    doc.setDrawColor(...border);
+    doc.rect(mL, top, contentW, rowH);
+    drawField(label, lines, mL, contentW, top, rowH);
+    return top + rowH;
+  };
+
   // ---------------------------------------------------------- signature --
   /**
    * "<label> <name>" below the body on the last page, outside any table border.
@@ -260,7 +357,7 @@ export async function createEngine(L: PdfLayout) {
     const sigLineH = sig.label_pt * L.font.line_height;
     const sigBaselineDrop = sigLineH * 0.74;
     setFont("normal", sig.label_pt);
-    const nameLines = doc.splitTextToSize(trimmed, Math.max(contentW - labelW, 10));
+    const nameLines = splitLines(trimmed, Math.max(contentW - labelW, 10));
     const blockH = Math.max(nameLines.length, 1) * sigLineH;
 
     let cursor = y;
@@ -461,8 +558,14 @@ export async function createEngine(L: PdfLayout) {
     border,
     fill,
     logo,
+    companyLogo,
+    fitLogo,
+    drawOrLogo,
+    drawCompanyLogo,
+    drawCompanyRow,
     pageFrames,
     setFont,
+    splitLines,
     wrap,
     drawLines,
     drawTitleBar,
@@ -484,12 +587,15 @@ function loadLogo(): Promise<Logo | null> {
   logoCache ??= new Promise<Logo | null>((resolve) => {
     const image = new Image();
     image.onload = () => {
+      // Shrunk to the same LOGO_MAX_EDGE_PX as a company logo: it was
+      // embedded at its full 2453x999 (66 KB of every PDF) to print ~30 mm wide
+      const scale = Math.min(1, LOGO_MAX_EDGE_PX / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
       const ctx = canvas.getContext("2d");
       if (!ctx) return resolve(null);
-      ctx.drawImage(image, 0, 0);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       resolve({
         data: canvas.toDataURL("image/png"),
         ratio: image.naturalWidth / image.naturalHeight,

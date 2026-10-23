@@ -196,8 +196,9 @@ will stop at the JSA.
 - `features/procedure/ProcedurePdfStep.tsx` — the procedure PDF, same delivery hook.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
-- `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai line wrapping has no word-segmentation dictionary — a break can occasionally land mid-word by design trade-off (never overflows a column, though).
+- `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai lines break between words via `engine.ts`'s `splitLines` (the browser's built-in `Intl.Segmenter` — no dictionary shipped); only a single word wider than its column is cut mid-word, and browsers without `Intl.Segmenter` fall back to jsPDF's space-only breaking.
 - `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
+- `lib/companyLogo.ts` + `features/company/` — the optional "บริษัท" for documents prepared in another company's name (e.g. a vendor submitting to PTTOR for a permit to work). The name is `header.company` (printed as an extra header row only when filled in; never sent to the AI); the logo prints opposite the OR logo and, like step photos, stays browser-only (IndexedDB via `photoStore.ts`'s `COMPANY_LOGO_KEY`, deleted with its history entry). Uploads are shrunk to `LOGO_MAX_EDGE_PX` and size-capped so they can't bloat the PDF; the OR logo is shrunk the same way on load. A remembered default (name + logo) lives in localStorage.
 - `history.ts` — localStorage-backed history of finished documents, per-PC, no expiry, capped at `MAX_ENTRIES` (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
 
 ⚠️ **Bundle boundary**: `engine.ts` statically imports jsPDF (~230KB with its
@@ -231,7 +232,7 @@ font/color defaults without diffing first.
 **Updating a generated component**: several files here are already
 hand-patched (`button.tsx`'s sizes/`loading` prop, `input.tsx`/`textarea.tsx`'s
 `text-base` iOS-zoom fix, `card.tsx`/`dialog.tsx`/`alert-dialog.tsx`'s
-brand-radius override). Never run `shadcn add <component> --overwrite`
+border-instead-of-ring look; radius follows shadcn's stock scale). Never run `shadcn add <component> --overwrite`
 against these — it silently destroys the patch. Use `--diff`/`--dry-run`
 first, then hand-merge.
 
@@ -242,11 +243,13 @@ first, then hand-merge.
 | AI model | `config/ai.yaml` → `model` |
 | ThaiLLM endpoint / timeout / retry | `config/ai.yaml` |
 | Company name / department | `config/company.yaml` |
+| Developer name / contact email (เกี่ยวกับ dialog) | `config/app.yaml` → `app.developer` / `app.contact_email` |
 | Logo | Overwrite `frontend/src/assets/logo.png` (the app and the PDF both import from there) |
 | Tab icon (favicon) | `frontend/public/favicon.svg`, then regenerate `favicon.ico` via `scripts/build_icons.mjs` (see its header comment) |
 | Form number / effective-date text | `config/document.yaml` |
 | Header field labels / column names | `config/document.yaml` |
 | PDF font size / margins / header color | `config/pdf.yaml` |
+| "บริษัท" header-row wording | `config/document.yaml` → `labels.company` |
 | Analyst line at the end of the PDF | `config/pdf.yaml` → `signature` (wording: `config/document.yaml` → `labels.analyst`) |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | How the AI thinks / what it must not do | `prompts/jsa-generate.md` |

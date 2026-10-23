@@ -98,11 +98,37 @@ app.include_router(jsa_router)
 # --------------------------------------------------------------------------- #
 # Static frontend — production only (dev uses the vite dev server via proxy)
 # Must be registered after the API routes so the catch-all doesn't swallow /api/*
+#
+# Cache policy — the fix for "PDF stops working after a deploy":
+#   index.html     no-cache: the browser revalidates it on every visit (a
+#                  cheap 304 when nothing changed). Without a header it was
+#                  cached heuristically for days, and a stale copy asked for
+#                  /assets/* files that a new deploy had already deleted.
+#   /assets/*      a year, immutable: Vite puts a content hash in every name,
+#                  so a changed file always gets a new URL.
+#   other files    a day: fonts and icons in frontend/public, unhashed but
+#                  rarely changed.
+# main.tsx also reloads the page once if a code file still fails to load.
 # --------------------------------------------------------------------------- #
+NO_CACHE = "no-cache"
+IMMUTABLE = "public, max-age=31536000, immutable"
+ONE_DAY = "public, max-age=86400"
+
+
+class HashedAssets(StaticFiles):
+    """/assets/* with the long-lived cache header — see the policy above."""
+
+    async def get_response(self, path, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = IMMUTABLE
+        return response
+
+
 if FRONTEND_DIST.exists():
     app.mount(
         "/assets",
-        StaticFiles(directory=str(FRONTEND_DIST / "assets")),
+        HashedAssets(directory=str(FRONTEND_DIST / "assets")),
         name="assets",
     )
 
@@ -122,7 +148,8 @@ if FRONTEND_DIST.exists():
             and candidate.is_file()
             and candidate.is_relative_to(FRONTEND_DIST_RESOLVED)
         ):
-            return FileResponse(candidate)
-        return FileResponse(FRONTEND_DIST / "index.html")
+            if candidate.name != "index.html":
+                return FileResponse(candidate, headers={"Cache-Control": ONE_DAY})
+        return FileResponse(FRONTEND_DIST / "index.html", headers={"Cache-Control": NO_CACHE})
 else:
     logger.info("No frontend/dist yet — for dev mode, run vite separately (npm run dev)")

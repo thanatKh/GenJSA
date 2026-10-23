@@ -96,7 +96,7 @@ export function StepCard({
         // in EditorStep.tsx owns the border/rounding, and every card becomes
         // one row of a continuous table — only a top divider remains (skipped
         // on the first row), so a 6-step JSA reads as one sheet, not 6 boxes.
-        "rounded-[var(--radius)] border bg-white p-3 sm:p-4",
+        "rounded-card border bg-white p-3 sm:p-4",
         incomplete ? "border-danger" : "border-line",
         "lg:rounded-none lg:border-x-0 lg:border-b-0 lg:bg-transparent lg:p-0 lg:border-line",
         index === 0 && "lg:border-t-0",
@@ -317,8 +317,8 @@ export function StepCard({
                   whenever one column has more text than the other. */}
               {hazardIndex === step.hazards.length - 1 ? (
                 <div className="mt-auto flex justify-start pt-1">
-                  <Button variant="ghost" size="sm" onClick={addHazard}>
-                    <Plus className="size-3.5" aria-hidden="true" />
+                  <Button variant="ghost" size="sm" onClick={addHazard} className="text-sm">
+                    <Plus className="size-4" aria-hidden="true" />
                     เพิ่มอันตราย
                   </Button>
                 </div>
@@ -411,7 +411,7 @@ export function StepCard({
         {step.hazards.map((hazard, hazardIndex) => (
           <div
             key={hazardIndex}
-            className="rounded-[var(--radius-sm)] border border-line bg-raised p-3"
+            className="rounded-field border border-line bg-raised p-3"
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

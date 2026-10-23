@@ -15,6 +15,7 @@
  * can't drift apart on Thai typography or jsPDF's quirks.
  */
 
+import type { CompanyLogo } from "../companyLogo";
 import type { ProcedureDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
@@ -33,7 +34,7 @@ import {
   type StepPhoto,
 } from "./layout";
 
-export type BuildProcedureOptions = {
+type BuildProcedureOptions = {
   layout?: PdfLayout;
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
@@ -42,6 +43,9 @@ export type BuildProcedureOptions = {
    * outside the document because it never reaches the backend — see
    * StepPhoto in layout.ts. */
   photos?: PhotoMap;
+  /** Logo of the company that prepared this document — see BuildOptions in
+   * buildJsaPdf.ts */
+  companyLogo?: CompanyLogo | null;
 };
 
 export async function buildProcedurePdf(
@@ -57,17 +61,28 @@ export async function buildProcedurePdf(
   const C = options.company;
   const photos = options.photos ?? {};
 
-  const E = await createEngine(L);
+  const E = await createEngine(L, { companyLogo: options.companyLogo });
   const { doc, pageW, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines, logo, border } = E;
 
   const headingPt = L.font.body_pt + 2;
   const headingLineH = headingPt * L.font.line_height;
+  // Step titles sit between section headings and body text: one point above
+  // body, bold. At body size they read as just another line of the list
+  // (only bold set them apart), so on a page of steps nothing grouped.
+  const stepPt = L.font.body_pt + 1;
+  const stepLineH = stepPt * L.font.line_height;
+  // Photo captions — small and gray, a label rather than content
+  const captionPt = Math.max(L.font.body_pt - 2, 8);
+  const captionLineH = captionPt * L.font.line_height;
   // Sub-steps hang under their step, which hangs under the section — indents
   // are in mm so they hold at any body_pt
   const stepIndent = mmToPt(6);
   const subIndent = mmToPt(14);
   const sectionGap = mmToPt(4);
   const blockGap = mmToPt(2);
+  // Before each step after the first: clearly more than the line gap inside
+  // a step (it used to be 6pt over a plain line, so steps ran together)
+  const stepGap = mmToPt(4);
   const photoGap = mmToPt(2);
   // ~a third of an A4 page. Big enough to read a gauge or a valve tag, small
   // enough that a step with a photo still shares its page with other steps.
@@ -80,11 +95,24 @@ export async function buildProcedurePdf(
    * per call, so drawFrames() (one call per page, by index) always has an
    * entry waiting for the page it's about to stroke.
    *
-   * Repeating the full header — not just the title — on every page: a
-   * continuation page that opens straight into step content with no
-   * work-activity/date visible reads as loose text, not the same document,
-   * especially once printed or read as a standalone sheet. */
-  const drawHeader = (top: number): number => {
+   * The full header (title bar + work activity + supervisor/date) prints on
+   * the first content page only. Continuation pages get `compact`: one
+   * bordered row naming the document and the job — still enough that a
+   * loose printed sheet reads as part of this document, without the 20/18pt
+   * title bar outweighing every heading on the page and taking ~15% of it
+   * (the cover and first page already carry the full details). */
+  const drawHeader = (top: number, compact = false): number => {
+    if (compact) {
+      const lines = E.measureFieldLines(P.titleTh, procedure.header.work_activity, contentW);
+      const rowH = E.fieldRowHeight(lines);
+      doc.setLineWidth(L.table.border_width_pt);
+      doc.setDrawColor(...E.border);
+      doc.rect(mL, top, contentW, rowH);
+      E.drawField(P.titleTh, lines, mL, contentW, top, rowH);
+      E.pageFrames.push({ top, bottom: top + rowH });
+      return top + rowH + sectionGap;
+    }
+
     let cursor = E.drawTitleBar(P.titleTh, P.titleEn, top);
     const frameTop = top;
 
@@ -119,14 +147,18 @@ export async function buildProcedurePdf(
     E.drawField(P.labels.date, dateLines, mL + splitW, contentW - splitW, cursor, infoH);
     cursor += infoH;
 
+    // Same "บริษัท: …" row as the JSA header — only when one is filled in
+    const company = procedure.header.company?.trim();
+    if (company) cursor = E.drawCompanyRow(D.labels.company ?? "บริษัท", company, cursor);
+
     E.pageFrames.push({ top: frameTop, bottom: cursor });
     return cursor + sectionGap;
   };
 
-  /** Start a new page, redraw the full header, and reset the cursor. */
+  /** Start a new page with the compact header, and reset the cursor. */
   const newPage = () => {
     doc.addPage();
-    y = drawHeader(mT);
+    y = drawHeader(mT, true);
   };
 
   const need = (height: number) => {
@@ -144,10 +176,16 @@ export async function buildProcedurePdf(
    * `need(1 line)` is checked per line — cheap, and the natural unit here
    * since nothing in this document ever needs to keep two lines of body text
    * together mid-paragraph. */
-  const drawFlowing = (lines: Line[], x: number, cellW: number, step: number = lineH) => {
+  const drawFlowing = (
+    lines: Line[],
+    x: number,
+    cellW: number,
+    step: number = lineH,
+    size: number = L.font.body_pt,
+  ) => {
     lines.forEach((line) => {
       if (y + step > bodyBottom) newPage();
-      drawLines([line], x, y, cellW, L.font.body_pt, step);
+      drawLines([line], x, y, cellW, size, step);
       y += step;
     });
   };
@@ -164,8 +202,7 @@ export async function buildProcedurePdf(
    * Capping against usableBodyH too is what guarantees need() terminates: an
    * image that can't fit even a freshly-headed page would otherwise be pushed
    * to a new page forever and still overflow it. */
-  const photoSize = (photo: StepPhoto) => {
-    const maxW = contentW - subIndent;
+  const photoSize = (photo: StepPhoto, maxW: number) => {
     const maxH = Math.min(photoMaxH, usableBodyH);
     const ratio = photo.ratio > 0 ? photo.ratio : 1;
 
@@ -178,19 +215,28 @@ export async function buildProcedurePdf(
     return { w, h };
   };
 
+  /** Photo + caption height, for keep-together reservations */
+  const photoBlockH = (photo: StepPhoto, maxW: number) =>
+    photoGap + photoSize(photo, maxW).h + captionLineH;
+
   /** One atomic block — never split across pages, unlike drawFlowing's text.
-   * Centered in the text column rather than flush-left: a narrow (portrait or
-   * panorama) image left-aligned at the sub-step indent reads as accidentally
-   * placed, especially once its width is well short of maxW. */
-  const drawPhoto = (photo: StepPhoto) => {
-    const { w, h } = photoSize(photo);
-    const maxW = contentW - subIndent;
-    const x = mL + subIndent + (maxW - w) / 2;
+   * Left-aligned with its sub-step's own text (x = where the text starts,
+   * after "1.1") and captioned "ภาพประกอบขั้นตอน 1.1". It used to be centered
+   * on the page with no caption, so a photo between 1.1 and 1.2 could belong
+   * to either — on paper there was nothing to say which. */
+  const drawPhoto = (photo: StepPhoto, x: number, maxW: number, label: string) => {
+    const { w, h } = photoSize(photo, maxW);
 
     y += photoGap;
-    need(h);
+    need(h + captionLineH);
     doc.addImage(photo.data, "JPEG", x, y, w, h);
     y += h;
+
+    E.setFont("normal", captionPt);
+    doc.setTextColor(110, 110, 110);
+    doc.text(label, x, y + captionPt * 1.05);
+    doc.setTextColor(0, 0, 0);
+    y += captionLineH;
   };
 
   // ------------------------------------------------------------- cover --
@@ -221,8 +267,11 @@ export async function buildProcedurePdf(
     const titleEnPt = L.font.title_en_pt + 8;
     const activityPt = L.font.title_en_pt + 6;
     const activityLineH = activityPt * L.font.line_height;
-    const infoPt = L.font.header_label_pt;
-    const infoLineH = infoPt * L.font.line_height;
+    // +2 over the header label size, with a little more line spacing: at
+    // header_label_pt the supervisor/date lines read as fine print under a
+    // much larger job name
+    const infoPt = L.font.header_label_pt + 2;
+    const infoLineH = infoPt * (L.font.line_height + 0.2);
 
     const logoH = logo ? mmToPt(16) : 0;
     const logoGap = logo ? mmToPt(12) : 0;
@@ -233,7 +282,8 @@ export async function buildProcedurePdf(
     const dateShown = !!procedure.header.analysis_date?.trim();
     const authorName = procedure.header.analyst?.trim() || procedure.header.supervisor?.trim();
     const authorShown = !!authorName && authorName !== procedure.header.supervisor?.trim();
-    const infoLinesCount = [supervisorShown, dateShown, authorShown].filter(Boolean).length;
+    const companyName = procedure.header.company?.trim() ?? "";
+    const infoLinesCount = [supervisorShown, dateShown, authorShown, !!companyName].filter(Boolean).length;
 
     const blockH =
       logoH +
@@ -259,8 +309,25 @@ export async function buildProcedurePdf(
       // page's actual subject instead of a mark above one — 16mm keeps it
       // clearly present without competing with the document title's own
       // weight.
-      const logoW = Math.min(logoH * logo.ratio, contentW * 0.5);
-      doc.addImage(logo.data, "PNG", centerX - logoW / 2, cursor, logoW, logoH);
+      //
+      // With a company logo, the two sit side by side as one centred pair
+      // (OR first), each in the same height box, separated by a thin rule.
+      const orBox = E.fitLogo(logo.ratio, contentW * 0.4, logoH);
+      const companyBox = E.companyLogo
+        ? E.fitLogo(E.companyLogo.ratio, contentW * 0.4, logoH)
+        : null;
+      const pairGap = mmToPt(10);
+      const totalW = orBox.w + (companyBox ? pairGap + companyBox.w : 0);
+      let x = centerX - totalW / 2;
+      E.drawOrLogo(x, cursor + (logoH - orBox.h) / 2, orBox.w, orBox.h);
+      if (companyBox) {
+        x += orBox.w + pairGap / 2;
+        doc.setDrawColor(...border);
+        doc.setLineWidth(0.8);
+        doc.line(x, cursor + logoH * 0.15, x, cursor + logoH * 0.85);
+        x += pairGap / 2;
+        E.drawCompanyLogo(x, cursor + (logoH - companyBox.h) / 2, companyBox.w, companyBox.h);
+      }
       cursor += logoH + logoGap;
     }
 
@@ -268,15 +335,23 @@ export async function buildProcedurePdf(
     // subject and needs to read as clearly larger than the job name below it
     // (title_en_pt + a smaller step), which a shrunk logo no longer does the
     // job of announcing on its own.
+    // doc.text() places text by its BASELINE, so the title's tall Thai vowels
+    // and tone marks rose above `cursor` — straight into the gap reserved
+    // under the logo, and visibly touching it. Step down by the title's
+    // ascent first so that gap is real; the total advance stays 1.3x.
     E.setFont("bold", titleThPt);
     doc.setTextColor(0, 0, 0);
+    cursor += titleThPt * 0.85;
     doc.text(P.titleTh, centerX, cursor, { align: "center" });
-    cursor += titleThPt * 1.3;
+    cursor += titleThPt * 0.35;
 
+    // Same baseline rule for the English line: step down by its own ascent
+    // before drawing, or it rises into the Thai title's descenders above.
     if (P.titleEn) {
       E.setFont("normal", titleEnPt);
+      cursor += titleEnPt * 0.95;
       doc.text(P.titleEn, centerX, cursor, { align: "center" });
-      cursor += titleEnPt * 1.3;
+      cursor += titleEnPt * 0.35;
     }
 
     // A rule under the title, sized to the longer of the two title lines
@@ -319,6 +394,7 @@ export async function buildProcedurePdf(
       doc.text(value, startX + labelW, cursor);
       cursor += infoLineH;
     };
+    if (companyName) infoLine(D.labels.company ?? "บริษัท", companyName);
     infoLine(D.labels.supervisor, procedure.header.supervisor);
     infoLine(P.labels.date, formatThaiDate(procedure.header.analysis_date));
 
@@ -340,10 +416,11 @@ export async function buildProcedurePdf(
 
   y = drawHeader(mT);
 
-  // Every page repeats the same header, so the first one's height is the height
-  // on all of them — i.e. this is exactly what a fresh page has room for, and
-  // the ceiling drawPhoto clamps to. Captured after the call because drawHeader
-  // measures wrapped header fields rather than using a fixed height.
+  // The first content page has the full header and every later page the
+  // compact one, so this — the room below the FULL header — is the smallest
+  // a page ever has: a safe ceiling for drawPhoto to clamp to. Captured
+  // after the call because drawHeader measures wrapped header fields rather
+  // than using a fixed height.
   const usableBodyH = bodyBottom - y - photoGap;
 
   // ------------------------------------------------------------ sections --
@@ -398,21 +475,20 @@ export async function buildProcedurePdf(
   listSection(P.sections.tools, procedure.tools);
 
   // ------------------------------------------------- the procedure itself --
-  const stepsHeadingNo = sectionNo + 1;
+  // Steps are numbered on their own — "1.", sub-steps "1.1" — exactly as the
+  // editor and its photo slots show them. They used to carry this section's
+  // number too ("5.1.1"), and that number shifted with whether a reference
+  // section existed (4.x.x in one document, 5.x.x in another), so "check
+  // step 1.2" said on screen pointed at nothing on paper.
   // Reserve the heading plus the first step title, so the section never opens
   // on the last line of a page
-  need(headingLineH + lineH * 2);
+  need(headingLineH + stepLineH + lineH);
   drawHeading(P.sections.procedure);
   y += blockGap;
 
-  procedure.steps.forEach((step) => {
-    const titleLines = wrap(
-      step.procedure,
-      contentW - stepIndent,
-      "bold",
-      L.font.body_pt,
-      `${stepsHeadingNo}.${step.no}`,
-    );
+  procedure.steps.forEach((step, stepIndex) => {
+    if (stepIndex > 0) y += stepGap;
+    const titleLines = wrap(step.procedure, contentW - stepIndent, "bold", stepPt, `${step.no}.`);
 
     const subLines = step.sub_steps.map((sub) =>
       wrap(
@@ -420,7 +496,7 @@ export async function buildProcedurePdf(
         contentW - subIndent,
         "normal",
         L.font.body_pt,
-        `${stepsHeadingNo}.${step.no}.${sub.no}`,
+        `${step.no}.${sub.no}`,
       ),
     );
     const subPhotos = step.sub_steps.map((sub) => photos[photoKey(step.no, sub.no)]);
@@ -434,18 +510,24 @@ export async function buildProcedurePdf(
     // whole sub-step and its photo instead — otherwise the per-sub-step
     // keep-together below would carry them to the next page and strand the
     // title on this one anyway.
-    let keepTogether = Math.min(titleLines.length, 1) * lineH;
+    // Photos align with their sub-step's text, after the "1.1" marker
+    const photoX = (lines: Line[]) => mL + subIndent + (lines[0]?.indent ?? 0);
+    const photoMaxW = (lines: Line[]) => contentW - subIndent - (lines[0]?.indent ?? 0);
+
+    let keepTogether = Math.min(titleLines.length, 1) * stepLineH;
     if (subLines.length) {
       const firstPhoto = subPhotos[0];
       const withPhoto = firstPhoto
-        ? titleLines.length * lineH + subLines[0].length * lineH + photoGap + photoSize(firstPhoto).h
+        ? titleLines.length * stepLineH +
+          subLines[0].length * lineH +
+          photoBlockH(firstPhoto, photoMaxW(subLines[0]))
         : 0;
       keepTogether =
         firstPhoto && withPhoto <= usableBodyH ? withPhoto : keepTogether + Math.min(subLines[0].length, 1) * lineH;
     }
     need(keepTogether);
 
-    drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent);
+    drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent, stepLineH, stepPt);
 
     step.sub_steps.forEach((_, subIndex) => {
       const actionLines = subLines[subIndex];
@@ -457,7 +539,7 @@ export async function buildProcedurePdf(
       // unrelated image. A sub-step too long for that is going to break
       // across pages regardless, so nothing is reserved for it.
       if (photo) {
-        const blockH = actionLines.length * lineH + photoGap + photoSize(photo).h;
+        const blockH = actionLines.length * lineH + photoBlockH(photo, photoMaxW(actionLines));
         if (blockH <= usableBodyH) need(blockH);
       }
 
@@ -465,10 +547,15 @@ export async function buildProcedurePdf(
 
       // Right under its own line, so it reads as "this is what that action
       // looks like" rather than a picture of the step as a whole.
-      if (photo) drawPhoto(photo);
+      if (photo) {
+        drawPhoto(
+          photo,
+          photoX(actionLines),
+          photoMaxW(actionLines),
+          `ภาพประกอบขั้นตอน ${step.no}.${step.sub_steps[subIndex].no}`,
+        );
+      }
     });
-
-    y += blockGap;
   });
 
   // ผู้จัดทำ used to be printed here as a sign-off after the last step —

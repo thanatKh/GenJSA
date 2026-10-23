@@ -67,14 +67,14 @@ export function PhotoPreview({
       <img
         src={photo.data}
         alt={label}
-        className="max-h-32 w-auto max-w-full rounded-[var(--radius)] border border-line"
+        className="max-h-32 w-auto max-w-full rounded-xl border border-line"
       />
       <Button
         type="button"
         variant="ghost"
         size="sm"
         onClick={onRemove}
-        className="text-muted hover:text-danger"
+        className="text-muted hover:bg-danger-soft hover:text-danger-text"
       >
         <Trash2 className="size-4" aria-hidden="true" />
         ลบรูปภาพ

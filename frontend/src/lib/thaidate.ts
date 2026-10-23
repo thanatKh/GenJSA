@@ -4,7 +4,7 @@
  * Never display a date as 12/08/2026 anywhere.
  */
 
-export const THAI_MONTHS = [
+const THAI_MONTHS = [
   "มกราคม",
   "กุมภาพันธ์",
   "มีนาคม",
@@ -53,6 +53,3 @@ function parseIsoDate(
   return { year, month, day };
 }
 
-export function isValidIsoDate(iso: string): boolean {
-  return parseIsoDate(iso) !== null;
-}

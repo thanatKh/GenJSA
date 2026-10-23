@@ -3,7 +3,6 @@
  */
 
 import { z } from "zod";
-import { isValidIsoDate } from "./thaidate";
 
 export const hazardSchema = z.object({
   hazard: z.string(),
@@ -25,6 +24,10 @@ export const jsaHeaderSchema = z.object({
   // back to the supervisor's name when blank.
   // Defaulted so documents saved before this field existed still parse.
   analyst: z.string().default(""),
+  // The company that prepared the document when it isn't PTTOR (e.g. a
+  // vendor) — printed as an extra header row only when filled in. Defaulted
+  // for the same reason as `analyst`.
+  company: z.string().default(""),
 });
 
 export const jsaDocumentSchema = z.object({
@@ -70,13 +73,15 @@ export const inputFormSchema = z.object({
   // Optional in meaning (no min length) but always present in the form state —
   // InputStep seeds it with "" so the input is never uncontrolled
   analyst: z.string().trim().max(200, "ชื่อยาวเกินไป"),
-  analysis_date: z
-    .string()
-    .refine(isValidIsoDate, "กรุณาเลือกวันที่วิเคราะห์"),
+  // Optional, like analyst — see jsaHeaderSchema.company
+  company: z.string().trim().max(200, "ชื่อบริษัทยาวเกินไป"),
+  // No analysis_date: the first screen doesn't ask for one. App.tsx stamps
+  // today's date when the document is created, and it stays editable in the
+  // JSA editor's header card (see EditorStep).
   work_description: z
     .string()
     .trim()
-    .min(10, "กรุณาอธิบายงานให้ละเอียดขึ้นอีกนิด (อย่างน้อย 10 ตัวอักษร)")
+    .min(10, "กรุณาระบุรายละเอียดงานอย่างน้อย 10 ตัวอักษร")
     .max(5000, "รายละเอียดยาวเกินกำหนด กรุณาย่อหรือแยกเป็นหลาย JSA"),
 });
 

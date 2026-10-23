@@ -54,6 +54,8 @@ export type DocumentMeta = {
     supervisor: string;
     analysis_date: string;
     analyst: string;
+    /** Optional so an older backend that doesn't send it still works */
+    company?: string;
   };
   columns: {
     procedure: string;
@@ -130,6 +132,7 @@ export const FALLBACK_DOCUMENT: DocumentMeta = {
     supervisor: "ชื่อหัวหน้างาน",
     analysis_date: "วันที่วิเคราะห์",
     analyst: "ผู้วิเคราะห์",
+    company: "บริษัท",
   },
   columns: {
     procedure: "ขั้นตอนการทำงาน",
@@ -201,7 +204,7 @@ export function photoKey(stepNo: number, subNo: number): string {
 export const PHOTO_MAX_EDGE_PX = 1000;
 export const PHOTO_JPEG_QUALITY = 0.7;
 
-export const MM_PER_PT = 0.352777778;
+const MM_PER_PT = 0.352777778;
 
 export function mmToPt(mm: number): number {
   return mm / MM_PER_PT;

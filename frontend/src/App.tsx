@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AppBar } from "./components/AppBar";
+import type { SaveState } from "./components/SaveStatus";
 import { Stepper } from "./components/Stepper";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
@@ -11,6 +12,7 @@ import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import { usePhotos } from "./features/procedure/usePhotos";
+import { useCompanyLogo } from "./features/company/useCompanyLogo";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
 import {
@@ -21,13 +23,16 @@ import {
   generateProcedure,
   type PublicConfig,
 } from "./lib/api";
+import type { CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
+import * as photoStore from "./lib/photoStore";
 import {
   stepFingerprint,
   type InputForm,
   type JsaDocument,
   type ProcedureDocument,
 } from "./lib/schema";
+import { todayIso } from "./lib/thaidate";
 import { clearAllDrafts, currentHistoryId, docDraft, procedureDraft } from "./store";
 
 // How long to wait after the last edit before rewriting the history entry.
@@ -39,10 +44,10 @@ const HISTORY_SAVE_DEBOUNCE_MS = 800;
 // in by hand — one empty step with one empty hazard, matching the shape
 // EditorStep's own "เพิ่มขั้นตอน"/"เพิ่มอันตราย" actions add.
 function buildBlankDocument(
-  values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
+  values: Pick<InputForm, "supervisor" | "analyst" | "company">,
 ): JsaDocument {
   return {
-    header: { work_activity: "", ...values },
+    header: { work_activity: "", analysis_date: todayIso(), ...values },
     steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] }],
     assumptions: [],
   };
@@ -145,6 +150,13 @@ export default function App() {
     replaceStepPhotos,
     pruneToLiveKeys,
   } = usePhotos(historyId, procedure);
+  // The open document's company logo — browser-only, like photos. See
+  // useCompanyLogo.ts for why a new job gets its logo via setLogoFor.
+  const {
+    logo: companyLogo,
+    setLogo: setCompanyLogo,
+    setLogoFor: setCompanyLogoFor,
+  } = useCompanyLogo(historyId);
 
   // If a draft JSA is left over (refresh mid-flow), jump straight back to the editor step
   useEffect(() => {
@@ -167,16 +179,23 @@ export default function App() {
     if (stage >= 3 && !procedure) setStage(2);
   }, [stage, procedure]);
 
-  // Keep the history entry in step with the document being edited
+  // Keep the history entry in step with the document being edited. The
+  // save states feed the editors' "บันทึกแล้ว" indicator (SaveStatus.tsx).
+  const [docSave, setDocSave] = useState<SaveState>("idle");
+  const [procedureSave, setProcedureSave] = useState<SaveState>("idle");
   useEffect(() => {
     if (!doc || !historyId) return;
     // Don't leave an empty row behind for a manual entry the user abandons
     const worthKeeping =
       doc.header.work_activity.trim() || doc.steps.some((s) => s.procedure.trim());
-    if (!worthKeeping) return;
+    if (!worthKeeping) {
+      setDocSave("idle");
+      return;
+    }
 
+    setDocSave("saving");
     const timer = setTimeout(
-      () => historyStore.upsertDoc(historyId, doc),
+      () => setDocSave(historyStore.upsertDoc(historyId, doc) ? "saved" : "failed"),
       HISTORY_SAVE_DEBOUNCE_MS,
     );
     return () => clearTimeout(timer);
@@ -187,8 +206,9 @@ export default function App() {
   // upsertProcedure merges rather than replacing, so neither erases the other.
   useEffect(() => {
     if (!procedure || !historyId) return;
+    setProcedureSave("saving");
     const timer = setTimeout(
-      () => historyStore.upsertProcedure(historyId, procedure),
+      () => setProcedureSave(historyStore.upsertProcedure(historyId, procedure) ? "saved" : "failed"),
       HISTORY_SAVE_DEBOUNCE_MS,
     );
     return () => clearTimeout(timer);
@@ -203,10 +223,11 @@ export default function App() {
     });
   }, []);
 
-  const startHistoryEntry = () => {
+  const startHistoryEntry = (): string => {
     const id = historyStore.newId();
     setHistoryId(id);
     currentHistoryId.save(id);
+    return id;
   };
 
   /** Drop the procedure from screen and draft storage. The copy already in
@@ -219,18 +240,32 @@ export default function App() {
     procedureDraft.clear();
   };
 
-  const handleGenerate = async (values: InputForm, withProcedure: boolean) => {
+  const handleGenerate = async (
+    values: InputForm,
+    withProcedure: boolean,
+    logo: CompanyLogo | null,
+  ) => {
     setBusy(true);
     setError(null);
     const controller = new AbortController();
     generateController.current = controller;
+    // The history id this run allocates, if it gets that far — the cancel
+    // branch below rolls back the logo saved under it along with the rest
+    let newEntryId: string | null = null;
     try {
-      const generated = await generateJsa(values, { signal: controller.signal });
+      // The date is today, stamped at the moment of creating — the first
+      // screen no longer asks for it (a saved draft used to carry yesterday's
+      // date into today's JSA); it stays editable in the JSA editor.
+      const generated = await generateJsa(
+        { ...values, analysis_date: todayIso() },
+        { signal: controller.signal },
+      );
       setDoc(generated);
       docDraft.save(generated);
       // A new JSA means any procedure on screen describes a different job
       discardProcedure();
-      startHistoryEntry();
+      newEntryId = startHistoryEntry();
+      setCompanyLogoFor(newEntryId, logo);
 
       // Chained under the SAME controller/signal as the JSA call, so ยกเลิก
       // (cancelGenerate) aborts either half — including after the JSA already
@@ -292,6 +327,7 @@ export default function App() {
         setDoc(null);
         docDraft.clear();
         discardProcedure();
+        if (newEntryId) void photoStore.remove(newEntryId, photoStore.COMPANY_LOGO_KEY);
         setHistoryId(null);
         currentHistoryId.clear();
       } else {
@@ -313,13 +349,14 @@ export default function App() {
   const cancelGenerate = () => generateController.current?.abort();
 
   const handleSkipToManual = (
-    values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
+    values: Pick<InputForm, "supervisor" | "analyst" | "company">,
+    logo: CompanyLogo | null,
   ) => {
     const blank = buildBlankDocument(values);
     setDoc(blank);
     docDraft.save(blank);
     discardProcedure();
-    startHistoryEntry();
+    setCompanyLogoFor(startHistoryEntry(), logo);
     setStage(1);
     window.scrollTo({ top: 0 });
   };
@@ -468,6 +505,8 @@ export default function App() {
         appName={appName}
         documentMeta={config?.document}
         department={config?.company.department}
+        developer={config?.about?.developer}
+        contactEmail={config?.about?.contactEmail}
         onHome={startOver}
       />
 
@@ -567,6 +606,9 @@ export default function App() {
           <EditorStep
             doc={view.doc}
             onChange={setDoc}
+            companyLogo={companyLogo}
+            onCompanyLogoChange={setCompanyLogo}
+            saveState={docSave}
             onContinue={() => goto(2)}
             onStartOver={startOver}
             error={error}
@@ -581,7 +623,7 @@ export default function App() {
             computeView picks the right heading for whichever stage this is. */}
         {view?.kind === "procedureGenerating" ? (
           <div className="mx-auto max-w-[45rem]">
-            <h1 className="text-[1.75rem] font-semibold text-navy">{view.heading}</h1>
+            <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">{view.heading}</h1>
             <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
           </div>
         ) : null}
@@ -590,6 +632,7 @@ export default function App() {
           <div className="mx-auto max-w-[45rem]">
             <PdfStep
               doc={view.doc}
+              companyLogo={companyLogo}
               config={config}
               onBack={() => goto(1)}
               onNewJsa={startOver}
@@ -615,6 +658,7 @@ export default function App() {
               photos={photos}
               onPhotoChange={updatePhoto}
               onStepPhotosReplace={replaceStepPhotos}
+              saveState={procedureSave}
               onContinue={() => goto(4)}
               onBack={() => goto(2)}
               onRegenerate={() => handleCreateProcedure({ force: true })}
@@ -630,6 +674,7 @@ export default function App() {
               procedure={view.procedure}
               doc={view.doc}
               photos={photos}
+              companyLogo={companyLogo}
               config={config}
               onBack={() => goto(3)}
               onBackToJsa={() => goto(2)}
@@ -638,6 +683,20 @@ export default function App() {
           </div>
         ) : null}
       </main>
+
+      {/* Credit line, from config/app.yaml (the same source as the เกี่ยวกับ
+          dialog). On the two editors the page ends under a bar fixed to the
+          bottom of the screen, so the line gets extra bottom padding there to
+          stay visible above it. */}
+      {config?.about?.developer ? (
+        <footer
+          className={`px-4 pt-2 text-center text-xs text-muted ${
+            view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-40 sm:pb-24" : "pb-6"
+          }`}
+        >
+          พัฒนาโดย {config.about.developer}
+        </footer>
+      ) : null}
     </div>
   );
 }

@@ -206,7 +206,7 @@ export function Alert({
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-[var(--radius)] border border-line p-4 sm:p-5">
+    <div className="rounded-card border border-line p-4 sm:p-5">
       <Skeleton className="h-5 w-2/5" />
       <Skeleton className="mt-3 h-4 w-full" />
       <Skeleton className="mt-2 h-4 w-4/5" />
@@ -239,14 +239,14 @@ export function UndoToast({
       role="status"
       aria-live="polite"
       className={`t-toast fixed inset-x-0 bottom-20 z-20 mx-auto flex w-[min(92vw,26rem)] items-center
-                  justify-between gap-3 rounded-[var(--radius)] border border-line bg-ink px-4 py-3
+                  justify-between gap-3 rounded-card border border-line bg-ink/95 px-4 py-3 supports-backdrop-filter:bg-ink/85 supports-backdrop-filter:backdrop-blur-md
                   text-sm text-white shadow-lg ${open ? "is-open" : "pointer-events-none"}`}
     >
       <span>{message}</span>
       <button
         type="button"
         onClick={onUndo}
-        className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 font-semibold text-cyan hover:bg-white/10"
+        className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 font-semibold text-cyan hover:bg-white/10"
       >
         <Undo2 className="size-4" aria-hidden="true" />
         เลิกทำ

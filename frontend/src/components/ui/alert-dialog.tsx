@@ -65,7 +65,7 @@ function AlertDialogContent({
           // --scale-large (0.96). ease-[...] is --ease-smooth-out — see
           // dialog.tsx's DialogOverlay for why tw-animate-css needs it
           // spelled out per class.
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius)] border border-line bg-popover p-4 text-popover-foreground outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-96 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-96 data-closed:duration-150",
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-card border border-line bg-popover p-4 text-popover-foreground outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-96 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-96 data-closed:duration-150",
           className
         )}
         {...props}
@@ -98,7 +98,7 @@ function AlertDialogFooter({
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-[var(--radius)] border-t border-line bg-raised/50 p-4 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-card border-t border-line bg-raised/50 p-4 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

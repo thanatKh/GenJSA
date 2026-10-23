@@ -14,7 +14,6 @@ import { MAX_ENTRIES } from "../history";
 import type { DocumentMeta } from "../lib/pdf/layout";
 import { Button, InfoDialog } from "./ui";
 
-const CONTACT_EMAIL = "ce-em@pttor.com";
 
 function AboutSection({
   icon: Icon,
@@ -40,11 +39,16 @@ export function AppBar({
   appName = "GenJSA",
   documentMeta,
   department,
+  developer,
+  contactEmail,
   onHome,
 }: {
   appName?: string;
   documentMeta?: DocumentMeta;
   department?: string;
+  /** From config/app.yaml (via the public config) — not constants here */
+  developer?: string;
+  contactEmail?: string;
   /** Reset to a fresh JSA — the same "เริ่มใหม่"/"สร้าง JSA ใหม่" action already
    * on EditorStep/PdfStep. No confirm dialog here for the same reason those
    * don't have one: in-progress work is already autosaved to history as the
@@ -55,7 +59,16 @@ export function AppBar({
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-surface">
+    <header
+      // Frosted glass: the page scrolls under this sticky bar, so a little of
+      // it shows through. 80% white keeps the bar's text at full contrast;
+      // browsers without backdrop-filter get a near-solid 95% instead of a
+      // see-through bar with nothing blurred.
+      // z-30: above anything that scrolls under it — Stepper nodes and
+      // StepCard's focused cell are positioned (z-10), and at an equal z the
+      // later element wins — but below dialogs (z-50).
+      className="sticky top-0 z-30 border-b border-line bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md"
+    >
       {/* Explicit height (not just py-2.5) so EditorStep's sticky column
           header — lg only, so always past this sm: breakpoint — has a fixed
           offset to park under instead of guessing. sm: reads --appbar-h
@@ -70,24 +83,27 @@ export function AppBar({
             className="flex min-w-0 items-center gap-3 rounded-md
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
+            <img src={logoUrl} alt="OR" className="h-7 w-auto sm:h-8" />
             <span className="min-w-0 text-left">
               <span className="block font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
                 {appName}
               </span>
-              <span className="block truncate text-xs text-muted">
+              {/* Hidden below sm: at phone width it only ever showed as a
+                  cut-off "…ความปล…", and the page's own heading right below
+                  already says what this is */}
+              <span className="hidden truncate text-xs text-muted sm:block">
                 เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
               </span>
             </span>
           </button>
         ) : (
           <>
-            <img src={logoUrl} alt="OR" className="h-8 w-auto sm:h-9" />
+            <img src={logoUrl} alt="OR" className="h-7 w-auto sm:h-8" />
             <div className="min-w-0">
               <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
                 {appName}
               </span>
-              <p className="truncate text-xs text-muted">
+              <p className="hidden truncate text-xs text-muted sm:block">
                 เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
               </p>
             </div>
@@ -125,13 +141,14 @@ export function AppBar({
 
         <AboutSection icon={ListChecks} title="ขั้นตอนการใช้งาน">
           <ol className="list-decimal space-y-1 pl-5">
-            <li>กรอกรายละเอียดงาน วันที่วิเคราะห์ และชื่อหัวหน้างาน</li>
+            <li>กรอกรายละเอียดงานและชื่อหัวหน้างาน</li>
             <li>ระบบร่าง JSA ให้อัตโนมัติ</li>
             <li>ตรวจทานและแก้ไขทุกช่องให้ตรงกับงานจริง</li>
             <li>เปิดเอกสาร PDF เพื่อบันทึกหรือพิมพ์</li>
             <li>
-              (ไม่บังคับ) กด &ldquo;สร้างขั้นตอนปฏิบัติงาน&rdquo;
-              ในหน้าเอกสาร JSA เพื่อให้ระบบขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด
+              (ไม่บังคับ) เลือก &ldquo;สร้างขั้นตอนปฏิบัติงานด้วย&rdquo; ในหน้าแรก
+              หรือกด &ldquo;สร้างขั้นตอนปฏิบัติงาน&rdquo; ในหน้าเอกสาร JSA
+              เพื่อให้ระบบขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด แนบรูปภาพประกอบได้
               ตรวจทานแล้วเปิดเป็น PDF อีกฉบับ
             </li>
           </ol>
@@ -141,7 +158,7 @@ export function AppBar({
           <ul className="list-disc space-y-1 pl-5">
             <li>
               อธิบายงานให้ละเอียดที่สุด รวมขั้นตอนที่คิดไว้แล้ว —
-              ยิ่งละเอียด JSA ยิ่งตรงกับงานจริง
+              รายละเอียดที่ครบถ้วนช่วยให้ JSA ตรงกับงานจริงมากขึ้น
             </li>
             <li>
               ระบบเป็นผู้ร่างเท่านั้น ต้องตรวจทานทุกช่องก่อนสร้าง PDF
@@ -174,16 +191,19 @@ export function AppBar({
                 อ้างอิงแบบฟอร์ม {documentMeta.formCode} {documentMeta.footerText}
               </p>
             ) : null}
-            {department ? <p>พัฒนาโดย {department}</p> : null}
-            <p className="flex items-center gap-1.5">
-              <Mail className="size-3.5 shrink-0" aria-hidden="true" />
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                className="text-navy hover:underline"
-              >
-                {CONTACT_EMAIL}
-              </a>
-            </p>
+            {developer || department ? (
+              <p>
+                พัฒนาโดย {[developer, department].filter(Boolean).join(" · ")}
+              </p>
+            ) : null}
+            {contactEmail ? (
+              <p className="flex items-center gap-1.5">
+                <Mail className="size-3.5 shrink-0" aria-hidden="true" />
+                <a href={`mailto:${contactEmail}`} className="text-navy hover:underline">
+                  {contactEmail}
+                </a>
+              </p>
+            ) : null}
             <div className="mt-2 flex items-center gap-2">
               <span
                 className="size-2 rounded-full bg-[var(--success)]"

@@ -45,7 +45,7 @@ const UNTITLED = "JSA ไม่มีชื่องาน";
 // (border-transparent: same box as the dashed "create" button beside it, so
 // every row is the same height)
 const docButton =
-  "flex min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-navy-soft px-2.5 py-2 text-xs " +
+  "flex min-w-0 items-center gap-1.5 rounded-full border border-transparent bg-navy-soft px-2.5 py-2 text-xs " +
   "font-medium text-navy hover:bg-navy-soft/70 focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-ring/50";
 
@@ -84,15 +84,13 @@ export function HistoryList({
     // Thai has no case and no word boundaries, so plain substring matching is
     // the right primitive here — no tokenizer, no fuzzy library
     return entries.filter((entry) => {
-      const { work_activity, supervisor, analyst } = entry.doc.header;
-      return [work_activity, supervisor, analyst]
+      const { work_activity, supervisor, analyst, company } = entry.doc.header;
+      return [work_activity, supervisor, analyst, company]
         .join(" ")
         .toLowerCase()
         .includes(needle);
     });
   }, [entries, query]);
-
-  if (entries.length === 0) return null;
 
   const searching = query.trim().length > 0;
   const scrollable = matches.length > SCROLL_THRESHOLD;
@@ -119,6 +117,14 @@ export function HistoryList({
     setQuery("");
     setConfirmClear(false);
   };
+
+  const undoToast = <UndoToast open={!!undoEntry} message="ลบรายการแล้ว" onUndo={undoDelete} />;
+
+  // Nothing to list: render nothing — except while the last entry's undo is
+  // still on offer. The toast lives in this component, so returning null
+  // here used to take it down too: deleting your only (or last) job left no
+  // way to undo it.
+  if (entries.length === 0) return undoEntry ? undoToast : null;
 
   return (
     // The top divider only makes sense when this sits BELOW the form
@@ -192,7 +198,7 @@ export function HistoryList({
                 animate={{ opacity: 1, scale: 1, y: "-50%" }}
                 exit={{ opacity: 0, scale: 0.98, y: "-50%" }}
                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute right-2 top-1/2 flex size-7 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-navy"
+                className="absolute right-2 top-1/2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-navy"
               >
                 <X className="size-4" aria-hidden="true" />
               </motion.button>
@@ -261,7 +267,7 @@ export function HistoryList({
                   <button
                     type="button"
                     onClick={() => onOpen(entry)}
-                    className="t-history-row min-w-0 rounded-md py-2 pl-2 pr-1 text-left"
+                    className="t-history-row min-w-0 rounded-field py-2 pl-3 pr-1 text-left"
                   >
                     <span className="flex min-w-0 items-center gap-1">
                       <span className="truncate font-medium text-ink group-hover:text-navy">
@@ -292,7 +298,7 @@ export function HistoryList({
                     // always visible and touch-tapped below sm, so it gets the
                     // app's full 44px minimum there instead of icon-lg's
                     // stock 36px; desktop keeps the more compact hover size.
-                    className="text-muted opacity-100 transition-opacity hover:text-danger max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                    className="text-muted opacity-100 transition-opacity hover:bg-danger-soft hover:text-danger-text max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
@@ -306,7 +312,7 @@ export function HistoryList({
                     reachable only from the JSA's PDF page. Dashed and unfilled
                     so "create" never reads as "open": it starts a 1-3 minute
                     AI draft rather than opening something that exists. */}
-                <div className="mb-1.5 grid grid-cols-2 gap-2">
+                <div className="mb-1.5 mt-1 grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => onOpen(entry)}
@@ -333,7 +339,7 @@ export function HistoryList({
                       type="button"
                       onClick={() => onCreateProcedure(entry)}
                       aria-label={`สร้างขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                      className="flex min-w-0 items-center gap-1.5 rounded-md border border-dashed
+                      className="flex min-w-0 items-center gap-1.5 rounded-full border border-dashed
                                  border-navy/40 px-2.5 py-2 text-xs font-medium text-navy
                                  hover:border-navy hover:bg-navy-soft focus-visible:outline-none
                                  focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -350,15 +356,10 @@ export function HistoryList({
       )}
 
       <p className="mt-4 text-sm text-muted">
-        เก็บไว้ในเบราว์เซอร์ของเครื่องนี้โดยไม่มีวันหมดอายุ (สูงสุด{" "}
-        {historyStore.MAX_ENTRIES} งานล่าสุด) ไม่ถูกส่งขึ้นเซิร์ฟเวอร์
+        บันทึกไว้ในเครื่องนี้เท่านั้น (สูงสุด {historyStore.MAX_ENTRIES} งานล่าสุด)
       </p>
 
-      <UndoToast
-        open={!!undoEntry}
-        message="ลบรายการแล้ว"
-        onUndo={undoDelete}
-      />
+      {undoToast}
 
       <ConfirmDialog
         open={confirmClear}

@@ -13,7 +13,7 @@ import {
 import type { DocumentMeta, PdfLayout, ProcedureMeta } from "./pdf/layout";
 
 const FALLBACK_ERROR =
-  "เกิดข้อผิดพลาดที่ไม่คาดคิด ข้อมูลของคุณยังอยู่ กรุณาลองอีกครั้ง";
+  "เกิดข้อผิดพลาดที่ไม่คาดคิด ข้อมูลที่กรอกไว้ยังอยู่ครบ กรุณาลองอีกครั้ง";
 
 const NETWORK_ERROR =
   "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง " +
@@ -41,10 +41,12 @@ export class CancelledError extends Error {
   }
 }
 
-export type GenerateInput = {
+type GenerateInput = {
   supervisor: string;
   analysis_date: string;
   work_description: string;
+  analyst?: string;
+  company?: string;
 };
 
 /** POST JSON to a generate endpoint, with the shared timeout/abort handling. */
@@ -90,7 +92,7 @@ async function postGenerate(
   return response;
 }
 
-const SHAPE_ERROR = "ระบบตอบกลับในรูปแบบที่ไม่คาดคิด กรุณากดลองอีกครั้ง";
+const SHAPE_ERROR = "เกิดข้อผิดพลาดในการสร้างเอกสาร กรุณาลองอีกครั้ง";
 
 export async function generateJsa(
   input: GenerateInput,
@@ -122,6 +124,9 @@ export async function generateProcedure(
 
 export type PublicConfig = {
   appName: string;
+  // config/app.yaml — shown in the เกี่ยวกับ dialog. Optional: an older
+  // backend doesn't send it.
+  about?: { developer: string; contactEmail: string };
   company: { name: string; department: string };
   document: DocumentMeta;
   // The work procedure document (config/procedure.yaml)

@@ -26,11 +26,11 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Files that can be edited without touching code — config, prompt, logo
-# (PDF fonts now live under frontend/src/assets/fonts/ and get bundled with the frontend build)
+# Files that can be edited without touching code — config and prompts.
+# (The logo and the PDF fonts live under frontend/src/assets/ and are bundled
+# into the frontend build above, so there's no separate assets folder.)
 COPY config/    ./config/
 COPY prompts/   ./prompts/
-COPY assets/    ./assets/
 COPY backend/   ./backend/
 
 # The built frontend — main.py looks for files at <root>/frontend/dist

@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Check, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, Building2, Check, ChevronDown, RotateCcw, Sparkles } from "lucide-react";
 
 import {
   Alert,
@@ -20,17 +20,23 @@ import {
   Input,
   Label,
 } from "../../components/ui";
-import { ThaiDatePicker } from "../../components/ThaiDatePicker";
+import {
+  type CompanyLogo,
+  clearCompanyProfile,
+  loadCompanyProfile,
+  saveCompanyProfile,
+} from "../../lib/companyLogo";
+import { CompanyLogoField } from "../company/CompanyLogoField";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
-import { todayIso } from "../../lib/thaidate";
 import { inputDraft } from "../../store";
 import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
 import { GeneratingPanel, TYPICAL_MAX_SECONDS, TYPICAL_MIN_SECONDS } from "./GeneratingPanel";
+import { ModeSwitch } from "./ModeSwitch";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
   analyst: "",
-  analysis_date: todayIso(),
+  company: "",
   work_description: "",
 });
 
@@ -138,9 +144,10 @@ export function InputStep({
   busy,
   error,
 }: {
-  onGenerate: (values: InputForm, withProcedure: boolean) => void;
+  onGenerate: (values: InputForm, withProcedure: boolean, companyLogo: CompanyLogo | null) => void;
   onSkipToManual: (
-    values: Pick<InputForm, "supervisor" | "analysis_date" | "analyst">,
+    values: Pick<InputForm, "supervisor" | "analyst" | "company">,
+    companyLogo: CompanyLogo | null,
   ) => void;
   // Only passed when there's an existing document to return to (reached via
   // the stepper's back-navigation, not a fresh session) — submitting or
@@ -159,21 +166,28 @@ export function InputStep({
   const [placeholder] = useState(
     () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)],
   );
-  // "สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)" — deliberately local state,
-  // not part of InputForm/the sessionStorage draft: every fresh JSA should
-  // start unchecked
-  // by default so this never silently doubles the wait for someone who
-  // didn't ask for it, and so the checkbox itself does the discoverability
-  // work of showing every first-time visitor that GenJSA can produce both
-  // documents. The doubled-wait warning lives in GeneratingPanel once busy
+  // ModeSwitch's "เฉพาะ JSA / JSA + ขั้นตอนปฏิบัติงาน" — deliberately local
+  // state, not part of InputForm/the sessionStorage draft: every fresh JSA
+  // starts on "เฉพาะ JSA" so this never silently doubles the wait for
+  // someone who didn't ask for it, while the switch at the top of the form
+  // shows every first-time visitor that GenJSA can produce both documents. The doubled-wait warning lives in GeneratingPanel once busy
   // starts (typicalMin/MaxSeconds), not repeated here.
   const [withProcedure, setWithProcedure] = useState(false);
+
+  // The company section ("บริษัท (ไม่บังคับ)") — for documents prepared in
+  // another company's name, e.g. a vendor submitting to PTTOR. Prefilled
+  // from the remembered default (lib/companyLogo.ts), and open from the
+  // start when there is one; collapsed otherwise so PTTOR's own users never
+  // have to deal with it. The name lives in the form (and its draft); the
+  // logo is local state, handed to App with the submit.
+  const [profile] = useState(loadCompanyProfile);
+  const [companyLogo, setCompanyLogo] = useState<CompanyLogo | null>(() => profile?.logo ?? null);
+  const [rememberCompany, setRememberCompany] = useState(true);
 
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     trigger,
     getValues,
@@ -182,8 +196,18 @@ export function InputStep({
     resolver: zodResolver(inputFormSchema),
     // Spread over the empty form, not instead of it — a draft saved before a
     // field existed would otherwise leave that input uncontrolled
-    defaultValues: { ...EMPTY_FORM(), ...inputDraft.load() },
+    defaultValues: { ...EMPTY_FORM(), company: profile?.name ?? "", ...inputDraft.load() },
   });
+
+  const [companyOpen, setCompanyOpen] = useState(
+    () => !!(getValues("company")?.trim() || companyLogo),
+  );
+
+  /** Apply "จำไว้ในเบราว์เซอร์นี้" at the moment a document is created */
+  const rememberOrForgetCompany = (name: string) => {
+    if (rememberCompany) saveCompanyProfile({ name: name.trim(), logo: companyLogo });
+    else clearCompanyProfile();
+  };
 
   const values = watch();
 
@@ -198,7 +222,8 @@ export function InputStep({
     !values.work_description?.trim();
 
   const applyReset = () => {
-    reset(EMPTY_FORM());
+    // The remembered company survives ล้างฟอร์ม — it's a setting, not a draft
+    reset({ ...EMPTY_FORM(), company: loadCompanyProfile()?.name ?? "" });
     inputDraft.clear();
     setConfirmReset(false);
     document.getElementById("supervisor")?.focus();
@@ -208,10 +233,11 @@ export function InputStep({
   // (not work_description, which only matters for the AI prompt) need to
   // validate — a separate, narrower check from the full-form submit above.
   const skipToManual = async () => {
-    const valid = await trigger(["supervisor", "analysis_date", "analyst"]);
+    const valid = await trigger(["supervisor", "analyst", "company"]);
     if (!valid) return;
-    const { supervisor, analysis_date, analyst } = getValues();
-    onSkipToManual({ supervisor, analysis_date, analyst });
+    const { supervisor, analyst, company } = getValues();
+    rememberOrForgetCompany(company);
+    onSkipToManual({ supervisor, analyst, company: company.trim() }, companyLogo);
   };
 
   return (
@@ -236,7 +262,7 @@ export function InputStep({
           (กำลังสร้างขั้นตอนปฏิบัติงาน / …ใหม่) — this page used to keep its
           idle title showing through the whole generate, the one place JSA
           and procedure loading didn't read as the same pattern. */}
-      <h1 className="text-[1.75rem] font-semibold text-navy">
+      <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
         {busy
           ? withProcedure
             ? "กำลังสร้าง JSA และขั้นตอนปฏิบัติงาน"
@@ -245,7 +271,7 @@ export function InputStep({
       </h1>
       {busy ? null : (
         <p className="mt-1.5 text-muted">
-          อธิบายว่าจะทำงานอะไร แล้วระบบจะร่าง JSA ให้ตรวจทาน
+          ระบุรายละเอียดงานที่จะปฏิบัติ ระบบจะร่าง JSA เพื่อให้ตรวจทาน
         </p>
       )}
 
@@ -264,10 +290,15 @@ export function InputStep({
         />
       ) : (
         <form
-          onSubmit={handleSubmit((values) => onGenerate(values, withProcedure))}
+          onSubmit={handleSubmit((values) => {
+            rememberOrForgetCompany(values.company);
+            onGenerate(values, withProcedure, companyLogo);
+          })}
           className="mt-6 grid gap-5"
           noValidate
         >
+          <ModeSwitch withProcedure={withProcedure} onChange={setWithProcedure} />
+
           <div>
             <Label htmlFor="work_description" required>
               รายละเอียดงาน
@@ -282,25 +313,9 @@ export function InputStep({
               {...register("work_description")}
             />
             <p id="work_description_hint" className="mt-1.5 text-sm text-muted">
-              ยิ่งระบุรายละเอียดครบถ้วน ระบบจะสามารถจัดทำ JSA
-              ได้ตรงกับลักษณะงานจริงมากยิ่งขึ้น
-              โปรดระบุขั้นตอนการปฏิบัติงานที่ทราบแล้วให้ครบถ้วน
+              ระบุขั้นตอนการปฏิบัติงานที่ทราบให้ครบถ้วน เพื่อให้ JSA ตรงกับงานจริงมากที่สุด
             </p>
             <FieldError>{errors.work_description?.message}</FieldError>
-          </div>
-
-          <div>
-            <Label htmlFor="analysis_date" required>
-              วันที่วิเคราะห์
-            </Label>
-            <ThaiDatePicker
-              id="analysis_date"
-              value={values.analysis_date ?? ""}
-              onChange={(next) =>
-                setValue("analysis_date", next, { shouldValidate: true })
-              }
-            />
-            <FieldError>{errors.analysis_date?.message}</FieldError>
           </div>
 
           <div>
@@ -327,56 +342,85 @@ export function InputStep({
             <FieldError>{errors.analyst?.message}</FieldError>
           </div>
 
-          {error ? <Alert>{error}</Alert> : null}
-
-          {/* Plain button[role=checkbox] rather than a native <input
-              type="checkbox"> — keeps the same brand-styled square as the
-              rest of the app's hand-rolled controls instead of an unstyled
-              OS checkbox, with no new shadcn component needed for one field.
-              Not a separate section — this is a choice about what to
-              generate. Unchecked by default: the procedure is still an
-              optional power feature, not something every JSA should carry.
-              Its real job is discoverability — every first-time visitor now
-              SEES this capability exists on the very first screen, which a
-              card buried on the PDF page three stages later never achieved. */}
-          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+          {/* Company — collapsed unless something is already filled in.
+              rounded-field (18px), the same as the text box above it, and
+              overflow-hidden so the header's hover background takes the
+              box's own corners: rounded all round when closed, rounded on
+              top and straight along the divider when open. The header has
+              no radius of its own — with one, its bottom corners curved
+              against the straight divider. */}
+          <div className="overflow-hidden rounded-field border border-line">
             <button
               type="button"
-              role="checkbox"
-              aria-checked={withProcedure}
-              onClick={() => setWithProcedure((v) => !v)}
-              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                withProcedure
-                  ? "border-navy bg-navy text-white"
-                  : "border-line bg-surface"
-              }`}
+              onClick={() => setCompanyOpen((open) => !open)}
+              aria-expanded={companyOpen}
+              aria-controls="company_fields"
+              className="flex w-full items-center gap-2 px-3.5 py-3 text-left text-sm
+                         font-medium text-ink hover:bg-raised focus-visible:outline-none
+                         focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
             >
-              {withProcedure ? <Check className="size-3.5" aria-hidden="true" /> : null}
-            </button>
-            <span className="text-ink">
-              สร้างเอกสารขั้นตอนปฏิบัติงาน (Work Procedure)
-              <span className="block text-muted">
-                ขยายแต่ละขั้นตอนใน JSA เป็นวิธีปฏิบัติงานอย่างละเอียด
+              <Building2 className="size-4 shrink-0 text-muted" aria-hidden="true" />
+              <span>
+                บริษัท <span className="font-normal text-muted">(ไม่บังคับ)</span>
               </span>
-            </span>
-          </label>
+              {!companyOpen && values.company?.trim() ? (
+                <span className="min-w-0 truncate font-normal text-muted">
+                  · {values.company.trim()}
+                </span>
+              ) : null}
+              <ChevronDown
+                className={`ml-auto size-4 shrink-0 text-muted transition-transform ${companyOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            {companyOpen ? (
+              <div id="company_fields" className="grid gap-4 border-t border-line px-3.5 pb-4 pt-3">
+                <p className="text-sm text-muted">
+                  สำหรับเอกสารที่จัดทำในนามบริษัท ชื่อและโลโก้ของบริษัทจะแสดงบนหัวเอกสาร PDF
+                </p>
+                <div>
+                  <Label htmlFor="company">ชื่อบริษัท</Label>
+                  <Input
+                    id="company"
+                    autoComplete="organization"
+                    aria-invalid={!!errors.company}
+                    {...register("company")}
+                  />
+                  <FieldError>{errors.company?.message}</FieldError>
+                </div>
+                <CompanyLogoField logo={companyLogo} onChange={setCompanyLogo} />
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={rememberCompany}
+                    onClick={() => setRememberCompany((v) => !v)}
+                    className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                      rememberCompany ? "border-navy bg-navy text-white" : "border-line bg-surface"
+                    }`}
+                  >
+                    {rememberCompany ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                  </button>
+                  <span className="text-ink">จำไว้สำหรับครั้งต่อไป</span>
+                </label>
+              </div>
+            ) : null}
+          </div>
+
+          {error ? <Alert>{error}</Alert> : null}
 
           {/* Secondary on the left, primary on the right, both auto-width —
               matches EditorStep's footer (เริ่มใหม่ / สร้าง PDF) so the two
               most consequential actions in the app share one convention
               instead of each page inventing its own button arrangement.
-              "สร้างเอกสาร" rather than "สร้าง JSA" — this already produces
-              either one or two documents depending on withProcedure, and
-              "สร้างเอกสาร" is the label the rest of the app already uses for
-              exactly that generic case (ProcedureEditorStep's own submit
-              button, PdfDeliveryCard's in-flight/error states), so this
-              matches instead of inventing a JSA-specific and
-              JSA+procedure-specific pair of labels. A prior version tried
-              swapping in the full "สร้าง JSA และขั้นตอนปฏิบัติงาน" label when
-              withProcedure was checked — correct in principle, but it forced
-              a full-width, two-line-tall button at narrow widths that read as
-              disproportionate next to ล้างฟอร์ม for no real gain over the
-              checkbox above it already saying the same thing. */}
+              "สร้างเอกสาร" rather than "สร้าง JSA" — the label the rest of
+              the app already uses for this generic case (ProcedureEditorStep's
+              own submit button, PdfDeliveryCard's in-flight/error states).
+              With "JSA + ขั้นตอนปฏิบัติงาน" chosen it becomes "สร้าง 2 เอกสาร", so
+              the choice is visible at the moment of clicking. Deliberately
+              short: a prior version swapped in the full "สร้าง JSA และ
+              ขั้นตอนปฏิบัติงาน", which forced a full-width, two-line-tall
+              button at narrow widths, disproportionate next to ล้างฟอร์ม. */}
           <div className="flex items-center justify-between gap-2">
             <Button
               type="button"
@@ -390,7 +434,7 @@ export function InputStep({
             </Button>
             <Button type="submit" size="lg">
               <Sparkles className="size-5" aria-hidden="true" />
-              สร้างเอกสาร
+              {withProcedure ? "สร้าง 2 เอกสาร" : "สร้างเอกสาร"}
             </Button>
           </div>
 

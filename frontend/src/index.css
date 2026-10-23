@@ -76,6 +76,14 @@
   --radius-3xl: calc(var(--radius) * 2.2);
 
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* GenJSA's rounder look (shadcn's softer presets): two named sizes so the
+     whole app can be tuned from here. Buttons, inputs, badges and the JSA
+     switch are pills (rounded-full) instead.
+     card  = cards, dialogs and other panels (~22px at --radius 10px)
+     field = multi-line text boxes, alerts, and tiles inside cards (~18px) */
+  --radius-card: calc(var(--radius) * 2.2);
+  --radius-field: calc(var(--radius) * 1.8);
 }
 
 html {
@@ -94,12 +102,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-display);
-  line-height: var(--leading-heading);
-  margin: 0;
+/* In @layer base, not unlayered: in Tailwind v4 an unlayered rule beats
+   every utility, so this margin: 0 silently cancelled any mt- or mb- class
+   on a heading (ProcedureEditorStep's "ขั้นตอนการปฏิบัติงาน" sat 0px from the
+   card above it despite mt-8). */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    line-height: var(--leading-heading);
+    margin: 0;
+  }
 }
 
 /* Users who set reduced motion — disable all animation */
@@ -200,13 +214,16 @@ h3 {
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 .t-history-row:hover {
-  /* navy-soft, not surface-raised: the page ground is already white, so the
-     tint has to come from the brand ramp to be visible at all */
-  background-color: var(--brand-navy-soft);
+  /* surface-raised (pale gray), not navy-soft: the JSA / procedure buttons
+     right under the title are navy-soft, and a navy-soft hover here merged
+     the title and those buttons into one blue block. Gray keeps them two
+     things; the title turning navy (group-hover in HistoryList.tsx) and the
+     chevron carry the rest of the "this opens" signal. */
+  background-color: var(--surface-raised);
   transition-duration: var(--duration-quick);
 }
 .t-history-row:active {
-  background-color: var(--brand-navy-soft);
+  background-color: var(--surface-raised);
   transition-duration: var(--duration-micro);
 }
 

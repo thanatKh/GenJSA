@@ -100,10 +100,13 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: stri
   }
 }
 
-function writeRaw(entries: HistoryEntry[]): void {
+/** True once the entries are actually stored — App.tsx's "บันทึกแล้ว"
+ * indicator only claims a save that really happened. */
+function writeRaw(entries: HistoryEntry[]): boolean {
   const file: HistoryFile = { v: 1, entries };
   try {
     localStorage.setItem(KEY, JSON.stringify(file));
+    return true;
   } catch {
     // Out of quota (or blocked). Drop the oldest entry and try once more —
     // losing the least recent JSA beats failing to save the current one.
@@ -115,10 +118,12 @@ function writeRaw(entries: HistoryEntry[]): void {
           JSON.stringify({ v: 1, entries: entries.slice(0, -1) } satisfies HistoryFile),
         );
         void clearForHistoryIds([evicted.id]);
+        return true;
       } catch {
         /* still no room — history is a convenience, never fail loudly */
       }
     }
+    return false;
   }
 }
 
@@ -143,14 +148,14 @@ export function list(): HistoryEntry[] {
  * on purpose — a caller that has only one of the two must not be able to get
  * this wrong.
  */
-function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "procedure">>): void {
+function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "procedure">>): boolean {
   const all = readRaw().entries;
   const existing = all.find((entry) => entry.id === id);
   const doc = patch.doc ?? existing?.doc;
   // A procedure is meaningless without the JSA it was generated from, and an
   // entry with no doc would be dropped by readRaw's validation on the next
   // read anyway — so skip rather than write a record that can't survive
-  if (!doc) return;
+  if (!doc) return false;
 
   const procedure = patch.procedure ?? existing?.procedure;
   const others = all.filter((entry) => entry.id !== id);
@@ -161,27 +166,28 @@ function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "proc
     doc,
     ...(procedure ? { procedure } : {}),
   };
-  writeCapped([next, ...others]);
+  return writeCapped([next, ...others]);
 }
 
 /** Write newest-first `entries`, dropping whatever falls past MAX_ENTRIES —
  * and those entries' photos with them. Without the photo cleanup, every job
  * that aged out of the cap would leave its images in IndexedDB forever, with
  * no history row left to show or delete them from. */
-function writeCapped(entries: HistoryEntry[]): void {
-  writeRaw(entries.slice(0, MAX_ENTRIES));
+function writeCapped(entries: HistoryEntry[]): boolean {
+  const stored = writeRaw(entries.slice(0, MAX_ENTRIES));
   const overflow = entries.slice(MAX_ENTRIES).map((entry) => entry.id);
   if (overflow.length) void clearForHistoryIds(overflow);
+  return stored;
 }
 
 /** Save the JSA for `id`, keeping any procedure already stored alongside it. */
-export function upsertDoc(id: string, doc: JsaDocument): void {
-  upsertEntry(id, { doc });
+export function upsertDoc(id: string, doc: JsaDocument): boolean {
+  return upsertEntry(id, { doc });
 }
 
 /** Save the work procedure for `id`, keeping its JSA. */
-export function upsertProcedure(id: string, procedure: ProcedureDocument): void {
-  upsertEntry(id, { procedure });
+export function upsertProcedure(id: string, procedure: ProcedureDocument): boolean {
+  return upsertEntry(id, { procedure });
 }
 
 /** Removes the entry AND its photos. Note for HistoryList.tsx's undo flow:
@@ -201,7 +207,7 @@ export function remove(id: string): void {
 export function restore(entry: HistoryEntry): void {
   const others = readRaw().entries.filter((other) => other.id !== entry.id);
   const next = [entry, ...others].sort((a, b) => b.savedAt - a.savedAt);
-  writeCapped(next);
+  void writeCapped(next);
 }
 
 export function clear(): void {

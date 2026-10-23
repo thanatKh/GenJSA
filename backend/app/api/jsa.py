@@ -42,6 +42,10 @@ async def public_config() -> dict:
 
     return {
         "appName": settings.app.app.name,
+        "about": {
+            "developer": settings.app.app.developer,
+            "contactEmail": settings.app.app.contact_email,
+        },
         "company": {"name": company.name, "department": company.department},
         "document": {
             "formCode": doc.form_code,

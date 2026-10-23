@@ -217,7 +217,7 @@ export function GeneratingPanel({
       </p>
       <p className="mt-1 text-sm text-muted">
         {slow
-          ? "ใช้เวลานานกว่าปกติ แต่ระบบยังทำงานอยู่ ไม่ได้ค้าง — กรุณาอย่าปิดหรือรีเฟรชหน้านี้"
+          ? "ใช้เวลานานกว่าปกติ ระบบยังดำเนินการอยู่ — กรุณาอย่าปิดหรือรีเฟรชหน้านี้"
           : "ระบบกำลังทำงานอยู่ กรุณาอย่าปิดหรือรีเฟรชหน้านี้ ข้อมูลที่กรอกไว้ยังอยู่ครบ"}
       </p>
 
@@ -231,7 +231,7 @@ export function GeneratingPanel({
       <ul
         aria-live="polite"
         aria-label="ขั้นตอนที่ระบบกำลังทำ"
-        className="mt-4 grid list-none gap-2 rounded-[var(--radius)] border border-line bg-raised p-4"
+        className="mt-4 grid list-none gap-2 rounded-card border border-line bg-raised p-4"
       >
         <AnimatePresence initial={false}>
           {/* Only lines up to and including the active one are ever rendered

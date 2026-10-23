@@ -7,12 +7,12 @@
  * Every value (sizes, margins, colors, column proportions) comes from
  * config/pdf.yaml via GET /api/config/public — nothing is hard-coded here.
  *
- * Accepted limitation: Thai line wrapping uses jsPDF's splitTextToSize,
- * which has no word-segmentation dictionary, so a break can land mid-word
- * (Thai doesn't use spaces between words). Still readable and never
- * overflows the column.
+ * Thai line wrapping breaks between words (engine.ts's splitLines, using
+ * the browser's Intl.Segmenter) — never overflows a column, and only cuts
+ * mid-word for a single word wider than the whole column.
  */
 
+import type { CompanyLogo } from "../companyLogo";
 import type { JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
@@ -28,10 +28,13 @@ import {
 
 type Row = { cells: [Line[], Line[], Line[]] };
 
-export type BuildOptions = {
+type BuildOptions = {
   layout?: PdfLayout;
   document?: DocumentMeta;
   company?: CompanyMeta;
+  /** Logo of the company that prepared this document, when it isn't PTTOR
+   * — printed opposite the OR logo. Browser-only, see lib/companyLogo.ts. */
+  companyLogo?: CompanyLogo | null;
 };
 
 export async function buildJsaPdf(
@@ -45,7 +48,7 @@ export async function buildJsaPdf(
   // Shared drawing context — fonts, geometry, text wrapping, the title bar,
   // header fields, the signature line, the frame pass and the footer all live
   // in engine.ts so this file and buildProcedurePdf.ts can't drift apart on them
-  const E = await createEngine(L);
+  const E = await createEngine(L, { companyLogo: options.companyLogo });
   const {
     doc,
     mL,
@@ -164,11 +167,16 @@ export async function buildJsaPdf(
     drawField(D.labels.analysis_date, dateLines, mL + splitW, contentW - splitW, y, infoH);
     y += infoH;
 
+    // "บริษัท: …" — only on documents prepared in another company's name, so
+    // PTTOR's own copy of the F-ปธบ.-1202 header is unchanged
+    const company = jsa.header.company?.trim();
+    if (company) y = E.drawCompanyRow(D.labels.company ?? "บริษัท", company, y);
+
     // --- column headers ---
     setFont("bold", L.font.table_header_pt);
     const headTexts = [D.columns.procedure, D.columns.hazard, D.columns.control];
     const headLines = headTexts.map((text, i) =>
-      doc.splitTextToSize(text, colW[i] - pad * 2),
+      E.splitLines(text, colW[i] - pad * 2),
     );
     const hintLines = D.columns.procedure_hint ? 1 : 0;
     const headRows = Math.max(...headLines.map((l) => l.length)) + hintLines;

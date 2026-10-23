@@ -19,7 +19,10 @@ import {
   UndoToast,
 } from "../../components/ui";
 import { ThaiDatePicker } from "../../components/ThaiDatePicker";
+import { type SaveState, SaveStatus } from "../../components/SaveStatus";
+import type { CompanyLogo } from "../../lib/companyLogo";
 import type { JsaDocument, JsaStep } from "../../lib/schema";
+import { CompanyLogoField } from "../company/CompanyLogoField";
 import { docDraft } from "../../store";
 import { StepCard } from "./StepCard";
 
@@ -51,9 +54,17 @@ export function EditorStep({
   onContinue,
   onStartOver,
   error,
+  companyLogo,
+  onCompanyLogoChange,
+  saveState,
 }: {
   doc: JsaDocument;
   onChange: (next: JsaDocument) => void;
+  /** Browser-only, beside the document rather than in it — see useCompanyLogo.ts */
+  companyLogo: CompanyLogo | null;
+  onCompanyLogoChange: (logo: CompanyLogo | null) => void;
+  /** This document's save to history, for the "บันทึกแล้ว" indicator */
+  saveState: SaveState;
   onContinue: () => void;
   onStartOver: () => void;
   error: string | null;
@@ -160,17 +171,20 @@ export function EditorStep({
 
   return (
     <section>
-      <h1 className="text-[1.75rem] font-semibold text-navy">ตรวจทานและแก้ไข</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานและแก้ไข</h1>
+        <SaveStatus state={saveState} />
+      </div>
       <p className="mt-1.5 text-muted">
         เอกสารนี้ระบบร่างให้เป็นจุดเริ่มต้น{" "}
         <strong className="font-semibold text-ink">
           ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้ตรวจสอบและรับผิดชอบเนื้อหา
         </strong>{" "}
-        โปรดอ่านทุกขั้นตอนและแก้ให้ตรงกับงานจริงก่อนนำไปใช้
+        โปรดอ่านทุกขั้นตอนและแก้ไขให้ตรงกับงานจริงก่อนนำไปใช้
       </p>
 
       <Card className="mt-6">
-        <label htmlFor="work_activity" className="text-sm font-medium text-muted">
+        <label htmlFor="work_activity" className="text-sm font-medium text-ink">
           งาน/กิจกรรม
         </label>
         <AutoGrowTextarea
@@ -199,8 +213,8 @@ export function EditorStep({
             there wasn't caught until the printed PDF. */}
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <label htmlFor="supervisor" className="text-sm font-medium text-muted">
-              หัวหน้างาน<span className="ml-0.5 text-danger-text">*</span>
+            <label htmlFor="supervisor" className="text-sm font-medium text-ink">
+              ชื่อหัวหน้างาน<span className="ml-0.5 text-danger-text">*</span>
             </label>
             <Input
               id="supervisor"
@@ -217,7 +231,7 @@ export function EditorStep({
             />
           </div>
           <div>
-            <label htmlFor="analysis_date" className="text-sm font-medium text-muted">
+            <label htmlFor="analysis_date" className="text-sm font-medium text-ink">
               วันที่วิเคราะห์
             </label>
             <div className="mt-1">
@@ -234,7 +248,7 @@ export function EditorStep({
             </div>
           </div>
           <div>
-            <label htmlFor="analyst" className="text-sm font-medium text-muted">
+            <label htmlFor="analyst" className="text-sm font-medium text-ink">
               ผู้วิเคราะห์
             </label>
             <Input
@@ -251,6 +265,30 @@ export function EditorStep({
             />
           </div>
         </div>
+
+        {/* Company — optional, for documents prepared in another company's
+            name. Blank prints no company row, so PTTOR's own JSAs are
+            unchanged. */}
+        <div className="mt-4">
+          <label htmlFor="company" className="text-sm font-medium text-ink">
+            บริษัท <span className="font-normal text-muted">(ไม่บังคับ)</span>
+          </label>
+          <Input
+            id="company"
+            autoComplete="organization"
+            value={doc.header.company}
+            onChange={(event) =>
+              onChange({
+                ...doc,
+                header: { ...doc.header, company: event.target.value },
+              })
+            }
+            className="mt-1"
+          />
+          <div className="mt-2">
+            <CompanyLogoField logo={companyLogo} onChange={onCompanyLogoChange} />
+          </div>
+        </div>
       </Card>
 
       {/* Column header matching the printed PDF table — desktop only, the
@@ -264,7 +302,7 @@ export function EditorStep({
           it while lg:sticky. Sticky under the app bar (lg only, so always
           past the sm breakpoint — see --appbar-h in tokens.css) so the three
           column meanings stay visible while scrolling a long JSA. */}
-      <div className="mt-4 hidden grid-cols-[35%_1fr_1fr] gap-0 px-1 text-center text-sm font-medium text-muted lg:grid lg:grid-cols-[3rem_35%_1fr_1fr] lg:sticky lg:top-[var(--appbar-h)] lg:z-[5] lg:rounded-t-[var(--radius)] lg:border lg:border-b-0 lg:border-line lg:bg-raised lg:px-2 lg:py-2 lg:font-semibold lg:text-ink">
+      <div className="mt-4 hidden grid-cols-[35%_1fr_1fr] gap-0 px-1 text-center text-sm font-medium text-muted lg:grid lg:grid-cols-[3rem_35%_1fr_1fr] lg:sticky lg:top-[var(--appbar-h)] lg:z-[5] lg:rounded-t-card lg:border lg:border-b-0 lg:border-line lg:bg-raised lg:px-2 lg:py-2 lg:font-semibold lg:text-ink">
         {/* Blank corner cell, Excel-style — matches StepCard.tsx's row-number gutter column */}
         <span aria-hidden="true" />
         <span>ขั้นตอนการทำงาน</span>
@@ -314,11 +352,15 @@ export function EditorStep({
 
       {/* On lg, visually fused to the table frame above (negative margin +
           matching side borders, rounded only at the bottom) so it reads as
-          the table's own last row rather than a detached control */}
-      <div className="mt-3 lg:mt-0 lg:-translate-y-px lg:rounded-b-[var(--radius)] lg:border lg:border-t-0 lg:border-line lg:px-2 lg:py-1.5">
+          the table's own last row rather than a detached control.
+          The hover shape nests inside the frame's rounded-card (22px) bottom
+          corners: frame padding 8px (lg:p-2), so the button is rounded-xl
+          (14px = 22 - 8). As a full-width pill it ran straight into those
+          curves, with the "+" sitting inside the curve. */}
+      <div className="mt-3 lg:mt-0 lg:-translate-y-px lg:rounded-b-card lg:border lg:border-t-0 lg:border-line lg:p-2">
         <Button
           variant="outline"
-          className="lg:h-8 lg:w-full lg:justify-start lg:border-0 lg:px-1 lg:text-sm lg:font-normal lg:text-muted lg:hover:bg-raised lg:hover:text-ink"
+          className="lg:h-9 lg:w-full lg:justify-start lg:rounded-xl lg:border-0 lg:px-3 lg:text-sm lg:font-normal lg:text-muted lg:hover:bg-raised lg:hover:text-ink"
           onClick={() =>
             setSteps([...doc.steps, { ...EMPTY_STEP, no: doc.steps.length + 1 }])
           }
@@ -329,8 +371,8 @@ export function EditorStep({
       </div>
 
       {doc.assumptions.length > 0 ? (
-        <div className="mt-6 rounded-[var(--radius)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
-          <h2 className="flex items-center gap-2 font-medium text-[var(--warning-text)]">
+        <div className="mt-6 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
             <Info className="size-5 text-[var(--warning)]" aria-hidden="true" />
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
           </h2>
@@ -374,7 +416,7 @@ export function EditorStep({
           steps) these actions used to only be reachable by scrolling all the
           way down every time; keeping them pinned means "restart" and
           "generate PDF" are always one tap away while reviewing. */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-sm">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
         {/* max-w-[var(--page-max-w)] — same shared bound as AppBar/<main> (see
             tokens.css) so these buttons line up with the table's own edges
             above them; this bar is `fixed`, so it sits outside <main>'s own
