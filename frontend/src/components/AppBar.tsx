@@ -58,6 +58,28 @@ export function AppBar({
 }) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
+  // Logo + name, sized as a pair: on phones the title matches the height of
+  // the "OR" letters; from sm up the text is two lines, so the logo grows to
+  // match it and a thin divider keeps the two from reading as one blob.
+  const brandRow = "flex min-w-0 items-center gap-3 sm:gap-4";
+  const brand = (
+    <>
+      <img src={logoUrl} alt="OR" className="h-7 w-auto shrink-0 sm:h-9" />
+      <span className="hidden h-8 w-px shrink-0 bg-line sm:block" aria-hidden="true" />
+      <span className="min-w-0 text-left">
+        <span className="block font-title text-lg font-semibold leading-tight tracking-tight text-navy">
+          {appName}
+        </span>
+        {/* Hidden below sm: at phone width it only ever showed as a
+            cut-off "…ความปล…", and the page's own heading right below
+            already says what this is */}
+        <span className="hidden truncate text-xs text-muted sm:block">
+          เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
+        </span>
+      </span>
+    </>
+  );
+
   return (
     <header
       // Frosted glass: the page scrolls under this sticky bar, so a little of
@@ -80,34 +102,13 @@ export function AppBar({
             type="button"
             onClick={onHome}
             aria-label={`${appName} — กลับไปเริ่มต้นใหม่`}
-            className="flex min-w-0 items-center gap-3 rounded-md
-                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className={`${brandRow} rounded-md
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50`}
           >
-            <img src={logoUrl} alt="OR" className="h-7 w-auto sm:h-8" />
-            <span className="min-w-0 text-left">
-              <span className="block font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
-                {appName}
-              </span>
-              {/* Hidden below sm: at phone width it only ever showed as a
-                  cut-off "…ความปล…", and the page's own heading right below
-                  already says what this is */}
-              <span className="hidden truncate text-xs text-muted sm:block">
-                เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
-              </span>
-            </span>
+            {brand}
           </button>
         ) : (
-          <>
-            <img src={logoUrl} alt="OR" className="h-7 w-auto sm:h-8" />
-            <div className="min-w-0">
-              <span className="font-title text-base font-semibold tracking-tight text-navy sm:text-lg">
-                {appName}
-              </span>
-              <p className="hidden truncate text-xs text-muted sm:block">
-                เครื่องมือช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน
-              </p>
-            </div>
-          </>
+          <div className={brandRow}>{brand}</div>
         )}
 
         <Button

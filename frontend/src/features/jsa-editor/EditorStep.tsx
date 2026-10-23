@@ -21,6 +21,7 @@ import {
 import { ThaiDatePicker } from "../../components/ThaiDatePicker";
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import type { CompanyLogo } from "../../lib/companyLogo";
+import { saveNames } from "../../lib/rememberedNames";
 import type { JsaDocument, JsaStep } from "../../lib/schema";
 import { CompanyLogoField } from "../company/CompanyLogoField";
 import { docDraft } from "../../store";
@@ -221,12 +222,15 @@ export function EditorStep({
               autoComplete="name"
               aria-invalid={missingSupervisor}
               value={doc.header.supervisor}
-              onChange={(event) =>
+              onChange={(event) => {
+                // Only a real edit updates the remembered name — merely
+                // opening an old job must not
+                saveNames({ supervisor: event.target.value });
                 onChange({
                   ...doc,
                   header: { ...doc.header, supervisor: event.target.value },
-                })
-              }
+                });
+              }}
               className="mt-1"
             />
           </div>
@@ -255,12 +259,15 @@ export function EditorStep({
               id="analyst"
               autoComplete="name"
               value={doc.header.analyst}
-              onChange={(event) =>
+              onChange={(event) => {
+                // Only a real edit updates the remembered name — merely
+                // opening an old job must not
+                saveNames({ analyst: event.target.value });
                 onChange({
                   ...doc,
                   header: { ...doc.header, analyst: event.target.value },
-                })
-              }
+                });
+              }}
               className="mt-1"
             />
           </div>

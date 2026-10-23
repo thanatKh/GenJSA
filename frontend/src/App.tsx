@@ -684,19 +684,26 @@ export default function App() {
         ) : null}
       </main>
 
-      {/* Credit line, from config/app.yaml (the same source as the เกี่ยวกับ
-          dialog). On the two editors the page ends under a bar fixed to the
-          bottom of the screen, so the line gets extra bottom padding there to
-          stay visible above it. */}
-      {config?.about?.developer ? (
-        <footer
-          className={`px-4 pt-2 text-center text-xs text-muted ${
-            view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-40 sm:pb-24" : "pb-6"
-          }`}
-        >
-          พัฒนาโดย {config.about.developer}
-        </footer>
-      ) : null}
+      {/* Every page ends with the standing caution — the "can make mistakes"
+          line AI products carry, worded with "GenJSA" since the UI never says
+          "AI". "ตกหล่น" on purpose: for a JSA the dangerous mistake is the
+          hazard a draft never mentions, not a wrong sentence. Then the credit
+          line from config/app.yaml (same source as the เกี่ยวกับ dialog).
+          On the two editors the page ends under a bar fixed to the bottom of
+          the screen, hence the extra bottom padding there. */}
+      <footer
+        className={`space-y-1 px-4 pt-2 text-center text-xs text-muted ${
+          view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-40 sm:pb-24" : "pb-6"
+        }`}
+      >
+        {/* Two inline-blocks so a narrow screen breaks between the phrases,
+            never leaving "งานจริง" alone on a line */}
+        <p>
+          <span className="inline-block">GenJSA อาจร่างเนื้อหาผิดพลาดหรือตกหล่น</span>{" "}
+          <span className="inline-block">โปรดตรวจสอบก่อนนำไปใช้งานจริง</span>
+        </p>
+        {config?.about?.developer ? <p>พัฒนาโดย {config.about.developer}</p> : null}
+      </footer>
     </div>
   );
 }

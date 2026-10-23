@@ -27,6 +27,7 @@ import {
   saveCompanyProfile,
 } from "../../lib/companyLogo";
 import { CompanyLogoField } from "../company/CompanyLogoField";
+import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
 import { inputDraft } from "../../store";
 import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
@@ -181,6 +182,9 @@ export function InputStep({
   // have to deal with it. The name lives in the form (and its draft); the
   // logo is local state, handed to App with the submit.
   const [profile] = useState(loadCompanyProfile);
+  // หัวหน้างาน / ผู้วิเคราะห์ from last time (lib/rememberedNames.ts) — the
+  // starting values, still editable; this tab's own draft wins over them
+  const [names] = useState(loadNames);
   const [companyLogo, setCompanyLogo] = useState<CompanyLogo | null>(() => profile?.logo ?? null);
   const [rememberCompany, setRememberCompany] = useState(true);
 
@@ -196,7 +200,7 @@ export function InputStep({
     resolver: zodResolver(inputFormSchema),
     // Spread over the empty form, not instead of it — a draft saved before a
     // field existed would otherwise leave that input uncontrolled
-    defaultValues: { ...EMPTY_FORM(), company: profile?.name ?? "", ...inputDraft.load() },
+    defaultValues: { ...EMPTY_FORM(), ...names, company: profile?.name ?? "", ...inputDraft.load() },
   });
 
   const [companyOpen, setCompanyOpen] = useState(
@@ -209,6 +213,12 @@ export function InputStep({
     else clearCompanyProfile();
   };
 
+  /** Everything remembered for next time, applied when a document is created */
+  const rememberForNextTime = ({ supervisor, analyst, company }: Pick<InputForm, "supervisor" | "analyst" | "company">) => {
+    saveNames({ supervisor, analyst });
+    rememberOrForgetCompany(company);
+  };
+
   const values = watch();
 
   // Save the draft on every keystroke — data must survive an API error or refresh
@@ -216,14 +226,16 @@ export function InputStep({
     inputDraft.save(values);
   }, [values]);
 
+  // "Empty" = nothing beyond what the form starts with, so ล้างฟอร์ม stays
+  // disabled when only the remembered names are filled in
   const isEmpty =
-    !values.supervisor?.trim() &&
-    !values.analyst?.trim() &&
+    (values.supervisor ?? "").trim() === names.supervisor &&
+    (values.analyst ?? "").trim() === names.analyst &&
     !values.work_description?.trim();
 
   const applyReset = () => {
-    // The remembered company survives ล้างฟอร์ม — it's a setting, not a draft
-    reset({ ...EMPTY_FORM(), company: loadCompanyProfile()?.name ?? "" });
+    // Remembered names and company survive ล้างฟอร์ม — they're settings, not a draft
+    reset({ ...EMPTY_FORM(), ...loadNames(), company: loadCompanyProfile()?.name ?? "" });
     inputDraft.clear();
     setConfirmReset(false);
     document.getElementById("supervisor")?.focus();
@@ -236,7 +248,7 @@ export function InputStep({
     const valid = await trigger(["supervisor", "analyst", "company"]);
     if (!valid) return;
     const { supervisor, analyst, company } = getValues();
-    rememberOrForgetCompany(company);
+    rememberForNextTime({ supervisor, analyst, company });
     onSkipToManual({ supervisor, analyst, company: company.trim() }, companyLogo);
   };
 
@@ -291,7 +303,7 @@ export function InputStep({
       ) : (
         <form
           onSubmit={handleSubmit((values) => {
-            rememberOrForgetCompany(values.company);
+            rememberForNextTime(values);
             onGenerate(values, withProcedure, companyLogo);
           })}
           className="mt-6 grid gap-5"
