@@ -14,7 +14,12 @@
 
 import { ArrowLeft, FilePlus2 } from "lucide-react";
 
-import { pdfFileName, procedurePdfFileName } from "../../lib/pdf/fileName";
+import {
+  docxFileName,
+  pdfFileName,
+  procedureDocxFileName,
+  procedurePdfFileName,
+} from "../../lib/pdf/fileName";
 import { FALLBACK_DOCUMENT, FALLBACK_PROCEDURE } from "../../lib/pdf/layout";
 import { formatThaiDate } from "../../lib/thaidate";
 import type { CompanyLogo } from "../../lib/companyLogo";
@@ -94,6 +99,41 @@ export function ProcedurePdfStep({
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",
   });
 
+  // The editable Word twins (lib/word/) — see the same note on PdfStep
+  const procedureWord = usePdfDelivery({
+    format: "docx",
+    build: async () => {
+      const { buildProcedureDocx } = await import("../../lib/word/buildProcedureDocx");
+      return buildProcedureDocx(procedure, {
+        layout: config?.pdf,
+        document: config?.document,
+        procedure: config?.procedure,
+        company: config?.company,
+        photos,
+        companyLogo,
+      });
+    },
+    fileName: procedureDocxFileName(procedure),
+    deps: [procedure, photos, config, companyLogo],
+    buildErrorMessage: "สร้างไฟล์ Word ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ไฟล์ PDF แทน",
+  });
+
+  const jsaWord = usePdfDelivery({
+    format: "docx",
+    build: async () => {
+      const { buildJsaDocx } = await import("../../lib/word/buildJsaDocx");
+      return buildJsaDocx(doc, {
+        layout: config?.pdf,
+        document: config?.document,
+        company: config?.company,
+        companyLogo,
+      });
+    },
+    fileName: docxFileName(doc),
+    deps: [doc, config, companyLogo],
+    buildErrorMessage: "สร้างไฟล์ Word ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ไฟล์ PDF แทน",
+  });
+
   const subStepCount = procedure.steps.reduce(
     (total, step) => total + step.sub_steps.length,
     0,
@@ -131,7 +171,7 @@ export function ProcedurePdfStep({
           second, after the JSA, with identical solid buttons on both cards,
           so nothing said which document was the point of the page. */}
       <PdfDeliveryCard
-        className="mt-6"
+        className="mt-4"
         kicker="เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)"
         title={procedure.header.work_activity}
         summary={[
@@ -143,6 +183,7 @@ export function ProcedurePdfStep({
           },
         ]}
         delivery={procedureDelivery}
+        word={procedureWord}
       />
 
       {/* The JSA second, as a supporting document: outline buttons, so the
@@ -161,6 +202,7 @@ export function ProcedurePdfStep({
           { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
         ]}
         delivery={jsaDelivery}
+        word={jsaWord}
       />
 
       {/* กลับไปแก้ไข plus สร้าง JSA ใหม่ — the way back to the JSA itself moved

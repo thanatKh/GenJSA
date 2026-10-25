@@ -8,7 +8,7 @@
  * only renders what that hook returns.
  */
 
-import { CircleCheck, FileText, Save, Share2 } from "lucide-react";
+import { CircleCheck, FileDown, FileText, Save, Share2 } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
 
@@ -18,6 +18,7 @@ export function PdfDeliveryCard({
   summary,
   delivery,
   secondary = false,
+  word,
   className,
 }: {
   /** Small label above the title naming which document this is — e.g.
@@ -47,6 +48,18 @@ export function PdfDeliveryCard({
    * on a page that's about another one (the JSA on ProcedurePdfStep), so
    * the page has one solid button, on its own document. */
   secondary?: boolean;
+  /** The editable Word twin — a usePdfDelivery({ format: "docx" }) result.
+   * One quiet button under the PDF's actions: the PDF stays the document,
+   * Word is for the job that has to change it further. */
+  word?: {
+    url: string | null;
+    error: string | null;
+    saving: boolean;
+    sharing: boolean;
+    savedFlash: boolean;
+    sharedFlash: boolean;
+    handleDeliver: () => void;
+  };
   className?: string;
 }) {
   const {
@@ -179,6 +192,28 @@ export function PdfDeliveryCard({
         <div className="mt-3">
           <Alert>{error}</Alert>
         </div>
+      ) : null}
+
+      {word ? (
+        <>
+          <Button
+            variant="ghost"
+            className="mt-2 w-full text-sm text-muted hover:text-navy"
+            onClick={word.handleDeliver}
+            disabled={!word.url}
+            loading={(!word.url && !word.error) || word.saving || word.sharing}
+            status={word.savedFlash || word.sharedFlash ? "success" : undefined}
+            successText="บันทึกแล้ว"
+          >
+            <FileDown className="size-4" aria-hidden="true" />
+            ไฟล์ Word (.docx) สำหรับแก้ไขต่อ
+          </Button>
+          {word.error ? (
+            <div className="mt-2">
+              <Alert>{word.error}</Alert>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </Card>
   );

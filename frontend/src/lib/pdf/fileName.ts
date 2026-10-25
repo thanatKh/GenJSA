@@ -26,3 +26,12 @@ export function procedurePdfFileName(procedure: ProcedureDocument): string {
   const safe = safeActivity(procedure.header.work_activity);
   return `WP-${safe || "document"}-${procedure.header.analysis_date}.pdf`;
 }
+
+/** The editable Word twin's name — the PDF's, with .docx (lib/word/) */
+export function docxFileName(jsa: JsaDocument): string {
+  return pdfFileName(jsa).replace(/\.pdf$/, ".docx");
+}
+
+export function procedureDocxFileName(procedure: ProcedureDocument): string {
+  return procedurePdfFileName(procedure).replace(/\.pdf$/, ".docx");
+}

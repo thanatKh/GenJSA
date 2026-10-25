@@ -306,7 +306,7 @@ export function InputStep({
             rememberForNextTime(values);
             onGenerate(values, withProcedure, companyLogo);
           })}
-          className="mt-6 grid gap-5"
+          className="mt-4 grid gap-4"
           noValidate
         >
           <ModeSwitch withProcedure={withProcedure} onChange={setWithProcedure} />

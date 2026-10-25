@@ -54,7 +54,10 @@
   --font-title: "Google Sans", "Google Sans Text", system-ui, sans-serif;
 
   /* Thai has two-tier stacked vowels/tone marks — below 1.7 in body text, marks collide with the line above */
-  --leading-body: 1.75;
+  /* 1.6, down from 1.75 for a denser UI — and the floor for Thai: below
+     ~1.6 the marks stacked above and below Thai letters (ปฏิบัติ, ผู้)
+     start touching the line above or below */
+  --leading-body: 1.6;
   --leading-heading: 1.35;
 
   --radius: 10px;
@@ -149,11 +152,4 @@
   --label-shimmer-base: var(--text-muted);
   --label-shimmer-highlight: var(--brand-navy);
 
-  /* undo toast (transitions.dev #22) — step/hazard delete in EditorStep */
-  --toast-open: var(--duration-medium);
-  --toast-close: var(--duration-quick);
-  --toast-distance: var(--distance-base);
-  --toast-blur: var(--blur-small);
-  --toast-scale: var(--scale-medium);
-  --toast-ease: var(--ease-smooth-out);
 }

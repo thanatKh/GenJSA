@@ -74,7 +74,7 @@ export function ModeSwitch({
                 select(1 - index);
               }
             }}
-            className={`relative flex min-h-11 items-center justify-center rounded-full px-2 text-sm font-medium
+            className={`relative flex min-h-10 items-center justify-center rounded-full px-2 text-sm font-medium
                         transition-colors focus-visible:outline-none focus-visible:ring-2
                         focus-visible:ring-ring/50 ${checked ? "text-navy" : "text-muted hover:text-ink"}`}
           >

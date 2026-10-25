@@ -23,8 +23,8 @@
 
 import { jsPDF } from "jspdf";
 
-import logoUrl from "../../assets/logo.png";
-import { type CompanyLogo, LOGO_MAX_EDGE_PX, logoFormat } from "../companyLogo";
+import { type CompanyLogo, logoFormat } from "../companyLogo";
+import { loadOrLogo } from "../orLogo";
 import { FONT_NAME, registerThaiFont } from "./fonts";
 import {
   FALLBACK_LAYOUT,
@@ -42,8 +42,6 @@ export type Line = {
   marker?: string;
   indent: number;
 };
-
-type Logo = { data: string; ratio: number };
 
 /** Thai word boundaries for splitLines, built once per page load. Null where
  * the browser has no Intl.Segmenter — splitLines then falls back to jsPDF's
@@ -88,7 +86,7 @@ export async function createEngine(
   const border = hexToRgb(L.table.border_color);
   const fill = hexToRgb(L.table.header_fill);
 
-  const logo = await loadLogo();
+  const logo = await loadOrLogo();
   const companyLogo = extras.companyLogo ?? null;
 
   /** Draw a logo inside a max box, keeping its aspect ratio. The alias makes
@@ -577,33 +575,4 @@ export async function createEngine(
     drawFrames,
     drawFooter,
   };
-}
-
-// ----------------------------------------------------------------- logo --
-let logoCache: Promise<Logo | null> | null = null;
-
-/** Memoized across documents — generating both PDFs decodes the logo once. */
-function loadLogo(): Promise<Logo | null> {
-  logoCache ??= new Promise<Logo | null>((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      // Shrunk to the same LOGO_MAX_EDGE_PX as a company logo: it was
-      // embedded at its full 2453x999 (66 KB of every PDF) to print ~30 mm wide
-      const scale = Math.min(1, LOGO_MAX_EDGE_PX / Math.max(image.naturalWidth, image.naturalHeight));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(null);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve({
-        data: canvas.toDataURL("image/png"),
-        ratio: image.naturalWidth / image.naturalHeight,
-      });
-    };
-    // A missing logo must not fail the whole document — still produce one without it
-    image.onerror = () => resolve(null);
-    image.src = logoUrl;
-  });
-  return logoCache;
 }

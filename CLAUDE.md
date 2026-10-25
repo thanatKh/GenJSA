@@ -197,13 +197,14 @@ will stop at the JSA.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai lines break between words via `engine.ts`'s `splitLines` (the browser's built-in `Intl.Segmenter` — no dictionary shipped); only a single word wider than its column is cut mid-word, and browsers without `Intl.Segmenter` fall back to jsPDF's space-only breaking.
+- `lib/word/` — the editable Word (.docx) twin of each PDF, built in the browser with the `docx` library from the same `config/pdf.yaml` values. `common.ts` is its `engine.ts`; `buildJsaDocx.ts` / `buildProcedureDocx.ts` mirror the two PDF builders section for section — **a content change to one PDF builder needs the same change in its Word twin.** The procedure's Word file is deliberately built from real Word styles (Heading 1/2, Thai-named custom styles) with numbering attached to the styles, so users can insert/delete steps in Word and everything renumbers — never put sizes, bold or typed "1.1" numbers directly on its paragraphs. The JSA's Word file is a form table and is fine with direct formatting. Delivered through `usePdfDelivery({ format: "docx" })` as one button under each PDF card. The OR logo loader lives in `lib/orLogo.ts` (not `engine.ts`) so Word never pulls in jsPDF.
 - `store.ts` — sessionStorage-backed drafts, tab-scoped (see persistence principle above).
 - `lib/companyLogo.ts` + `features/company/` — the optional "บริษัท" for documents prepared in another company's name (e.g. a vendor submitting to PTTOR for a permit to work). The name is `header.company` (printed as an extra header row only when filled in; never sent to the AI); the logo prints opposite the OR logo and, like step photos, stays browser-only (IndexedDB via `photoStore.ts`'s `COMPANY_LOGO_KEY`, deleted with its history entry). Uploads are shrunk to `LOGO_MAX_EDGE_PX` and size-capped so they can't bloat the PDF; the OR logo is shrunk the same way on load. A remembered default (name + logo) lives in localStorage.
 - `history.ts` — localStorage-backed history of finished documents, per-PC, no expiry, capped at `MAX_ENTRIES` (see persistence principle above). `App.tsx` owns the current entry's id and debounces writes; `clearAllDrafts()` deliberately leaves history alone.
 
 ⚠️ **Bundle boundary**: `engine.ts` statically imports jsPDF (~230KB with its
-transitive deps), so it must only ever be reached through a dynamic
-`import()`. That's why `fileName.ts` exists as a separate, dependency-free
+transitive deps), and `lib/word/common.ts` imports `docx` (~430KB), so both
+must only ever be reached through a dynamic `import()`. That's why `fileName.ts` exists as a separate, dependency-free
 module — the PDF pages import file names statically and the builders
 dynamically. Check the chunk list after `npm run build` if you touch this.
 
@@ -222,7 +223,8 @@ comment block at the top of each generated file for exactly what changed).
 `components/ui.tsx` is a thin app-specific wrapper layer on top of those
 (`Label` adds a `required` asterisk, `AutoGrowTextarea` adds scrollHeight-based
 auto-grow, `Card`/`Alert` fix colors/radius, `ConfirmDialog`/`InfoDialog` wrap
-`AlertDialog`/`Dialog`) — feature code imports from `components/ui`, never
+`AlertDialog`/`Dialog`, `UndoToast` drives the app-wide Sonner `Toaster`
+mounted once in `App.tsx`) — feature code imports from `components/ui`, never
 directly from `components/ui/*`. Brand colors live in
 `styles/tokens.css`, aliased onto shadcn's expected semantic token names
 (`--primary`, `--destructive`, etc.) so generated components resolve to the
@@ -256,6 +258,7 @@ first, then hand-merge.
 | Work procedure titles / section headings / labels | `config/procedure.yaml` (optional file — deleting it falls back to built-in defaults) |
 | Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |
 | How the AI writes the procedure | `prompts/procedure-generate.md` |
+| Word (.docx) export layout | `frontend/src/lib/word/` (keep in step with the PDF builders) |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
 | History entry cap | `frontend/src/history.ts` → `MAX_ENTRIES` |
 | Request size / rate limit / CORS | `config/app.yaml` |

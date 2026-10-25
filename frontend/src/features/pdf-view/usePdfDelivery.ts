@@ -28,6 +28,14 @@
  *
  * The picker is checked first precisely because desktop matches both; it is
  * absent on Android Chrome and iOS Safari, so mobile still lands on share.
+ *
+ * format: "docx" — the same lifecycle for the editable Word twin (lib/word/).
+ * A Word file can't be shown in a browser tab, so it has no open link; its
+ * one button is handleDeliver: picker, else share sheet, else a plain
+ * download (desktop Firefox/Safari, which have neither). That download is
+ * NOT the forbidden <a download> on the PDF's open link: the PDF rule exists
+ * because "open" must never silently save, while this button is labelled as
+ * a download and saving is all it does.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -41,11 +49,28 @@ import { useEffect, useRef, useState } from "react";
 // lower-stakes confirmation, not something to actively undo).
 const SUCCESS_FLASH_MS = 2000;
 
+const FORMATS = {
+  pdf: {
+    mime: "application/pdf",
+    description: "เอกสาร PDF",
+    extension: ".pdf",
+    // Points at the open link above the button, which a PDF always has
+    retryHint: ' หรือใช้ปุ่ม "เปิดเอกสาร PDF" ด้านบนแทน',
+  },
+  docx: {
+    mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    description: "เอกสาร Word",
+    extension: ".docx",
+    retryHint: "",
+  },
+} as const;
+
 export function usePdfDelivery({
   build,
   fileName,
   deps,
   buildErrorMessage,
+  format = "pdf",
 }: {
   /** Produces the PDF. Called once per change in `deps`. */
   build: () => Promise<Blob>;
@@ -53,7 +78,9 @@ export function usePdfDelivery({
   fileName: string;
   deps: unknown[];
   buildErrorMessage: string;
+  format?: keyof typeof FORMATS;
 }) {
+  const F = FORMATS[format];
   const [url, setUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +137,7 @@ export function usePdfDelivery({
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
-        setFile(new File([blob], fileName, { type: "application/pdf" }));
+        setFile(new File([blob], fileName, { type: F.mime }));
       } catch {
         if (!cancelled) setError(buildErrorMessage);
       }
@@ -172,8 +199,8 @@ export function usePdfDelivery({
         suggestedName: fileName,
         types: [
           {
-            description: "เอกสาร PDF",
-            accept: { "application/pdf": [".pdf"] },
+            description: F.description,
+            accept: { [F.mime]: [F.extension] },
           },
         ],
       });
@@ -185,9 +212,7 @@ export function usePdfDelivery({
     } catch (caught) {
       // AbortError = the user pressed Cancel, which is a normal outcome
       if (!(caught instanceof Error && caught.name === "AbortError")) {
-        setError(
-          "บันทึกไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
-        );
+        setError(`บันทึกไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง${F.retryHint}`);
       }
     } finally {
       setSaving(false);
@@ -210,13 +235,29 @@ export function usePdfDelivery({
       // AbortError = the user closed the share sheet without picking
       // anything — that's a normal outcome, not a failure to report
       if (!(caught instanceof Error && caught.name === "AbortError")) {
-        setError(
-          "แชร์ไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ปุ่ม \"เปิดเอกสาร PDF\" ด้านบนแทน",
-        );
+        setError(`แชร์ไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง${F.retryHint}`);
       }
     } finally {
       setSharing(false);
     }
+  };
+
+  /** Plain download — only reached through handleDeliver, on browsers with
+   * neither a save dialog nor a share sheet (see the file header) */
+  const handleDownload = () => {
+    if (!url) return;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+  };
+
+  /** The Word file's single button: the best way this browser has to hand
+   * over a file that can't be opened in a tab */
+  const handleDeliver = () => {
+    if (canSavePicker) void handleSave();
+    else if (canShareFile) void handleShare();
+    else handleDownload();
   };
 
   return {
@@ -233,5 +274,6 @@ export function usePdfDelivery({
     sharedFlash,
     handleSave,
     handleShare,
+    handleDeliver,
   };
 }

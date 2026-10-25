@@ -183,7 +183,7 @@ export function GeneratingPanel({
   const slow = elapsed >= typicalMaxSeconds;
 
   return (
-    <section className="mt-6" aria-busy="true">
+    <section className="mt-4" aria-busy="true">
       <div className="flex items-center justify-between gap-2">
         <p className="font-medium text-ink">กำลังร่างเอกสาร</p>
 

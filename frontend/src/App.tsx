@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppBar } from "./components/AppBar";
 import type { SaveState } from "./components/SaveStatus";
 import { Stepper } from "./components/Stepper";
+import { Toaster } from "./components/ui";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
 import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
@@ -516,7 +517,7 @@ export default function App() {
           has room for the form's own 45rem plus a real side column for
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
-      <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-6 sm:py-8">
+      <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
         {/* current stays clamped to 2: the work procedure (stages 3-4) is
             optional and branches off the JSA's last step rather than
             extending the wizard — most users will stop at the JSA, and a
@@ -704,6 +705,7 @@ export default function App() {
         </p>
         {config?.about?.developer ? <p>พัฒนาโดย {config.about.developer}</p> : null}
       </footer>
+      <Toaster />
     </div>
   );
 }

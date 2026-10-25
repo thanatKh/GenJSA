@@ -239,28 +239,6 @@ body {
   opacity: 1;
 }
 
-/* Undo toast (transitions.dev #22) — used by EditorStep after a step/hazard
-   delete. Opens on the slower clock, closes on the faster one, so arriving
-   feels deliberate and leaving feels snappy. */
-.t-toast {
-  opacity: 0;
-  transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
-  filter: blur(var(--toast-blur));
-  transition:
-    opacity var(--toast-close) var(--toast-ease),
-    transform var(--toast-close) var(--toast-ease),
-    filter var(--toast-close) var(--toast-ease);
-}
-.t-toast.is-open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  filter: blur(0);
-  transition:
-    opacity var(--toast-open) var(--toast-ease),
-    transform var(--toast-open) var(--toast-ease),
-    filter var(--toast-open) var(--toast-ease);
-}
-
 /* Hide the browser's own calendar icon but stretch its clickable area to the
    full field — the result is our icon showing alone (no overlap), and
    clicking anywhere in the field opens the picker */
@@ -303,8 +281,8 @@ input[type="date"] {
   /* min-width:0 stops the native min-content width (sized from the date
      format string) from acting as a floor and pushing the box wider */
   min-width: 0;
-  height: 2.75rem; /* 44px, matches h-11 */
-  max-height: 2.75rem;
+  height: 2.5rem; /* 40px, matches h-10 */
+  max-height: 2.5rem;
 }
 
 input[type="date"]::-webkit-datetime-edit,
@@ -333,9 +311,9 @@ input[type="date"]::-webkit-date-and-time-value {
      value centres: fill the content box's exact height with line-height,
      rather than relying on WebKit's internal margins (which had to be
      zeroed above to stop the box growing). Derived, not magic:
-     44px height - 2px borders - 20px vertical padding = 22px. */
-  line-height: calc(2.75rem - 2px - 1.25rem);
-  height: calc(2.75rem - 2px - 1.25rem);
+     40px height - 2px borders - 16px vertical padding = 22px. */
+  line-height: calc(2.5rem - 2px - 1rem);
+  height: calc(2.5rem - 2px - 1rem);
 }
 
 /* shadcn init generates its own :root/.dark blocks with a neutral grayscale

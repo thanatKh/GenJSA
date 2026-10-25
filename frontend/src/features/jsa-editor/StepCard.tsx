@@ -197,6 +197,8 @@ export function StepCard({
               />
             </span>
           ) : null}
+          {/* icon-sm (28px): this column sets every row's minimum height, and
+              it's desktop-only, so mouse-sized targets are fine here */}
           <div className="mt-1 flex flex-col items-center gap-0.5">
             {/* hover:bg-white overrides ghost's default hover:bg-raised —
                 this gutter's own background already is bg-raised (or
@@ -204,7 +206,7 @@ export function StepCard({
             <Button
               type="button"
               variant="ghost"
-              size="icon-lg"
+              size="icon-sm"
               onClick={() => onMove(-1)}
               disabled={index === 0}
               aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ขึ้น`}
@@ -215,7 +217,7 @@ export function StepCard({
             <Button
               type="button"
               variant="ghost"
-              size="icon-lg"
+              size="icon-sm"
               onClick={() => onMove(1)}
               disabled={index === total - 1}
               aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ลง`}
@@ -226,7 +228,7 @@ export function StepCard({
             <Button
               type="button"
               variant="ghost"
-              size="icon-lg"
+              size="icon-sm"
               onClick={onRemove}
               disabled={total === 1}
               aria-label={`ลบขั้นตอนที่ ${index + 1}`}
@@ -326,7 +328,7 @@ export function StepCard({
             </div>
             <div
               className={cx(
-                "flex flex-col bg-white p-2",
+                "relative flex flex-col bg-white p-2",
                 hazardIndex > 0 && "border-t border-line",
                 CELL_FOCUS_WITHIN,
               )}
@@ -339,7 +341,7 @@ export function StepCard({
               </label>
               <AutoGrowTextarea
                 id={`controls-${index}-${hazardIndex}`}
-                minRows={2}
+                minRows={1}
                 maxRows={10}
                 maxLength={CONTROLS_MAX}
                 // One line = one control — easier for users to manage than adding fields one at a time
@@ -349,21 +351,22 @@ export function StepCard({
                     controls: event.target.value.split("\n"),
                   })
                 }
-                className={CELL_INPUT}
+                className={cx(CELL_INPUT, step.hazards.length > 1 && "pr-9")}
               />
+              {/* Top-right corner of the cell, not a row of its own under the
+                  text — that row made every hazard ~40px taller than its
+                  content. The textarea keeps pr-9 clear for it. */}
               {step.hazards.length > 1 ? (
-                <div className="mt-auto flex justify-end pt-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-lg"
-                    onClick={() => onRemoveHazard(hazardIndex)}
-                    aria-label="ลบอันตรายนี้"
-                    className="shrink-0 text-muted hover:bg-danger-soft hover:text-danger-text"
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => onRemoveHazard(hazardIndex)}
+                  aria-label="ลบอันตรายนี้"
+                  className="absolute top-2 right-2 text-muted hover:bg-danger-soft hover:text-danger-text"
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
               ) : null}
             </div>
           </Fragment>
@@ -371,7 +374,7 @@ export function StepCard({
       </div>
 
       {/* Mobile/narrow tablet: stacked fields (no room for 3 live columns) */}
-      <div className="mt-3 grid gap-3 lg:hidden">
+      <div className="mt-2 grid gap-2.5 lg:hidden">
         <div>
           <label
             htmlFor={`procedure-m-${index}`}
@@ -411,16 +414,37 @@ export function StepCard({
         {step.hazards.map((hazard, hazardIndex) => (
           <div
             key={hazardIndex}
-            className="rounded-field border border-line bg-raised p-3"
+            className="rounded-field border border-line bg-raised p-2.5"
           >
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
-                <label
-                  htmlFor={`hazard-m-${index}-${hazardIndex}`}
-                  className="text-sm font-medium text-muted"
-                >
-                  อันตรายที่อาจเกิดขึ้น
-                </label>
+                {/* The delete sits on the label's own line rather than a row
+                    of its own under the hazard — a full row per hazard was the
+                    biggest single cost of a step card on a phone */}
+                <div className="flex min-h-6 items-center justify-between gap-2">
+                  <label
+                    htmlFor={`hazard-m-${index}-${hazardIndex}`}
+                    className="text-sm font-medium text-muted"
+                  >
+                    อันตรายที่อาจเกิดขึ้น
+                  </label>
+                  {step.hazards.length > 1 ? (
+                    // ghost + danger hover, matching the desktop table's own
+                    // delete — hazard deletion is exactly as reversible as
+                    // step deletion (6s undo, see UndoToast in EditorStep),
+                    // so it gets no more visual weight than that
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onRemoveHazard(hazardIndex)}
+                      aria-label="ลบอันตรายนี้"
+                      className="-my-2 -mr-1.5 text-muted hover:bg-danger-soft hover:text-danger-text"
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                </div>
                 <AutoGrowTextarea
                   id={`hazard-m-${index}-${hazardIndex}`}
                   minRows={1}
@@ -442,7 +466,7 @@ export function StepCard({
                 </label>
                 <AutoGrowTextarea
                   id={`controls-m-${index}-${hazardIndex}`}
-                  minRows={2}
+                  minRows={1}
                   maxRows={8}
                   maxLength={CONTROLS_MAX}
                   value={hazard.controls.join("\n")}
@@ -453,33 +477,13 @@ export function StepCard({
                   }
                   className="mt-1 bg-white"
                 />
-                <p className="mt-1 text-xs text-muted">พิมพ์หนึ่งมาตรการต่อบรรทัด</p>
+                {/* Said once, on the first hazard of the first step — repeated
+                    under every hazard it was a line of noise per box */}
+                {index === 0 && hazardIndex === 0 ? (
+                  <p className="mt-1 text-xs text-muted">พิมพ์หนึ่งมาตรการต่อบรรทัด</p>
+                ) : null}
               </div>
             </div>
-
-            {step.hazards.length > 1 ? (
-              // ghost + danger hover, matching the desktop table's own
-              // ลบอันตรายนี้ button (see its "shrink-0 text-muted
-              // hover:bg-danger-soft hover:text-danger-text" a few lines
-              // above) — previously variant="destructive" (solid red,
-              // full-width) here only, giving hazard deletion more visual
-              // weight on mobile than deleting the whole step gets, with no
-              // functional reason for the two platforms to disagree: the
-              // action is exactly as reversible either way (see UndoToast in
-              // EditorStep.tsx — 6s undo window on both step and hazard
-              // deletion), so it doesn't need extra shouting on mobile only.
-              <div className="mt-2 flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onRemoveHazard(hazardIndex)}
-                  className="text-muted hover:bg-danger-soft hover:text-danger-text"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  ลบอันตรายนี้
-                </Button>
-              </div>
-            ) : null}
           </div>
         ))}
 

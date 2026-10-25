@@ -139,7 +139,7 @@ export function HistoryList({
     // which looks identical to the bug this is fixing. The scrollable <ul>
     // below is the one piece that grows (flex-1 + min-h-0) — header, search
     // box and footer note all keep their natural height.
-    <section className="mt-10 flex flex-col border-t border-line pt-6 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
+    <section className="mt-6 flex flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
           <History className="size-5 shrink-0" aria-hidden="true" />
@@ -298,7 +298,7 @@ export function HistoryList({
                     // always visible and touch-tapped below sm, so it gets the
                     // app's full 44px minimum there instead of icon-lg's
                     // stock 36px; desktop keeps the more compact hover size.
-                    className="text-muted opacity-100 transition-opacity hover:bg-danger-soft hover:text-danger-text max-sm:size-11 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                    className="text-muted opacity-100 transition-opacity hover:bg-danger-soft hover:text-danger-text max-sm:size-10 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>

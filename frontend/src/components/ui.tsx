@@ -9,11 +9,13 @@
 import {
   forwardRef,
   useEffect,
+  useId,
   useRef,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
 import { TriangleAlert, Undo2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -218,12 +220,23 @@ export function SkeletonCard() {
   );
 }
 
+/* The one toast stack for the whole app — mounted once in App.tsx */
+export { Toaster } from "./ui/sonner";
+
 /* ---------------------------------------------------------------- UndoToast */
 
 /**
  * A brief "deleted — undo?" toast, for actions that used to be instant and
- * irreversible (removing a step/hazard in EditorStep). Auto-dismisses after
- * a few seconds; the caller owns the timer and just tells us whether to show.
+ * irreversible (removing a step/hazard/history entry). The caller owns the
+ * timer and just says whether to show; this drives the app-wide Sonner
+ * <Toaster> (components/ui/sonner.tsx, mounted once in App.tsx), so every
+ * toast shares one look and one stack.
+ *
+ * Sonner's own timer is turned off (duration Infinity) — the caller's
+ * UNDO_TIMEOUT_MS is the single source of truth for how long undo lasts,
+ * and the toast closes when `open` goes false. It also closes when the page
+ * that showed it unmounts: an undo surviving onto another page would run a
+ * handler for state that no longer exists.
  */
 export function UndoToast({
   open,
@@ -234,25 +247,36 @@ export function UndoToast({
   message: string;
   onUndo: () => void;
 }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`t-toast fixed inset-x-0 bottom-20 z-20 mx-auto flex w-[min(92vw,26rem)] items-center
-                  justify-between gap-3 rounded-card border border-line bg-ink/95 px-4 py-3 supports-backdrop-filter:bg-ink/85 supports-backdrop-filter:backdrop-blur-md
-                  text-sm text-white shadow-lg ${open ? "is-open" : "pointer-events-none"}`}
-    >
-      <span>{message}</span>
-      <button
-        type="button"
-        onClick={onUndo}
-        className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 font-semibold text-cyan hover:bg-white/10"
-      >
-        <Undo2 className="size-4" aria-hidden="true" />
-        เลิกทำ
-      </button>
-    </div>
-  );
+  // Read at click time, not captured when the toast opened — the handler
+  // closes over the caller's latest state
+  const onUndoRef = useRef(onUndo);
+  useEffect(() => {
+    onUndoRef.current = onUndo;
+  });
+
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    toast(message, {
+      id,
+      duration: Infinity,
+      dismissible: false,
+      action: {
+        label: (
+          <>
+            <Undo2 className="size-4" aria-hidden="true" />
+            เลิกทำ
+          </>
+        ),
+        onClick: () => onUndoRef.current(),
+      },
+    });
+    return () => {
+      toast.dismiss(id);
+    };
+  }, [open, message, id]);
+
+  return null;
 }
 
 /* --------------------------------------------------------- ConfirmDialog */

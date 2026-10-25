@@ -12,7 +12,7 @@
 import { ArrowLeft, FilePlus2, ListOrdered } from "lucide-react";
 
 import { Alert, Button, Card } from "../../components/ui";
-import { pdfFileName } from "../../lib/pdf/fileName";
+import { docxFileName, pdfFileName } from "../../lib/pdf/fileName";
 import { FALLBACK_DOCUMENT } from "../../lib/pdf/layout";
 import { formatThaiDate } from "../../lib/thaidate";
 import type { CompanyLogo } from "../../lib/companyLogo";
@@ -67,6 +67,25 @@ export function PdfStep({
       "กรุณากลับไปแก้ไขแล้วลองอีกครั้ง",
   });
 
+  // The editable Word twin (lib/word/) — built alongside the PDF so its
+  // button is ready on the first tap; the share sheet needs the file in hand
+  // before the tap, not after an await
+  const jsaWord = usePdfDelivery({
+    format: "docx",
+    build: async () => {
+      const { buildJsaDocx } = await import("../../lib/word/buildJsaDocx");
+      return buildJsaDocx(doc, {
+        layout: config?.pdf,
+        document: config?.document,
+        company: config?.company,
+        companyLogo,
+      });
+    },
+    fileName: docxFileName(doc),
+    deps: [doc, config, companyLogo],
+    buildErrorMessage: "สร้างไฟล์ Word ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ไฟล์ PDF แทน",
+  });
+
   const hazardCount = doc.steps.reduce(
     (total, step) => total + step.hazards.length,
     0,
@@ -82,7 +101,7 @@ export function PdfStep({
       </p>
 
       <PdfDeliveryCard
-        className="mt-6"
+        className="mt-4"
         title={doc.header.work_activity}
         summary={[
           { label: labels.supervisor, value: doc.header.supervisor },
@@ -90,6 +109,7 @@ export function PdfStep({
           { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
         ]}
         delivery={delivery}
+        word={jsaWord}
       />
 
       {/* A card, not a text link beside "กลับไปแก้ไข" below — this starts an

@@ -214,13 +214,13 @@ export function ProcedureEditorStep({
         </div>
       ) : null}
 
-      <Card className="mt-6">
-        <div className="grid gap-5">
+      <Card className="mt-4">
+        <div className="grid gap-4">
           <div>
             <Label htmlFor="purpose">วัตถุประสงค์</Label>
             <AutoGrowTextarea
               id="purpose"
-              minRows={2}
+              minRows={1}
               value={procedure.purpose}
               onChange={(event) => patch({ purpose: event.target.value })}
             />
@@ -230,7 +230,7 @@ export function ProcedureEditorStep({
             <Label htmlFor="scope">ขอบเขต</Label>
             <AutoGrowTextarea
               id="scope"
-              minRows={2}
+              minRows={1}
               value={procedure.scope}
               onChange={(event) => patch({ scope: event.target.value })}
             />
@@ -240,7 +240,7 @@ export function ProcedureEditorStep({
             <Label htmlFor="tools">เครื่องมือ/อุปกรณ์ที่ต้องเตรียม</Label>
             <AutoGrowTextarea
               id="tools"
-              minRows={2}
+              minRows={1}
               // Raw text while typing, not procedure.tools.join("\n") — that
               // round-trip through linesToList's .filter(Boolean) on every
               // keystroke silently ate the very newline the user just typed
@@ -324,7 +324,7 @@ export function ProcedureEditorStep({
       </ul>
 
       {procedure.assumptions.length > 0 ? (
-        <div className="mt-6 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+        <div className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
             <Info className="size-5 text-[var(--warning)]" aria-hidden="true" />
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
@@ -344,7 +344,7 @@ export function ProcedureEditorStep({
       ) : null}
 
       {error ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <Alert>{error}</Alert>
         </div>
       ) : null}

@@ -197,7 +197,7 @@ export function Stepper({
   const nodes = branch ? STEPS.length + 1 : STEPS.length;
 
   return (
-    <nav aria-label="ขั้นตอนการทำงาน" className="mb-7">
+    <nav aria-label="ขั้นตอนการทำงาน" className="mb-5">
       <ol className={`grid ${nodes === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
         {STEPS.map((label, index) => {
           // While on the procedure branch, the JSA truly is finished — all

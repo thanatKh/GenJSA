@@ -184,7 +184,7 @@ export function EditorStep({
         โปรดอ่านทุกขั้นตอนและแก้ไขให้ตรงกับงานจริงก่อนนำไปใช้
       </p>
 
-      <Card className="mt-6">
+      <Card className="mt-4">
         <label htmlFor="work_activity" className="text-sm font-medium text-ink">
           งาน/กิจกรรม
         </label>
@@ -201,10 +201,10 @@ export function EditorStep({
               header: { ...doc.header, work_activity: event.target.value },
             })
           }
-          // py-2 (not the default py-2.5) so one row lands at exactly 44px —
-          // 1 * 28px line-height + 16px padding — matching the Input fields
-          // below it (h-11) instead of sitting ~4-20px taller
-          className="mt-1 py-2"
+          // py-1.5 (not the default py-2) so one row lands at ~40px —
+          // 25.6px line-height + 12px padding + 2px border — matching the
+          // Input fields below it (h-10) instead of sitting taller
+          className="mt-1 py-1.5"
         />
 
         {/* Editable, not read-only <dd>s — a typo here used to mean "เริ่มใหม่"
@@ -378,7 +378,7 @@ export function EditorStep({
       </div>
 
       {doc.assumptions.length > 0 ? (
-        <div className="mt-6 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+        <div className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
             <Info className="size-5 text-[var(--warning)]" aria-hidden="true" />
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
@@ -398,13 +398,13 @@ export function EditorStep({
       ) : null}
 
       {error ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <Alert>{error}</Alert>
         </div>
       ) : null}
 
       {incomplete ? (
-        <p className="mt-6 text-sm text-danger-text">
+        <p className="mt-4 text-sm text-danger-text">
           กรุณากรอก
           {[
             missingActivity && "งาน/กิจกรรม",

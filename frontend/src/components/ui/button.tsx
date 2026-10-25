@@ -46,11 +46,13 @@ const buttonVariants = cva(
       // secondary/dense contexts where the full tap-target minimum doesn't
       // apply (see each call site's own reasoning).
       size: {
-        default: "h-11 gap-2 px-4",
+        // 40px, not 44: GenJSA runs denser than the 44px guideline, and 40
+        // is still a comfortable thumb target. Inputs match (input.tsx).
+        default: "h-10 gap-2 px-4",
         xs: "h-6 gap-1 rounded-full px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-full px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-13 gap-2 px-6 text-[1.0625rem]",
-        icon: "size-11",
+        icon: "size-10",
         "icon-xs":
           "size-6 rounded-full in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
