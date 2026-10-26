@@ -26,7 +26,8 @@ export const screenFade: Variants = {
   // pointer-events off the instant a screen starts leaving: for those 120ms
   // its buttons were still live, so a quick second tap could land on the old
   // screen's button (e.g. its own "กลับไปแก้ไข") instead of the new screen's
-  exit: { opacity: 0, pointerEvents: "none", transition: { duration: 0.12, ease: "easeIn" } },
+  // ease-out on the way out too: ease-in starts slow, which reads as lag
+  exit: { opacity: 0, pointerEvents: "none", transition: { duration: 0.12, ease: EASE_OUT } },
 };
 
 /** An item joining or leaving a list (steps, hazards, sub-steps): rises in
@@ -34,7 +35,9 @@ export const screenFade: Variants = {
 export const listItem = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: 0 },
+  // Leaving is quicker than arriving: arriving is something to notice,
+  // leaving should just get out of the way
+  exit: { opacity: 0, y: 0, transition: { duration: QUICK, ease: EASE_OUT } },
   transition: { duration: FAST, ease: EASE_OUT } satisfies Transition,
 };
 
@@ -44,7 +47,7 @@ export const listItem = {
 export const collapse = {
   initial: { height: 0, opacity: 0 },
   animate: { height: "auto", opacity: 1 },
-  exit: { height: 0, opacity: 0 },
+  exit: { height: 0, opacity: 0, transition: { duration: QUICK, ease: EASE_OUT } },
   transition: { duration: FAST, ease: EASE_OUT } satisfies Transition,
 };
 

@@ -49,11 +49,11 @@ const EMPTY_FORM = (): InputForm => ({
 // lengths/styles signals that any level of detail and any kind of work is
 // fine to type here.
 const PLACEHOLDERS = [
-  "เช่น เปลี่ยน mechanical seal ของ LPG Pump P-400 ที่ Tank Farm " +
+  "เปลี่ยน mechanical seal ของ LPG Pump P-400 ที่ Tank Farm " +
     "ต้อง isolate ปั๊ม ระบายความดันและ drain product ก่อนเริ่มงาน " +
     "จากนั้นถอด seal เดิม ติดตั้ง seal ใหม่ และตรวจสอบการรั่วก่อนคืนระบบ",
 
-  "เช่น ตรวจสอบและบำรุงรักษา Circuit Breaker ในตู้ MCC-02 ห้องไฟฟ้า Sub 3 " +
+  "ตรวจสอบและบำรุงรักษา Circuit Breaker ในตู้ MCC-02 ห้องไฟฟ้า Sub 3 " +
     "ต้อง lock-out tag-out แหล่งจ่ายไฟก่อน ใช้ multimeter วัดแรงดันให้เป็นศูนย์ " +
     "ทำความสะอาดหน้าสัมผัส ขันน็อตให้ได้ค่าทอร์คตามสเปก " +
     "แล้วจึงจ่ายไฟกลับและทดสอบการทำงาน",
@@ -74,7 +74,7 @@ const PLACEHOLDERS = [
     "วัดออกซิเจน แก๊สไวไฟ และแก๊สพิษก่อนเข้า ติดตั้งพัดลมระบายอากาศ " +
     "มีคนเฝ้าหน้าถังตลอดเวลา และสวมชุด SCBA หากจำเป็น",
 
-  "ยกเครื่อง (overhaul) เครื่อง Boild Off Gas Compressor C-90912A" +
+  "ยกเครื่อง (overhaul) เครื่อง Boil-Off Gas Compressor C-90912A " +
     "ประจำปี ปลดสายพานและถอดฝาครอบ ตรวจสอบ bearing, valve plate และ ring " +
     "วัดค่า clearance เทียบกับ manual เปลี่ยนชิ้นส่วนที่สึกหรอ ประกอบกลับ " +
     "และรันทดสอบโดยไม่มีโหลดก่อน 30 นาที",
@@ -316,7 +316,8 @@ export function InputStep({
               id="work_description"
               minRows={6}
               maxRows={16}
-              placeholder={placeholder}
+              // "เช่น" added here, once, so every example reads as one
+              placeholder={`เช่น ${placeholder}`}
               aria-invalid={!!errors.work_description}
               aria-describedby="work_description_hint"
               {...register("work_description")}
@@ -445,8 +446,8 @@ export function InputStep({
 
       <ConfirmDialog
         open={confirmReset}
-        title="ล้างข้อมูลทั้งหมด?"
-        description="ข้อมูลที่กรอกไว้จะถูกลบและกู้คืนไม่ได้"
+        title="ล้างฟอร์ม?"
+        description="รายละเอียดงานที่กรอกไว้จะถูกลบและกู้คืนไม่ได้"
         confirmLabel="ล้างฟอร์ม"
         onConfirm={applyReset}
         onCancel={() => setConfirmReset(false)}

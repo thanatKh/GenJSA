@@ -100,7 +100,24 @@ html {
    instead of waiting to see if a second tap follows (iOS still waits on some
    elements). Not on text fields — double-tap there selects a word. In the
    base layer so a touch-* utility class can still override it. */
+/* When focus moves (Tab, or a validation error focusing its field), the
+   browser scrolls the field into view — these keep it from landing under the
+   sticky app bar or the editors' fixed bottom bar. Harmless where neither
+   bar is on screen: it only affects scrolling to a focused element. */
+html {
+  scroll-padding-top: calc(var(--appbar-h) + 0.75rem);
+  scroll-padding-bottom: 6rem;
+}
+
 @layer base {
+  /* Long Thai headings wrap into even lines instead of leaving one word
+     alone on the last ("...ความปลอดภัยใน / การทำงาน") */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
   button,
   a,
   summary,

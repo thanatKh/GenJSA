@@ -173,7 +173,7 @@ export function HistoryList({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="ค้นหาจากชื่องาน หัวหน้างาน หรือผู้วิเคราะห์"
+            placeholder="ค้นหาชื่องาน หัวหน้างาน ผู้วิเคราะห์ หรือบริษัท"
             aria-label="ค้นหางานที่เคยวิเคราะห์"
             className="pl-9 pr-9"
           />

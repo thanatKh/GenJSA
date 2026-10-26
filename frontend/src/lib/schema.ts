@@ -82,7 +82,7 @@ export const inputFormSchema = z.object({
     .string()
     .trim()
     .min(10, "กรุณาระบุรายละเอียดงานอย่างน้อย 10 ตัวอักษร")
-    .max(5000, "รายละเอียดยาวเกินกำหนด กรุณาย่อหรือแยกเป็นหลาย JSA"),
+    .max(5000, "รายละเอียดยาวเกิน 5,000 ตัวอักษร กรุณาย่อหรือแยกเป็นหลาย JSA"),
 });
 
 export type Hazard = z.infer<typeof hazardSchema>;

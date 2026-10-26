@@ -64,7 +64,9 @@ export function AppBar({
   const brandRow = "flex min-w-0 items-center gap-3 sm:gap-4";
   const brand = (
     <>
-      <img src={logoUrl} alt="OR" className="h-7 w-auto shrink-0 sm:h-9" />
+      {/* width/height = the file's own pixel size: the browser reserves the
+          right width before it loads (CSS still sets the shown size) */}
+      <img src={logoUrl} alt="OR" width={2453} height={999} className="h-7 w-auto shrink-0 sm:h-9" />
       <span className="hidden h-8 w-px shrink-0 bg-line sm:block" aria-hidden="true" />
       <span className="min-w-0 text-left">
         <span className="block font-title text-lg font-semibold leading-tight tracking-tight text-navy">
@@ -133,10 +135,9 @@ export function AppBar({
           <p>
             {appName} ช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน (Job
             Safety Analysis) — อธิบายงานที่จะทำเป็นภาษาไทย ระบบจะร่าง
-            JSA ให้ตรวจทานและแก้ไข ก่อนเปิดเป็นเอกสาร PDF
-            หลังจากนั้นยังสามารถให้ระบบร่าง
-            &ldquo;ขั้นตอนปฏิบัติงาน&rdquo; จาก JSA นั้นได้อีกด้วย
-            สำหรับใช้เป็นวิธีปฏิบัติงานอย่างละเอียดหน้างานจริง
+            JSA ให้ตรวจทานและแก้ไข แล้วเปิดเป็นเอกสาร PDF หรือไฟล์ Word
+            นอกจากนี้ยังให้ระบบร่าง &ldquo;ขั้นตอนปฏิบัติงาน&rdquo; จาก JSA
+            นั้นได้ เพื่อใช้เป็นวิธีปฏิบัติงานอย่างละเอียดที่หน้างาน
           </p>
         </AboutSection>
 
@@ -145,12 +146,12 @@ export function AppBar({
             <li>กรอกรายละเอียดงานและชื่อหัวหน้างาน</li>
             <li>ระบบร่าง JSA ให้อัตโนมัติ</li>
             <li>ตรวจทานและแก้ไขทุกช่องให้ตรงกับงานจริง</li>
-            <li>เปิดเอกสาร PDF เพื่อบันทึกหรือพิมพ์</li>
+            <li>เปิดเอกสาร PDF เพื่อบันทึกหรือพิมพ์ หรือดาวน์โหลดไฟล์ Word เพื่อแก้ไขต่อ</li>
             <li>
-              (ไม่บังคับ) เลือก &ldquo;สร้างขั้นตอนปฏิบัติงานด้วย&rdquo; ในหน้าแรก
+              (ไม่บังคับ) เลือก &ldquo;JSA + ขั้นตอนปฏิบัติงาน&rdquo; ในหน้าแรก
               หรือกด &ldquo;สร้างขั้นตอนปฏิบัติงาน&rdquo; ในหน้าเอกสาร JSA
-              เพื่อให้ระบบขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด แนบรูปภาพประกอบได้
-              ตรวจทานแล้วเปิดเป็น PDF อีกฉบับ
+              ระบบจะขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด แนบรูปภาพประกอบได้
+              แล้วตรวจทานและเปิดเป็นเอกสารอีกฉบับ
             </li>
           </ol>
         </AboutSection>
@@ -158,18 +159,18 @@ export function AppBar({
         <AboutSection icon={Lightbulb} title="ข้อแนะนำ">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              อธิบายงานให้ละเอียดที่สุด รวมขั้นตอนที่คิดไว้แล้ว —
+              อธิบายงานให้ละเอียดที่สุด รวมถึงขั้นตอนที่วางแผนไว้
               รายละเอียดที่ครบถ้วนช่วยให้ JSA ตรงกับงานจริงมากขึ้น
             </li>
             <li>
-              ระบบเป็นผู้ร่างเท่านั้น ต้องตรวจทานทุกช่องก่อนสร้าง PDF
-              เพราะหัวหน้างานคือผู้รับผิดชอบ
+              ระบบเป็นผู้ร่างเท่านั้น ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้ตรวจสอบ
+              และรับผิดชอบเนื้อหา จึงต้องตรวจทานทุกช่องก่อนนำไปใช้
             </li>
             <li>ข้อสันนิษฐานที่ระบบใช้จะแสดงในหน้าตรวจทาน ควรตรวจสอบว่าตรงกับหน้างานจริง</li>
             <li>
               งานที่วิเคราะห์แล้วจะแสดงในรายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
-              ในหน้าแรก เปิดขึ้นมาแก้ไขและสร้าง PDF ใหม่ได้
-              — หากต้องการเก็บถาวร ควรบันทึกเป็นไฟล์ PDF ไว้
+              ในหน้าแรก เปิดขึ้นมาแก้ไขและสร้างเอกสารใหม่ได้
+              หากต้องการเก็บถาวร ควรบันทึกเป็นไฟล์ PDF ไว้
             </li>
           </ul>
         </AboutSection>
@@ -177,9 +178,9 @@ export function AppBar({
         <AboutSection icon={ShieldCheck} title="ความเป็นส่วนตัว">
           <div className="space-y-1">
             <p>
-              ระบบนี้ไม่เก็บข้อมูล JSA หรือขั้นตอนปฏิบัติงานไว้บนเซิร์ฟเวอร์
-              ยกเว้นรายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
-              ที่เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น โดยไม่มีวันหมดอายุ (สูงสุด {MAX_ENTRIES} งานล่าสุด)
+              ระบบไม่เก็บข้อมูล JSA หรือขั้นตอนปฏิบัติงานไว้บนเซิร์ฟเวอร์
+              รายการ &ldquo;งานที่เคยวิเคราะห์&rdquo; รวมถึงรูปภาพและโลโก้
+              เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น (สูงสุด {MAX_ENTRIES} งานล่าสุด)
               และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
             </p>
           </div>
@@ -205,12 +206,17 @@ export function AppBar({
                 </a>
               </p>
             ) : null}
+            {/* documentMeta arrives with the server's settings, so it doubles
+                as "the server answered" — this used to say พร้อมใช้งาน
+                unconditionally, even with the server unreachable */}
             <div className="mt-2 flex items-center gap-2">
               <span
-                className="size-2 rounded-full bg-[var(--success)]"
+                className={`size-2 rounded-full ${documentMeta ? "bg-[var(--success)]" : "bg-danger"}`}
                 aria-hidden="true"
               />
-              <span className="text-ink">พร้อมใช้งาน</span>
+              <span className="text-ink">
+                {documentMeta ? "พร้อมใช้งาน" : "เชื่อมต่อระบบไม่ได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"}
+              </span>
             </div>
           </div>
         </AboutSection>

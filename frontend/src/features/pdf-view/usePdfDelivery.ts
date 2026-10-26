@@ -55,7 +55,7 @@ const FORMATS = {
     description: "เอกสาร PDF",
     extension: ".pdf",
     // Points at the open link above the button, which a PDF always has
-    retryHint: ' หรือใช้ปุ่ม "เปิดเอกสาร PDF" ด้านบนแทน',
+    retryHint: " หรือใช้ปุ่ม “เปิดเอกสาร PDF” ด้านบนแทน",
   },
   docx: {
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

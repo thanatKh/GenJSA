@@ -17,6 +17,13 @@
          top of that file. favicon.ico matters beyond old browsers: without a
          real file at /favicon.ico the SPA catch-all in backend/app/main.py
          answers that request with index.html. -->
+    <!-- The two Thai UI fonts every screen needs from the first paint (body
+         text and headings) — without this they're found only once the CSS is
+         parsed, and text flashed in a fallback font on a slow connection.
+         crossorigin is required for font preloads even on the same origin. -->
+    <link rel="preload" href="/fonts/googlesanstext-thai-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/googlesans-thai-400-700.woff2" as="font" type="font/woff2" crossorigin />
+
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 

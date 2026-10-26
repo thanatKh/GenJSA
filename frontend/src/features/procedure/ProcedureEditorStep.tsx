@@ -223,8 +223,8 @@ export function ProcedureEditorStep({
               JSA ถูกแก้ไขหลังจากสร้างเอกสารนี้
             </h2>
             <p className="mt-1 text-sm text-[var(--warning-text)]">
-              ขั้นตอนใน JSA เปลี่ยนไปหลังจากร่างเอกสารนี้แล้ว
-              กรุณาตรวจสอบว่ายังตรงกัน หรือสร้างขั้นตอนปฏิบัติงานใหม่
+              กรุณาตรวจสอบว่าขั้นตอนด้านล่างยังตรงกับ JSA
+              หรือสร้างขั้นตอนปฏิบัติงานใหม่จาก JSA ปัจจุบัน
             </p>
             {/* Offered here rather than as a permanent action: this is the one
                 moment the user has a concrete reason to want it, and it discards
@@ -363,7 +363,7 @@ export function ProcedureEditorStep({
           </h2>
           <p className="mt-1 text-sm text-[var(--warning-text)]">
             ข้อมูลเหล่านี้ไม่ได้ระบุมาใน JSA กรุณาตรวจสอบว่าตรงกับหน้างานจริง
-            (ส่วนนี้ไม่ถูกพิมพ์ลงเอกสาร)
+            (ส่วนนี้ไม่แสดงในเอกสาร)
           </p>
           <ul className="mt-2 grid gap-1 pl-5 text-sm text-[var(--warning-text)]">
             {procedure.assumptions.map((assumption, index) => (

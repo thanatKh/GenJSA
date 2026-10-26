@@ -73,7 +73,9 @@ export function Label({
 export function FieldError({ children }: { children?: ReactNode }) {
   if (!children) return null;
   return (
-    <p className="mt-1.5 text-sm text-danger-text flex items-start gap-1.5">
+    // role="alert": announced by screen readers the moment it appears —
+    // aria-invalid alone only marks the field, it says nothing about why
+    <p role="alert" className="mt-1.5 text-sm text-danger-text flex items-start gap-1.5">
       <TriangleAlert className="size-4 mt-1 shrink-0" aria-hidden="true" />
       <span>{children}</span>
     </p>

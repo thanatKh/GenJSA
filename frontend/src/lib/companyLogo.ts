@@ -90,7 +90,7 @@ export async function fileToCompanyLogo(file: File): Promise<CompanyLogo> {
 
       if (dataUrlBytes(data) <= LOGO_TARGET_BYTES || edge <= LOGO_MIN_EDGE_PX) {
         if (dataUrlBytes(data) > LOGO_HARD_MAX_BYTES) {
-          throw new LogoError("โลโก้นี้มีรายละเอียดมากเกินไป กรุณาใช้ไฟล์โลโก้ที่เรียบง่ายกว่านี้");
+          throw new LogoError("ไฟล์โลโก้นี้ใหญ่เกินไป กรุณาใช้ไฟล์ที่เล็กหรือเรียบง่ายกว่านี้");
         }
         return { data, ratio: w / h };
       }

@@ -50,6 +50,12 @@ const EMPTY_STEP: Omit<JsaStep, "no"> = {
   hazards: [{ hazard: "", controls: [""] }],
 };
 
+/** "A", "A และ B", "A, B และ C" */
+function thaiList(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} และ${items[items.length - 1]}`;
+}
+
 export function EditorStep({
   doc,
   onChange,
@@ -409,7 +415,7 @@ export function EditorStep({
           </h2>
           <p className="mt-1 text-sm text-[var(--warning-text)]">
             ข้อมูลเหล่านี้ไม่ได้ระบุมาในรายละเอียดงาน กรุณาตรวจสอบว่าตรงกับหน้างานจริง
-            (ส่วนนี้ไม่ถูกพิมพ์ลงเอกสาร)
+            (ส่วนนี้ไม่แสดงในเอกสาร)
           </p>
           <ul className="mt-2 grid gap-1 pl-5 text-sm text-[var(--warning-text)]">
             {doc.assumptions.map((assumption, index) => (
@@ -429,14 +435,13 @@ export function EditorStep({
 
       {incomplete ? (
         <p className="mt-4 text-sm text-danger-text">
-          กรุณากรอก
-          {[
-            missingActivity && "งาน/กิจกรรม",
-            missingSupervisor && "ชื่อหัวหน้างาน",
-            missingSteps && "ขั้นตอนการทำงานที่ยังไม่ได้กรอก",
-          ]
-            .filter((label): label is string => !!label)
-            .join(" ") + " ให้ครบ (ดูเครื่องหมายเตือนสีแดงด้านบน) ก่อนสร้างเอกสาร"}
+          {`กรุณากรอก${thaiList(
+            [
+              missingActivity && "งาน/กิจกรรม",
+              missingSupervisor && "ชื่อหัวหน้างาน",
+              missingSteps && "ขั้นตอนการทำงาน",
+            ].filter((label): label is string => !!label),
+          )}ให้ครบก่อนสร้างเอกสาร (ช่องที่ยังไม่ได้กรอกมีเครื่องหมายสีแดง)`}
         </p>
       ) : null}
 
