@@ -68,9 +68,9 @@ export async function buildJsaDocx(jsa: JsaDocument, options: BuildOptions = {})
 
   const headSize = halfPt(L.font.table_header_pt);
   const columnHead = (text: string, hint?: string) => [
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [K.run(text, { bold: true, size: headSize })] }),
+    new Paragraph({ alignment: AlignmentType.CENTER, children: [...K.run(text, { bold: true, size: headSize })] }),
     ...(hint
-      ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [K.run(hint, { size: halfPt(L.font.table_header_pt - 1) })] })]
+      ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [...K.run(hint, { size: halfPt(L.font.table_header_pt - 1) })] })]
       : []),
   ];
   header.push(
@@ -120,8 +120,8 @@ export async function buildJsaDocx(jsa: JsaDocument, options: BuildOptions = {})
           new Paragraph({
             spacing: { before: mm(sig.gap_above_mm) },
             children: [
-              K.run(`${D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst} `, { bold: true, size: halfPt(sig.label_pt) }),
-              K.run(analystName, { size: halfPt(sig.label_pt) }),
+              ...K.run(`${D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst} `, { bold: true, size: halfPt(sig.label_pt) }),
+              ...K.run(analystName, { size: halfPt(sig.label_pt) }),
             ],
           }),
         ]

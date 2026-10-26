@@ -52,6 +52,10 @@ export const mmToPx = (value: number) => (value * 96) / 25.4;
 /** A4 portrait — the only page config/pdf.yaml uses */
 const A4 = { width: mm(210), height: mm(297) };
 
+/** Thai letters; a Thai stretch may contain spaces between Thai words */
+const THAI = /[฀-๿]/;
+const THAI_OR_OTHER = /[฀-๿]+(?:\s+[฀-๿]+)*|[^฀-๿]+/g;
+
 /** Indent for a "1." / "1.1" / "•" marker hanging in front of its text */
 export function markerIndent(marker: string, left = 0) {
   const hanging = mm(marker.length <= 1 ? 4 : marker.length <= 2 ? 5.5 : 7.5);
@@ -79,8 +83,25 @@ export function createWordKit(L: PdfLayout) {
   };
   const cellMargins = { top: pad, bottom: pad, left: pad, right: pad };
 
-  const run = (text: string, options: Omit<IRunOptions, "text"> = {}) =>
-    new TextRun({ text, ...options });
+  /** Text as runs, one per script, each tagged with its language so Word
+   * spellchecks it with the right dictionary: Thai stretches th-TH, the
+   * rest (English words, numbers) en-US. Untagged, Word took the Thai for
+   * English and red-underlined every word. Word stores Thai in the same
+   * w:lang slot as English (w:val), not the complex-script one. `break`
+   * (a line break before the text) goes on the first run only. Spread the
+   * result: `children: [...run("…")]`. */
+  const run = (text: string, options: Omit<IRunOptions, "text"> = {}): TextRun[] => {
+    const parts = text.match(THAI_OR_OTHER) ?? [""];
+    return parts.map(
+      (part, i) =>
+        new TextRun({
+          ...options,
+          text: part,
+          break: i === 0 ? options.break : undefined,
+          language: { value: THAI.test(part) ? "th-TH" : "en-US" },
+        }),
+    );
+  };
 
   /** A paragraph of text with an optional hanging marker ("1.", "1.1", "•") */
   const markedParagraph = (
@@ -106,9 +127,9 @@ export function createWordKit(L: PdfLayout) {
       spacing: { before: spaceBefore },
       indent: marker ? markerIndent(marker, left) : left ? { left } : undefined,
       children: [
-        ...(marker ? [run(marker, { bold, size: halfPt(size) }), new TextRun({ children: [new Tab()] })] : []),
+        ...(marker ? [...run(marker, { bold, size: halfPt(size) }), new TextRun({ children: [new Tab()] })] : []),
         // A line per \n, so a multi-line field keeps its line breaks
-        ...text.split("\n").map((part, i) => run(part, { bold, size: halfPt(size), break: i > 0 ? 1 : 0 })),
+        ...text.split("\n").flatMap((part, i) => run(part, { bold, size: halfPt(size), break: i > 0 ? 1 : 0 })),
       ],
     });
 
@@ -116,8 +137,8 @@ export function createWordKit(L: PdfLayout) {
   const fieldParagraph = (label: string, value: string) =>
     new Paragraph({
       children: [
-        run(`${label}: `, { bold: true, size: halfPt(L.font.header_label_pt) }),
-        run(value, { size: halfPt(L.font.header_label_pt) }),
+        ...run(`${label}: `, { bold: true, size: halfPt(L.font.header_label_pt) }),
+        ...run(value, { size: halfPt(L.font.header_label_pt) }),
       ],
     });
 
@@ -172,13 +193,13 @@ export function createWordKit(L: PdfLayout) {
               children: [
                 new Paragraph({
                   alignment: AlignmentType.CENTER,
-                  children: [run(titleTh, { bold: true, size: halfPt(L.font.title_th_pt) })],
+                  children: [...run(titleTh, { bold: true, size: halfPt(L.font.title_th_pt) })],
                 }),
                 ...(titleEn
                   ? [
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
-                        children: [run(titleEn, { bold: true, size: halfPt(L.font.title_en_pt) })],
+                        children: [...run(titleEn, { bold: true, size: halfPt(L.font.title_en_pt) })],
                       }),
                     ]
                   : []),
@@ -208,7 +229,7 @@ export function createWordKit(L: PdfLayout) {
       shading: options.shaded ? { fill, color: "auto", type: "clear" } : undefined,
       children:
         last instanceof Table
-          ? [...children, new Paragraph({ children: [run("", { size: 2 })], spacing: { line: 20, lineRule: "exact" } })]
+          ? [...children, new Paragraph({ children: [...run("", { size: 2 })], spacing: { line: 20, lineRule: "exact" } })]
           : children,
     });
   };
@@ -233,7 +254,7 @@ export function createWordKit(L: PdfLayout) {
         else if (part === "{total}") children.push(PageNumber.TOTAL_PAGES);
         else if (part) children.push(part);
       });
-      pageParts.push(new TextRun({ children, size }));
+      pageParts.push(new TextRun({ children, size, language: { value: "th-TH" } }));
     }
     return new Footer({
       children: [
@@ -243,11 +264,11 @@ export function createWordKit(L: PdfLayout) {
             { type: TabStopType.RIGHT, position: contentW },
           ],
           children: [
-            run(left, { size }),
+            ...run(left, { size }),
             new TextRun({ children: [new Tab()] }),
             ...pageParts,
             new TextRun({ children: [new Tab()] }),
-            run(right, { size }),
+            ...run(right, { size }),
           ],
         }),
       ],
@@ -275,6 +296,9 @@ export function createWordKit(L: PdfLayout) {
         run: {
           font: { ascii: L.font.family, hAnsi: L.font.family, cs: L.font.family, eastAsia: L.font.family },
           size: halfPt(L.font.body_pt),
+          // Each run carries its own language (see run()); this is the
+          // fallback for text that doesn't go through it
+          language: { value: "th-TH" },
         },
         paragraph: { spacing: { after: 0, before: 0 } },
       },

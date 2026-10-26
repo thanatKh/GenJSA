@@ -21,7 +21,6 @@ import {
   Paragraph,
   Table,
   TableRow,
-  TextRun,
   WidthType,
 } from "docx";
 
@@ -86,8 +85,8 @@ export async function buildProcedureDocx(
             alignment: AlignmentType.CENTER,
             spacing: { after: mm(1.5) },
             children: [
-              K.run(`${label}: `, { bold: true, size: halfPt(infoPt) }),
-              K.run(value, { size: halfPt(infoPt) }),
+              ...K.run(`${label}: `, { bold: true, size: halfPt(infoPt) }),
+              ...K.run(value, { size: halfPt(infoPt) }),
             ],
           }),
         ]
@@ -103,20 +102,20 @@ export async function buildProcedureDocx(
             spacing: { after: mm(12) },
             children: [
               K.image(orLogo, 60, 16),
-              ...(companyLogo ? [K.run("          "), K.image(companyLogo, 60, 16)] : []),
+              ...(companyLogo ? [...K.run("          "), K.image(companyLogo, 60, 16)] : []),
             ],
           }),
         ]
       : []),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [K.run(P.titleTh, { bold: true, size: halfPt(L.font.title_th_pt + 24) })],
+      children: [...K.run(P.titleTh, { bold: true, size: halfPt(L.font.title_th_pt + 24) })],
     }),
     ...(P.titleEn
       ? [
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [K.run(P.titleEn, { size: halfPt(L.font.title_en_pt + 8) })],
+            children: [...K.run(P.titleEn, { size: halfPt(L.font.title_en_pt + 8) })],
           }),
         ]
       : []),
@@ -131,7 +130,7 @@ export async function buildProcedureDocx(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: mm(12) },
-      children: [K.run(h.work_activity, { bold: true, size: halfPt(L.font.title_en_pt + 6) })],
+      children: [...K.run(h.work_activity, { bold: true, size: halfPt(L.font.title_en_pt + 6) })],
     }),
     ...infoLine(D.labels.company ?? "บริษัท", h.company?.trim() ?? ""),
     ...infoLine(D.labels.supervisor, h.supervisor),
@@ -286,9 +285,10 @@ export async function buildProcedureDocx(
     ],
   };
 
-  /** Plain runs only — the style decides how they look. A line per \n. */
+  /** Plain runs only — the style decides how they look; K.run adds just the
+   * language tag for spellcheck. A line per \n. */
   const text = (value: string) =>
-    value.split("\n").map((part, i) => new TextRun({ text: part, break: i > 0 ? 1 : 0 }));
+    value.split("\n").flatMap((part, i) => K.run(part, { break: i > 0 ? 1 : 0 }));
 
   // --------------------------------------------------------------- sections --
   const body: (Paragraph | Table)[] = [headerBlock];
