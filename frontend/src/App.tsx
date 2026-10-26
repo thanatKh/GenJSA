@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { AppBar } from "./components/AppBar";
 import type { SaveState } from "./components/SaveStatus";
@@ -33,6 +34,7 @@ import {
   type JsaDocument,
   type ProcedureDocument,
 } from "./lib/schema";
+import { screenFade } from "./lib/motion";
 import { todayIso } from "./lib/thaidate";
 import { clearAllDrafts, currentHistoryId, docDraft, procedureDraft } from "./store";
 
@@ -559,130 +561,137 @@ export default function App() {
           />
         </div>
 
-        {view?.kind === "input" ? (
-          // Below xl: unchanged — single 45rem column, history stacked below
-          // the form. From xl up, with real desktop width to spare: history
-          // moves beside the form as its own column instead of competing for
-          // vertical space under it (see HistoryList.tsx's matching xl:
-          // classes that drop its now-unneeded top divider). Deliberately
-          // xl (1280px), not lg (1024px) — the form alone is 45rem (720px),
-          // so anything narrower than xl only leaves the side column ~300px
-          // wide: enough to break, not enough to look right (heading wraps,
-          // search placeholder truncates).
-          //
-          // Grid's default stretch (no xl:items-start override) — the history
-          // column now matches the form's full height so its own scroll area
-          // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
-          // list), instead of sizing to its own short content and floating
-          // next to a much taller form.
-          <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
-            <InputStep
-              onGenerate={handleGenerate}
-              onSkipToManual={handleSkipToManual}
-              // Only set when reached via the stepper's back-navigation
-              // (doc already exists then — see the effect above that jumps
-              // stage to 1 whenever a fresh mount finds a doc) — never on a
-              // genuinely fresh session, where there's nothing to cancel back to
-              onCancel={doc ? () => goto(1) : undefined}
-              onCancelGenerate={cancelGenerate}
-              busy={busy}
-              error={error}
-            />
-            {/* Hidden while generating so it doesn't compete with GeneratingPanel */}
-            {busy ? null : (
-              <HistoryList
-                onOpen={handleOpenHistory}
-                onOpenProcedure={handleOpenHistoryProcedure}
-                onCreateProcedure={handleCreateHistoryProcedure}
+        {/* One fade between screens (#1). Keyed on the screen, not the
+            document, so edits inside a screen never re-trigger it. mode="wait"
+            lets the old screen fade out before the new one fades in. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
+            {view?.kind === "input" ? (
+              // Below xl: unchanged — single 45rem column, history stacked below
+              // the form. From xl up, with real desktop width to spare: history
+              // moves beside the form as its own column instead of competing for
+              // vertical space under it (see HistoryList.tsx's matching xl:
+              // classes that drop its now-unneeded top divider). Deliberately
+              // xl (1280px), not lg (1024px) — the form alone is 45rem (720px),
+              // so anything narrower than xl only leaves the side column ~300px
+              // wide: enough to break, not enough to look right (heading wraps,
+              // search placeholder truncates).
+              //
+              // Grid's default stretch (no xl:items-start override) — the history
+              // column now matches the form's full height so its own scroll area
+              // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
+              // list), instead of sizing to its own short content and floating
+              // next to a much taller form.
+              <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
+                <InputStep
+                  onGenerate={handleGenerate}
+                  onSkipToManual={handleSkipToManual}
+                  // Only set when reached via the stepper's back-navigation
+                  // (doc already exists then — see the effect above that jumps
+                  // stage to 1 whenever a fresh mount finds a doc) — never on a
+                  // genuinely fresh session, where there's nothing to cancel back to
+                  onCancel={doc ? () => goto(1) : undefined}
+                  onCancelGenerate={cancelGenerate}
+                  busy={busy}
+                  error={error}
+                />
+                {/* Hidden while generating so it doesn't compete with GeneratingPanel */}
+                {busy ? null : (
+                  <HistoryList
+                    onOpen={handleOpenHistory}
+                    onOpenProcedure={handleOpenHistoryProcedure}
+                    onCreateProcedure={handleCreateHistoryProcedure}
+                  />
+                )}
+              </div>
+            ) : null}
+
+            {/* No inner max-w wrapper — the table benefits from the room, and it
+                keeps this stage's body flush with AppBar's edges (both share
+                <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
+                and off-center under a wider title bar. */}
+            {view?.kind === "editing" ? (
+              <EditorStep
+                doc={view.doc}
+                onChange={setDoc}
+                companyLogo={companyLogo}
+                onCompanyLogoChange={setCompanyLogo}
+                saveState={docSave}
+                onContinue={() => goto(2)}
+                onStartOver={startOver}
+                error={error}
               />
-            )}
-          </div>
-        ) : null}
+            ) : null}
 
-        {/* No inner max-w wrapper — the table benefits from the room, and it
-            keeps this stage's body flush with AppBar's edges (both share
-            <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
-            and off-center under a wider title bar. */}
-        {view?.kind === "editing" ? (
-          <EditorStep
-            doc={view.doc}
-            onChange={setDoc}
-            companyLogo={companyLogo}
-            onCompanyLogoChange={setCompanyLogo}
-            saveState={docSave}
-            onContinue={() => goto(2)}
-            onStartOver={startOver}
-            error={error}
-          />
-        ) : null}
+            {/* The procedure takes as long as the JSA did, so it gets the same
+                honest wait — elapsed counter and all — rather than a lone spinner
+                on a button. Replaces the page content for the same reason
+                InputStep does: the wait should be the only thing on screen.
+                Covers both stage 2's first-time draft and stage 3's regenerate —
+                computeView picks the right heading for whichever stage this is. */}
+            {view?.kind === "procedureGenerating" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">{view.heading}</h1>
+                <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
+              </div>
+            ) : null}
 
-        {/* The procedure takes as long as the JSA did, so it gets the same
-            honest wait — elapsed counter and all — rather than a lone spinner
-            on a button. Replaces the page content for the same reason
-            InputStep does: the wait should be the only thing on screen.
-            Covers both stage 2's first-time draft and stage 3's regenerate —
-            computeView picks the right heading for whichever stage this is. */}
-        {view?.kind === "procedureGenerating" ? (
-          <div className="mx-auto max-w-[45rem]">
-            <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">{view.heading}</h1>
-            <GeneratingPanel stages={PROCEDURE_STAGES} onCancel={cancelCreateProcedure} />
-          </div>
-        ) : null}
+            {view?.kind === "pdf" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <PdfStep
+                  doc={view.doc}
+                  companyLogo={companyLogo}
+                  config={config}
+                  onBack={() => goto(1)}
+                  onNewJsa={startOver}
+                  onCreateProcedure={() => handleCreateProcedure()}
+                  procedureBusy={procedureBusy}
+                  procedureError={procedureError}
+                  hasProcedure={!!procedure}
+                />
+              </div>
+            ) : null}
 
-        {view?.kind === "pdf" ? (
-          <div className="mx-auto max-w-[45rem]">
-            <PdfStep
-              doc={view.doc}
-              companyLogo={companyLogo}
-              config={config}
-              onBack={() => goto(1)}
-              onNewJsa={startOver}
-              onCreateProcedure={() => handleCreateProcedure()}
-              procedureBusy={procedureBusy}
-              procedureError={procedureError}
-              hasProcedure={!!procedure}
-            />
-          </div>
-        ) : null}
+            {/* Regenerating replaces the editor with the same full-page wait as a
+                first-time draft, for the same reason: the old sub-steps must not
+                stay on screen and editable while a response that's about to
+                overwrite them is in flight — the AI's reply silently wins that
+                race, so nothing here may be edited until it lands. (The busy
+                state itself renders above, under "procedureGenerating".) */}
+            {view?.kind === "procedureEditing" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <ProcedureEditorStep
+                  procedure={view.procedure}
+                  onChange={updateProcedure}
+                  photos={photos}
+                  onPhotoChange={updatePhoto}
+                  onStepPhotosReplace={replaceStepPhotos}
+                  saveState={procedureSave}
+                  onContinue={() => goto(4)}
+                  onBack={() => goto(2)}
+                  onRegenerate={() => handleCreateProcedure({ force: true })}
+                  stale={procedureStale}
+                  error={procedureError}
+                />
+              </div>
+            ) : null}
 
-        {/* Regenerating replaces the editor with the same full-page wait as a
-            first-time draft, for the same reason: the old sub-steps must not
-            stay on screen and editable while a response that's about to
-            overwrite them is in flight — the AI's reply silently wins that
-            race, so nothing here may be edited until it lands. (The busy
-            state itself renders above, under "procedureGenerating".) */}
-        {view?.kind === "procedureEditing" ? (
-          <div className="mx-auto max-w-[45rem]">
-            <ProcedureEditorStep
-              procedure={view.procedure}
-              onChange={updateProcedure}
-              photos={photos}
-              onPhotoChange={updatePhoto}
-              onStepPhotosReplace={replaceStepPhotos}
-              saveState={procedureSave}
-              onContinue={() => goto(4)}
-              onBack={() => goto(2)}
-              onRegenerate={() => handleCreateProcedure({ force: true })}
-              stale={procedureStale}
-              error={procedureError}
-            />
-          </div>
-        ) : null}
-
-        {view?.kind === "procedurePdf" ? (
-          <div className="mx-auto max-w-[45rem]">
-            <ProcedurePdfStep
-              procedure={view.procedure}
-              doc={view.doc}
-              photos={photos}
-              companyLogo={companyLogo}
-              config={config}
-              onBack={() => goto(3)}
-              onBackToJsa={() => goto(2)}
-              onNewJsa={startOver}
-            />
-          </div>
-        ) : null}
+            {view?.kind === "procedurePdf" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <ProcedurePdfStep
+                  procedure={view.procedure}
+                  doc={view.doc}
+                  photos={photos}
+                  companyLogo={companyLogo}
+                  config={config}
+                  onBack={() => goto(3)}
+                  onBackToJsa={() => goto(2)}
+                  onNewJsa={startOver}
+                />
+              </div>
+            ) : null}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Every page ends with the standing caution — the "can make mistakes"
@@ -694,7 +703,7 @@ export default function App() {
           the screen, hence the extra bottom padding there. */}
       <footer
         className={`space-y-1 px-4 pt-2 text-center text-xs text-muted ${
-          view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-40 sm:pb-24" : "pb-6"
+          view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-24" : "pb-6"
         }`}
       >
         {/* Two inline-blocks so a narrow screen breaks between the phrases,

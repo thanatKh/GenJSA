@@ -1,8 +1,9 @@
-import { Fragment } from "react";
+import { Fragment, useRef } from "react";
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, Trash2 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { AutoGrowTextarea, Button } from "../../components/ui";
+import { listItem } from "../../lib/motion";
 import type { JsaStep } from "../../lib/schema";
 
 // Mirrors backend/app/models/jsa.py's per-field caps — keeps the editor from
@@ -81,16 +82,44 @@ export function StepCard({
     patch({ hazards });
   };
 
-  const addHazard = () =>
+  // Stable on-screen identities for hazard rows — never part of the
+  // document. Hazards have no id, and keyed by position, deleting hazard 1
+  // of 3 animated the LAST box out while the text shifted up. The parent
+  // owns delete + undo, so this tracks both from here: the key removed last
+  // goes back in at its old position when the count grows by one again.
+  const hazardKeys = useRef<string[]>([]);
+  const keySeq = useRef(0);
+  const lastRemoved = useRef<{ index: number; key: string } | null>(null);
+  const newKey = () => `hz-${(keySeq.current += 1)}`;
+  if (hazardKeys.current.length !== step.hazards.length) {
+    const keys = [...hazardKeys.current];
+    if (step.hazards.length === keys.length + 1 && lastRemoved.current) {
+      keys.splice(lastRemoved.current.index, 0, lastRemoved.current.key);
+    } else if (step.hazards.length === keys.length + 1) {
+      keys.push(newKey());
+    } else {
+      keys.length = 0;
+      keys.push(...Array.from({ length: step.hazards.length }, newKey));
+    }
+    lastRemoved.current = null;
+    hazardKeys.current = keys;
+  }
+
+  const addHazard = () => {
+    lastRemoved.current = null;
     patch({ hazards: [...step.hazards, { hazard: "", controls: [""] }] });
+  };
+
+  const removeHazardAt = (hazardIndex: number) => {
+    lastRemoved.current = { index: hazardIndex, key: hazardKeys.current[hazardIndex] };
+    hazardKeys.current = hazardKeys.current.filter((_, i) => i !== hazardIndex);
+    onRemoveHazard(hazardIndex);
+  };
 
   return (
     <motion.li
       layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      {...listItem}
       className={cx(
         // Below lg: unchanged standalone card. On lg: the frame around <ul>
         // in EditorStep.tsx owns the border/rounding, and every card becomes
@@ -260,7 +289,6 @@ export function StepCard({
           <AutoGrowTextarea
             id={`procedure-${index}`}
             minRows={1}
-            maxRows={10}
             maxLength={PROCEDURE_MAX}
             value={step.procedure}
             onChange={(event) => patch({ procedure: event.target.value })}
@@ -275,7 +303,6 @@ export function StepCard({
           <AutoGrowTextarea
             id={`details-${index}`}
             minRows={1}
-            maxRows={10}
             maxLength={DETAILS_MAX}
             value={step.details}
             onChange={(event) => patch({ details: event.target.value })}
@@ -284,7 +311,7 @@ export function StepCard({
         </div>
 
         {step.hazards.map((hazard, hazardIndex) => (
-          <Fragment key={hazardIndex}>
+          <Fragment key={hazardKeys.current[hazardIndex]}>
             <div
               className={cx(
                 "flex flex-col border-r border-line bg-white p-2",
@@ -301,7 +328,6 @@ export function StepCard({
               <AutoGrowTextarea
                 id={`hazard-${index}-${hazardIndex}`}
                 minRows={1}
-                maxRows={8}
                 maxLength={HAZARD_MAX}
                 value={hazard.hazard}
                 onChange={(event) =>
@@ -342,7 +368,6 @@ export function StepCard({
               <AutoGrowTextarea
                 id={`controls-${index}-${hazardIndex}`}
                 minRows={1}
-                maxRows={10}
                 maxLength={CONTROLS_MAX}
                 // One line = one control — easier for users to manage than adding fields one at a time
                 value={hazard.controls.join("\n")}
@@ -361,7 +386,7 @@ export function StepCard({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => onRemoveHazard(hazardIndex)}
+                  onClick={() => removeHazardAt(hazardIndex)}
                   aria-label="ลบอันตรายนี้"
                   className="absolute top-2 right-2 text-muted hover:bg-danger-soft hover:text-danger-text"
                 >
@@ -385,7 +410,6 @@ export function StepCard({
           <AutoGrowTextarea
             id={`procedure-m-${index}`}
             minRows={1}
-            maxRows={6}
             maxLength={PROCEDURE_MAX}
             value={step.procedure}
             onChange={(event) => patch({ procedure: event.target.value })}
@@ -403,7 +427,6 @@ export function StepCard({
           <AutoGrowTextarea
             id={`details-m-${index}`}
             minRows={1}
-            maxRows={8}
             maxLength={DETAILS_MAX}
             value={step.details}
             onChange={(event) => patch({ details: event.target.value })}
@@ -411,9 +434,15 @@ export function StepCard({
           />
         </div>
 
+        {/* Animated on phones only: on desktop the hazards are rows of a
+            grid whose step cells span them, and animating those rows makes
+            the spanning cells overlap mid-move */}
+        <AnimatePresence initial={false}>
         {step.hazards.map((hazard, hazardIndex) => (
-          <div
-            key={hazardIndex}
+          <motion.div
+            key={hazardKeys.current[hazardIndex]}
+            layout="position"
+            {...listItem}
             className="rounded-field border border-line bg-raised p-2.5"
           >
             <div className="grid gap-2 sm:grid-cols-2">
@@ -437,7 +466,7 @@ export function StepCard({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => onRemoveHazard(hazardIndex)}
+                      onClick={() => removeHazardAt(hazardIndex)}
                       aria-label="ลบอันตรายนี้"
                       className="-my-2 -mr-1.5 text-muted hover:bg-danger-soft hover:text-danger-text"
                     >
@@ -448,7 +477,6 @@ export function StepCard({
                 <AutoGrowTextarea
                   id={`hazard-m-${index}-${hazardIndex}`}
                   minRows={1}
-                  maxRows={6}
                   maxLength={HAZARD_MAX}
                   value={hazard.hazard}
                   onChange={(event) =>
@@ -467,7 +495,6 @@ export function StepCard({
                 <AutoGrowTextarea
                   id={`controls-m-${index}-${hazardIndex}`}
                   minRows={1}
-                  maxRows={8}
                   maxLength={CONTROLS_MAX}
                   value={hazard.controls.join("\n")}
                   onChange={(event) =>
@@ -484,8 +511,9 @@ export function StepCard({
                 ) : null}
               </div>
             </div>
-          </div>
+          </motion.div>
         ))}
+        </AnimatePresence>
 
         <div>
           {/* ghost, matching the desktop table's own เพิ่มอันตราย button —

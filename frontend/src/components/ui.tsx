@@ -16,7 +16,9 @@ import {
 } from "react";
 import { TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 
+import { collapse } from "../lib/motion";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Label as ShadcnLabel } from "./ui/label";
@@ -92,7 +94,12 @@ type AutoGrowProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
  * own field-sizing-content class is stripped for the same reason).
  */
 export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
-  ({ minRows = 3, maxRows = 16, className, onChange, value, ...rest }, ref) => {
+  // maxRows defaults to no limit: these boxes hold safety content that a
+  // reviewer must see in full. A capped box scrolled inside itself with no
+  // cue — a hazard with 8 controls showed 3-4 of them, and the rest could
+  // be approved unseen. Pass maxRows only where text is being typed, not
+  // reviewed (the first screen's description).
+  ({ minRows = 3, maxRows = Infinity, className, onChange, value, ...rest }, ref) => {
     const inner = useRef<HTMLTextAreaElement | null>(null);
 
     const resize = () => {
@@ -217,6 +224,26 @@ export function SkeletonCard() {
         <Skeleton className="h-16" />
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Reveal */
+
+/**
+ * Shows/hides its children with a height + fade, so whatever is below moves
+ * smoothly instead of jumping — warnings, errors, the company section's
+ * fields. `initial={false}`: something already showing when the page opens
+ * just appears; only changes while you're on the page animate.
+ */
+export function Reveal({ show, children, className }: { show: boolean; children: ReactNode; className?: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {show ? (
+        <motion.div {...collapse} className={cn("overflow-hidden", className)}>
+          {children}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -350,7 +377,7 @@ export function InfoDialog({
           conflicting and both would otherwise ship, letting sm:max-w-sm win
           the cascade at any viewport >= 640px */}
       <DialogContent
-        className="flex max-h-[85vh] w-[min(92vw,36rem)] max-w-none sm:max-w-none flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[85dvh] w-[min(92vw,36rem)] max-w-none sm:max-w-none flex-col gap-0 overflow-hidden p-0"
         showCloseButton={false}
       >
         <DialogHeader className="flex-row items-center gap-2.5 border-b border-line px-5 py-4">
@@ -361,7 +388,7 @@ export function InfoDialog({
           ) : null}
           <DialogTitle className="text-lg text-navy">{title}</DialogTitle>
         </DialogHeader>
-        <div className="divide-y divide-line overflow-y-auto px-5 text-sm leading-relaxed [&>*]:py-4 first:[&>*]:pt-4">
+        <div className="divide-y divide-line overflow-y-auto overscroll-contain px-5 text-sm leading-relaxed [&>*]:py-4 first:[&>*]:pt-4">
           {children}
         </div>
         <DialogFooter className="mx-0 mb-0 rounded-none border-t border-line bg-transparent px-5 py-4">

@@ -51,6 +51,33 @@ const thaiWords =
     ? new Intl.Segmenter("th", { granularity: "word" })
     : null;
 
+/** Never start a line with these — "23.5" then "%)" alone on the next line,
+ * or a line opening with ")" or "," or Thai ๆ / ฯ. Each is glued onto the
+ * piece before it. */
+const NO_LINE_START = /^[%)\]}、。,.:;!?ๆฯ’”]/;
+/** …and never end a line with these: "(" sticks to the piece after it. */
+const NO_LINE_END = /[([{‘“]$/;
+
+/** The segmenter's words, regrouped so a line break can only fall where a
+ * reader expects one (see NO_LINE_START / NO_LINE_END). */
+function breakUnits(paragraph: string, words: Intl.Segmenter): string[] {
+  const units: string[] = [];
+  let carry = "";
+  for (const { segment } of words.segment(paragraph)) {
+    const prev = units[units.length - 1];
+    if (prev !== undefined && !carry && NO_LINE_START.test(segment) && prev.trim()) {
+      units[units.length - 1] = prev + segment;
+    } else if (NO_LINE_END.test(segment)) {
+      carry += segment;
+    } else {
+      units.push(carry + segment);
+      carry = "";
+    }
+  }
+  if (carry) units.push(carry);
+  return units;
+}
+
 /**
  * Create a jsPDF instance with the Thai font registered and every derived
  * geometry value precomputed, plus the drawing helpers that operate on it.
@@ -139,7 +166,7 @@ export async function createEngine(
     const lines: string[] = [];
     for (const paragraph of text.split(/\r?\n/)) {
       let line = "";
-      for (const { segment } of thaiWords.segment(paragraph)) {
+      for (const segment of breakUnits(paragraph, thaiWords)) {
         const blank = !segment.trim();
         // A wrapped line never starts with the space it broke at
         if (!line && blank) continue;
@@ -338,6 +365,20 @@ export async function createEngine(
    * "<label> <name>" below the body on the last page, outside any table border.
    * Returns nothing — it's always the last thing drawn before the frame pass.
    */
+  /** Height drawSignature needs below the body, gap included — 0 when it
+   * draws nothing. Lets a caller keep its last row on the signature's page
+   * instead of leaving the signature alone on a page of its own. */
+  const signatureHeight = (label: string, name: string): number => {
+    const sig = L.signature ?? FALLBACK_LAYOUT.signature;
+    const trimmed = name?.trim();
+    if (!sig.show || !trimmed) return 0;
+    setFont("bold", sig.label_pt);
+    const labelW = doc.getTextWidth(label) + mmToPt(1.5);
+    setFont("normal", sig.label_pt);
+    const lines = splitLines(trimmed, Math.max(contentW - labelW, 10)).length;
+    return mmToPt(sig.gap_above_mm) + Math.max(lines, 1) * sig.label_pt * L.font.line_height;
+  };
+
   const drawSignature = (label: string, name: string, y: number) => {
     // Fall back per-section, not just per-config: PublicConfig is an unchecked
     // cast (see lib/api.ts), so a backend older than this field would leave it
@@ -571,6 +612,7 @@ export async function createEngine(
     measureFieldLines,
     fieldRowHeight,
     drawField,
+    signatureHeight,
     drawSignature,
     drawFrames,
     drawFooter,

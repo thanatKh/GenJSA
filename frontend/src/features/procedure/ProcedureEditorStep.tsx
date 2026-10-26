@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
   FileText,
@@ -26,9 +27,11 @@ import {
   ConfirmDialog,
   FieldError,
   Label,
+  Reveal,
   UndoToast,
 } from "../../components/ui";
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
+import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
 import { PhotoButton, PhotoPreview } from "./SubStepPhoto";
@@ -89,6 +92,24 @@ export function ProcedureEditorStep({
   // changes `procedure` out from under this field is already a fresh mount.
   const [toolsText, setToolsText] = useState(() => procedure.tools.join("\n"));
 
+  // Stable on-screen identities for sub-step rows, per step — never part of
+  // the document. Sub-steps are renumbered on every change, so neither
+  // their number nor their position says which row is which; without these,
+  // deleting 1.2 of three animated the LAST row out (React saw the third
+  // key disappear) and the remaining text visibly jumped up a row.
+  const rowKeys = useRef<string[][]>([]);
+  const keySeq = useRef(0);
+  const newKey = () => `sub-${(keySeq.current += 1)}`;
+  /** The step's row keys, rebuilt only if the count changed some other way
+   * (a regenerate or a reloaded draft) */
+  const keysFor = (stepIndex: number, count: number): string[] => {
+    const current = rowKeys.current[stepIndex];
+    if (current?.length === count) return current;
+    const fresh = Array.from({ length: count }, newKey);
+    rowKeys.current[stepIndex] = fresh;
+    return fresh;
+  };
+
   useEffect(() => {
     return () => {
       if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -122,11 +143,11 @@ export function ProcedureEditorStep({
       ),
     );
 
-  const addSub = (stepIndex: number) =>
-    patchStep(stepIndex, [
-      ...procedure.steps[stepIndex].sub_steps,
-      { no: 0, action: "" },
-    ]);
+  const addSub = (stepIndex: number) => {
+    const subs = procedure.steps[stepIndex].sub_steps;
+    rowKeys.current[stepIndex] = [...keysFor(stepIndex, subs.length), newKey()];
+    patchStep(stepIndex, [...subs, { no: 0, action: "" }]);
+  };
 
   /** Photos are keyed by position ("1.3"), like the printed numbers, so
    * deleting a sub-step shifts every later sub-step's photo up one with it —
@@ -136,6 +157,8 @@ export function ProcedureEditorStep({
   const removeSub = (stepIndex: number, subIndex: number) => {
     const step = procedure.steps[stepIndex];
     const before = step.sub_steps;
+    const keysBefore = keysFor(stepIndex, before.length);
+    rowKeys.current[stepIndex] = keysBefore.filter((_, i) => i !== subIndex);
 
     const photosBefore: PhotoMap = {};
     const photosAfter: PhotoMap = {};
@@ -154,6 +177,9 @@ export function ProcedureEditorStep({
     armUndo({
       label: "ลบขั้นตอนย่อยแล้ว",
       restore: () => {
+        // The same row keys too, so undo brings back that row rather than
+        // re-animating the whole step
+        rowKeys.current[stepIndex] = keysBefore;
         patchStep(stepIndex, before);
         onStepPhotosReplace(step.no, photosBefore);
       },
@@ -187,32 +213,36 @@ export function ProcedureEditorStep({
         ระบบร่างขั้นตอนย่อยจาก JSA กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
       </p>
 
-      {stale ? (
-        <div className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
-            <TriangleAlert className="size-5 text-[var(--warning)]" aria-hidden="true" />
-            JSA ถูกแก้ไขหลังจากสร้างเอกสารนี้
-          </h2>
-          <p className="mt-1 text-sm text-[var(--warning-text)]">
-            ขั้นตอนใน JSA เปลี่ยนไปหลังจากร่างเอกสารนี้แล้ว
-            กรุณาตรวจสอบว่ายังตรงกัน หรือสร้างขั้นตอนปฏิบัติงานใหม่
-          </p>
-          {/* Offered here rather than as a permanent action: this is the one
-              moment the user has a concrete reason to want it, and it discards
-              everything they've edited below */}
-          <div className="mt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmRegenerate(true)}
-            >
-              <RotateCcw className="size-4" aria-hidden="true" />
-              สร้างใหม่จาก JSA ปัจจุบัน
-            </Button>
+      {/* Height + fade in, so a warning that appears while you're on the
+          page (the JSA was changed in another tab) doesn't shove the form */}
+      <Reveal show={stale}>
+        <div className="pt-4">
+          <div className="rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--warning-text)]">
+              <TriangleAlert className="size-5 text-[var(--warning)]" aria-hidden="true" />
+              JSA ถูกแก้ไขหลังจากสร้างเอกสารนี้
+            </h2>
+            <p className="mt-1 text-sm text-[var(--warning-text)]">
+              ขั้นตอนใน JSA เปลี่ยนไปหลังจากร่างเอกสารนี้แล้ว
+              กรุณาตรวจสอบว่ายังตรงกัน หรือสร้างขั้นตอนปฏิบัติงานใหม่
+            </p>
+            {/* Offered here rather than as a permanent action: this is the one
+                moment the user has a concrete reason to want it, and it discards
+                everything they've edited below */}
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmRegenerate(true)}
+              >
+                <RotateCcw className="size-4" aria-hidden="true" />
+                สร้างใหม่จาก JSA ปัจจุบัน
+              </Button>
+            </div>
           </div>
         </div>
-      ) : null}
+      </Reveal>
 
       <Card className="mt-4">
         <div className="grid gap-4">
@@ -292,9 +322,10 @@ export function ProcedureEditorStep({
               </h3>
 
               <ul className="mt-3 grid list-none gap-3 p-0">
+                <AnimatePresence initial={false}>
                 {step.sub_steps.map((sub, subIndex) => (
                   <SubStepItem
-                    key={subIndex}
+                    key={keysFor(stepIndex, step.sub_steps.length)[subIndex]}
                     label={`${stepIndex + 1}.${subIndex + 1}`}
                     sub={sub}
                     photo={photos[photoKey(step.no, sub.no)]}
@@ -303,6 +334,7 @@ export function ProcedureEditorStep({
                     onRemove={() => removeSub(stepIndex, subIndex)}
                   />
                 ))}
+                </AnimatePresence>
               </ul>
 
               <div className="mt-3 flex justify-start border-t border-line pt-3">
@@ -343,11 +375,11 @@ export function ProcedureEditorStep({
         </div>
       ) : null}
 
-      {error ? (
-        <div className="mt-4">
+      <Reveal show={!!error}>
+        <div className="pt-4">
           <Alert>{error}</Alert>
         </div>
-      ) : null}
+      </Reveal>
 
       {/* Spacer so the fixed bar below doesn't cover the last bit of content */}
       <div className="h-20" aria-hidden="true" />
@@ -355,7 +387,7 @@ export function ProcedureEditorStep({
       {/* Fixed, matching EditorStep — on a long procedure these actions would
           otherwise only be reachable after scrolling the whole document */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
           <Button
             type="button"
             variant="ghost"
@@ -364,13 +396,18 @@ export function ProcedureEditorStep({
               flushTools();
               onBack();
             }}
+            aria-label="กลับไปหน้าเอกสาร JSA"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            กลับไปหน้าเอกสาร JSA
+            {/* Short on phones so both buttons fit one row (see EditorStep's
+                bottom bar) */}
+            <span className="sm:hidden">กลับ</span>
+            <span className="hidden sm:inline">กลับไปหน้าเอกสาร JSA</span>
           </Button>
           <Button
             type="button"
             size="lg"
+            className="flex-1 sm:flex-none"
             onClick={() => {
               flushTools();
               onContinue();
@@ -428,7 +465,9 @@ function SubStepItem({
   const input = usePhotoInput(onPhotoChange);
 
   return (
-    <li
+    <motion.li
+      layout="position"
+      {...listItem}
       {...input.dropProps(setDragging)}
       className={`grid grid-cols-[auto_1fr_auto] items-start gap-2 border-t border-line pt-3 transition-colors ${
         dragging ? "rounded-field bg-navy-soft" : ""
@@ -479,6 +518,6 @@ function SubStepItem({
         </Button>
       </div>
       {input.fileInput}
-    </li>
+    </motion.li>
   );
 }

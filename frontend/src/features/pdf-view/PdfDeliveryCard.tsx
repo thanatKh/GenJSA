@@ -10,7 +10,7 @@
 
 import { CircleCheck, FileDown, FileText, Save, Share2 } from "lucide-react";
 
-import { Alert, Button, Card } from "../../components/ui";
+import { Alert, Button, Card, Reveal } from "../../components/ui";
 
 export function PdfDeliveryCard({
   kicker,
@@ -96,9 +96,12 @@ export function PdfDeliveryCard({
           <h2 className="font-display text-base font-semibold text-ink break-words">{title}</h2>
           <dl className="mt-2 grid gap-1 text-sm">
             {summary.map((row) => (
+              // The label never wraps — the value does. A long value (a
+              // supervisor with rank + title) used to squeeze the label into
+              // "ชื่อ / หัวหน้า / งาน:" over three lines on a small phone.
               <div key={row.label} className="flex gap-1.5">
-                <dt className="text-muted">{row.label}:</dt>
-                <dd className="text-ink">{row.value}</dd>
+                <dt className="shrink-0 whitespace-nowrap text-muted">{row.label}:</dt>
+                <dd className="min-w-0 break-words text-ink">{row.value}</dd>
               </div>
             ))}
           </dl>
@@ -188,11 +191,11 @@ export function PdfDeliveryCard({
 
       {/* Kept inside the card too — right under the action that would have
           produced it */}
-      {error ? (
-        <div className="mt-3">
+      <Reveal show={!!error}>
+        <div className="pt-3">
           <Alert>{error}</Alert>
         </div>
-      ) : null}
+      </Reveal>
 
       {word ? (
         <>
@@ -208,11 +211,11 @@ export function PdfDeliveryCard({
             <FileDown className="size-4" aria-hidden="true" />
             ไฟล์ Word (.docx) สำหรับแก้ไขต่อ
           </Button>
-          {word.error ? (
-            <div className="mt-2">
+          <Reveal show={!!word.error}>
+            <div className="pt-2">
               <Alert>{word.error}</Alert>
             </div>
-          ) : null}
+          </Reveal>
         </>
       ) : null}
     </Card>

@@ -1,4 +1,5 @@
 import { ListOrdered } from "lucide-react";
+import { motion } from "motion/react";
 
 const STEPS = ["กรอกข้อมูล", "ตรวจทานและแก้ไข", "เอกสาร PDF"] as const;
 
@@ -122,26 +123,30 @@ function Connectors({
   left: "done" | "todo" | "branch" | null;
   right: "done" | "todo" | "branch" | null;
 }) {
-  const style = (kind: "done" | "todo" | "branch") =>
-    kind === "branch"
-      ? "border-t border-dashed border-navy/50"
-      : kind === "done"
-        ? "border-t border-navy"
-        : "border-t border-line";
+  const style = (kind: "todo" | "branch") =>
+    kind === "branch" ? "border-t border-dashed border-navy/50" : "border-t border-line";
+  /** One half of a connector. "done" draws the navy line over the gray one
+   * and grows it left to right, so moving to the next step fills the line
+   * toward it; `delay` lets the second half (the one beside the step being
+   * reached) follow the first. Mounted once for the whole session (it sits
+   * outside the per-screen fade in App.tsx), so it plays on step changes. */
+  const half = (kind: "done" | "todo" | "branch", position: string, delay: number) => (
+    <span className={`absolute top-[14px] ${position}`} aria-hidden="true">
+      <span className={`absolute inset-x-0 top-0 ${style(kind === "done" ? "todo" : kind)}`} />
+      {kind === "done" ? (
+        <motion.span
+          className="absolute inset-x-0 top-0 origin-left border-t border-navy"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.2, delay, ease: "easeOut" }}
+        />
+      ) : null}
+    </span>
+  );
   return (
     <>
-      {left ? (
-        <span
-          className={`absolute top-[14px] left-0 right-1/2 mr-[22px] ${style(left)}`}
-          aria-hidden="true"
-        />
-      ) : null}
-      {right ? (
-        <span
-          className={`absolute top-[14px] left-1/2 right-0 ml-[22px] ${style(right)}`}
-          aria-hidden="true"
-        />
-      ) : null}
+      {left ? half(left, "left-0 right-1/2 mr-[22px]", 0.2) : null}
+      {right ? half(right, "left-1/2 right-0 ml-[22px]", 0) : null}
     </>
   );
 }

@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Check, ChevronDown, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Sparkles } from "lucide-react";
 
 import {
   Alert,
@@ -19,6 +19,7 @@ import {
   FieldError,
   Input,
   Label,
+  Reveal,
 } from "../../components/ui";
 import {
   type CompanyLogo,
@@ -26,7 +27,7 @@ import {
   loadCompanyProfile,
   saveCompanyProfile,
 } from "../../lib/companyLogo";
-import { CompanyLogoField } from "../company/CompanyLogoField";
+import { CompanySection } from "../company/CompanySection";
 import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
 import { inputDraft } from "../../store";
@@ -203,10 +204,6 @@ export function InputStep({
     defaultValues: { ...EMPTY_FORM(), ...names, company: profile?.name ?? "", ...inputDraft.load() },
   });
 
-  const [companyOpen, setCompanyOpen] = useState(
-    () => !!(getValues("company")?.trim() || companyLogo),
-  );
-
   /** Apply "จำไว้ในเบราว์เซอร์นี้" at the moment a document is created */
   const rememberOrForgetCompany = (name: string) => {
     if (rememberCompany) saveCompanyProfile({ name: name.trim(), logo: companyLogo });
@@ -354,72 +351,47 @@ export function InputStep({
             <FieldError>{errors.analyst?.message}</FieldError>
           </div>
 
-          {/* Company — collapsed unless something is already filled in.
-              rounded-field (18px), the same as the text box above it, and
-              overflow-hidden so the header's hover background takes the
-              box's own corners: rounded all round when closed, rounded on
-              top and straight along the divider when open. The header has
-              no radius of its own — with one, its bottom corners curved
-              against the straight divider. */}
-          <div className="overflow-hidden rounded-field border border-line">
-            <button
-              type="button"
-              onClick={() => setCompanyOpen((open) => !open)}
-              aria-expanded={companyOpen}
-              aria-controls="company_fields"
-              className="flex w-full items-center gap-2 px-3.5 py-3 text-left text-sm
-                         font-medium text-ink hover:bg-raised focus-visible:outline-none
-                         focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
-            >
-              <Building2 className="size-4 shrink-0 text-muted" aria-hidden="true" />
-              <span>
-                บริษัท <span className="font-normal text-muted">(ไม่บังคับ)</span>
-              </span>
-              {!companyOpen && values.company?.trim() ? (
-                <span className="min-w-0 truncate font-normal text-muted">
-                  · {values.company.trim()}
-                </span>
-              ) : null}
-              <ChevronDown
-                className={`ml-auto size-4 shrink-0 text-muted transition-transform ${companyOpen ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-            </button>
-            {companyOpen ? (
-              <div id="company_fields" className="grid gap-4 border-t border-line px-3.5 pb-4 pt-3">
-                <p className="text-sm text-muted">
-                  สำหรับเอกสารที่จัดทำในนามบริษัท ชื่อและโลโก้ของบริษัทจะแสดงบนหัวเอกสาร PDF
-                </p>
-                <div>
-                  <Label htmlFor="company">ชื่อบริษัท</Label>
-                  <Input
-                    id="company"
-                    autoComplete="organization"
-                    aria-invalid={!!errors.company}
-                    {...register("company")}
-                  />
-                  <FieldError>{errors.company?.message}</FieldError>
-                </div>
-                <CompanyLogoField logo={companyLogo} onChange={setCompanyLogo} />
-                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={rememberCompany}
-                    onClick={() => setRememberCompany((v) => !v)}
-                    className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                      rememberCompany ? "border-navy bg-navy text-white" : "border-line bg-surface"
-                    }`}
-                  >
-                    {rememberCompany ? <Check className="size-3.5" aria-hidden="true" /> : null}
-                  </button>
-                  <span className="text-ink">จำไว้สำหรับครั้งต่อไป</span>
-                </label>
-              </div>
-            ) : null}
-          </div>
+          <CompanySection
+            name={values.company ?? ""}
+            nameField={
+              <>
+                <Input
+                  id="company"
+                  autoComplete="organization"
+                  aria-invalid={!!errors.company}
+                  {...register("company")}
+                />
+                <FieldError>{errors.company?.message}</FieldError>
+              </>
+            }
+            logo={companyLogo}
+            onLogoChange={setCompanyLogo}
+            footer={
+              // Only here: remembering happens when a document is created
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={rememberCompany}
+                  onClick={() => setRememberCompany((v) => !v)}
+                  className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                    rememberCompany ? "border-navy bg-navy text-white" : "border-line bg-surface"
+                  }`}
+                >
+                  {rememberCompany ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                </button>
+                <span className="text-ink">จำไว้สำหรับครั้งต่อไป</span>
+              </label>
+            }
+          />
 
-          {error ? <Alert>{error}</Alert> : null}
+          {/* -mt-4 + pt-4: inside the form's gap-4 grid, so the grid gap
+              opens with the message instead of appearing all at once */}
+          <Reveal show={!!error} className="-mt-4">
+            <div className="pt-4">
+              <Alert>{error}</Alert>
+            </div>
+          </Reveal>
 
           {/* Secondary on the left, primary on the right, both auto-width —
               matches EditorStep's footer (เริ่มใหม่ / สร้าง PDF) so the two
@@ -433,6 +405,11 @@ export function InputStep({
               short: a prior version swapped in the full "สร้าง JSA และ
               ขั้นตอนปฏิบัติงาน", which forced a full-width, two-line-tall
               button at narrow widths, disproportionate next to ล้างฟอร์ม. */}
+          {/* px-3 on the ghost button below 360px: at size="lg"'s px-6 the
+              two buttons can't shrink (whitespace-nowrap) and came to 309px,
+              wider than a 320px phone's 288px column — the page scrolled
+              sideways and "สร้างเอกสาร" was cut off. The ghost button has no
+              visible edge, so its padding is the cheapest to give up. */}
           <div className="flex items-center justify-between gap-2">
             <Button
               type="button"
@@ -440,11 +417,12 @@ export function InputStep({
               size="lg"
               onClick={() => setConfirmReset(true)}
               disabled={isEmpty}
+              className="max-[359px]:px-3"
             >
               <RotateCcw className="size-4" aria-hidden="true" />
               ล้างฟอร์ม
             </Button>
-            <Button type="submit" size="lg">
+            <Button type="submit" size="lg" className="max-[359px]:px-4">
               <Sparkles className="size-5" aria-hidden="true" />
               {withProcedure ? "สร้าง 2 เอกสาร" : "สร้างเอกสาร"}
             </Button>

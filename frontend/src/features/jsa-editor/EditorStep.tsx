@@ -13,9 +13,10 @@ import {
   Alert,
   AutoGrowTextarea,
   Button,
-  ConfirmDialog,
   Card,
+  ConfirmDialog,
   Input,
+  Reveal,
   UndoToast,
 } from "../../components/ui";
 import { ThaiDatePicker } from "../../components/ThaiDatePicker";
@@ -23,7 +24,7 @@ import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import { saveNames } from "../../lib/rememberedNames";
 import type { JsaDocument, JsaStep } from "../../lib/schema";
-import { CompanyLogoField } from "../company/CompanyLogoField";
+import { CompanySection } from "../company/CompanySection";
 import { docDraft } from "../../store";
 import { StepCard } from "./StepCard";
 
@@ -31,7 +32,7 @@ const UNDO_TIMEOUT_MS = 6000;
 
 // What's needed to put a deleted step or hazard back exactly where it was
 type PendingDelete =
-  | { kind: "step"; index: number; step: JsaStep; message: string }
+  | { kind: "step"; index: number; step: JsaStep; key: string; message: string }
   | {
       kind: "hazard";
       stepIndex: number;
@@ -86,11 +87,28 @@ export function EditorStep({
   const setSteps = (steps: JsaStep[]) =>
     onChange({ ...doc, steps: steps.map((step, i) => ({ ...step, no: i + 1 })) });
 
+  // Stable on-screen identities for step cards — never part of the
+  // document. Steps are renumbered after every change, so the old key
+  // (`${index}-${step.no}`) was the same list every time: deleting step 1
+  // animated the LAST card out while the text shifted up, and moving a step
+  // swapped the cards' text instead of moving the cards. Every change below
+  // updates these alongside the steps; anything else (a different document
+  // arriving) just gets a fresh set.
+  const stepKeys = useRef<string[]>([]);
+  const stepKeySeq = useRef(0);
+  const newStepKey = () => `step-${(stepKeySeq.current += 1)}`;
+  if (stepKeys.current.length !== doc.steps.length) {
+    stepKeys.current = Array.from({ length: doc.steps.length }, newStepKey);
+  }
+
   const moveStep = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= doc.steps.length) return;
     const steps = [...doc.steps];
     [steps[index], steps[target]] = [steps[target], steps[index]];
+    const keys = [...stepKeys.current];
+    [keys[index], keys[target]] = [keys[target], keys[index]];
+    stepKeys.current = keys;
     setSteps(steps);
     // Keyboard/screen reader users need to know the move succeeded
     setLiveMessage(`ย้ายขั้นตอนไปอยู่ลำดับที่ ${target + 1}`);
@@ -104,11 +122,14 @@ export function EditorStep({
 
   const removeStep = (index: number) => {
     const step = doc.steps[index];
+    const key = stepKeys.current[index];
+    stepKeys.current = stepKeys.current.filter((_, i) => i !== index);
     setSteps(doc.steps.filter((_, i) => i !== index));
     armUndo({
       kind: "step",
       index,
       step,
+      key,
       message: `ลบขั้นตอนที่ ${index + 1} แล้ว`,
     });
   };
@@ -139,6 +160,9 @@ export function EditorStep({
     if (pendingDelete.kind === "step") {
       const steps = [...doc.steps];
       steps.splice(pendingDelete.index, 0, pendingDelete.step);
+      const keys = [...stepKeys.current];
+      keys.splice(pendingDelete.index, 0, pendingDelete.key);
+      stepKeys.current = keys;
       setSteps(steps);
     } else {
       const { stepIndex, hazardIndex, hazard } = pendingDelete;
@@ -191,7 +215,6 @@ export function EditorStep({
         <AutoGrowTextarea
           id="work_activity"
           minRows={1}
-          maxRows={4}
           maxLength={WORK_ACTIVITY_MAX}
           aria-invalid={missingActivity}
           value={doc.header.work_activity}
@@ -275,26 +298,26 @@ export function EditorStep({
 
         {/* Company — optional, for documents prepared in another company's
             name. Blank prints no company row, so PTTOR's own JSAs are
-            unchanged. */}
+            unchanged. The same collapsible section as the first screen. */}
         <div className="mt-4">
-          <label htmlFor="company" className="text-sm font-medium text-ink">
-            บริษัท <span className="font-normal text-muted">(ไม่บังคับ)</span>
-          </label>
-          <Input
-            id="company"
-            autoComplete="organization"
-            value={doc.header.company}
-            onChange={(event) =>
-              onChange({
-                ...doc,
-                header: { ...doc.header, company: event.target.value },
-              })
+          <CompanySection
+            name={doc.header.company}
+            nameField={
+              <Input
+                id="company"
+                autoComplete="organization"
+                value={doc.header.company}
+                onChange={(event) =>
+                  onChange({
+                    ...doc,
+                    header: { ...doc.header, company: event.target.value },
+                  })
+                }
+              />
             }
-            className="mt-1"
+            logo={companyLogo}
+            onLogoChange={onCompanyLogoChange}
           />
-          <div className="mt-2">
-            <CompanyLogoField logo={companyLogo} onChange={onCompanyLogoChange} />
-          </div>
         </div>
       </Card>
 
@@ -337,7 +360,7 @@ export function EditorStep({
         <AnimatePresence initial={false}>
           {doc.steps.map((step, index) => (
             <StepCard
-              key={`${index}-${step.no}`}
+              key={stepKeys.current[index]}
               step={step}
               index={index}
               total={doc.steps.length}
@@ -368,9 +391,10 @@ export function EditorStep({
         <Button
           variant="outline"
           className="lg:h-9 lg:w-full lg:justify-start lg:rounded-xl lg:border-0 lg:px-3 lg:text-sm lg:font-normal lg:text-muted lg:hover:bg-raised lg:hover:text-ink"
-          onClick={() =>
-            setSteps([...doc.steps, { ...EMPTY_STEP, no: doc.steps.length + 1 }])
-          }
+          onClick={() => {
+            stepKeys.current = [...stepKeys.current, newStepKey()];
+            setSteps([...doc.steps, { ...EMPTY_STEP, no: doc.steps.length + 1 }]);
+          }}
         >
           <Plus className="size-4" aria-hidden="true" />
           เพิ่มขั้นตอน
@@ -397,11 +421,11 @@ export function EditorStep({
         </div>
       ) : null}
 
-      {error ? (
-        <div className="mt-4">
+      <Reveal show={!!error}>
+        <div className="pt-4">
           <Alert>{error}</Alert>
         </div>
-      ) : null}
+      </Reveal>
 
       {incomplete ? (
         <p className="mt-4 text-sm text-danger-text">
@@ -428,15 +452,18 @@ export function EditorStep({
             tokens.css) so these buttons line up with the table's own edges
             above them; this bar is `fixed`, so it sits outside <main>'s own
             width entirely and needs the token again rather than inheriting it. */}
-        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-          {/* size="lg" — matching the primary button, not the app-wide 44px
-              default, so the two don't sit at different heights in the same
-              row (ghost's low visual weight already keeps it secondary) */}
+        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
+          {/* One row on every width — secondary left, primary right, the same
+              as the first screen's ล้างฟอร์ม / สร้างเอกสาร. On phones it used to
+              stack into two rows (~137px of screen covered the whole time you
+              edit); one row is ~65px. size="lg" on both so they sit at one
+              height; the primary fills the rest of the row on phones, keeping
+              it the big thumb target. */}
           <Button variant="ghost" size="lg" onClick={() => setConfirmRestart(true)}>
             <RotateCcw className="size-4" aria-hidden="true" />
             เริ่มใหม่
           </Button>
-          <Button size="lg" onClick={onContinue} disabled={incomplete}>
+          <Button size="lg" onClick={onContinue} disabled={incomplete} className="flex-1 sm:flex-none">
             สร้าง PDF
             <ArrowRight className="size-5" aria-hidden="true" />
           </Button>

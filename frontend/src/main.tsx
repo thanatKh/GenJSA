@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { MotionConfig } from "motion/react";
 
 import App from "./App";
 import "./index.css";
@@ -31,6 +32,10 @@ if (!root) throw new Error("#root not found in index.html");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    {/* Every animation follows the phone's "reduce motion" setting: movement
+        and size changes are skipped, fades stay (see lib/motion.ts) */}
+    <MotionConfig reducedMotion="user">
+      <App />
+    </MotionConfig>
   </StrictMode>,
 );

@@ -90,6 +90,25 @@ html {
   /* iOS Safari auto-zooms if inputs are smaller than 16px — set the base at 16 to avoid it */
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  /* No gray/blue flash over everything tapped on iOS/Android — the loudest
+     "this is a website" tell. Every control already has its own press state
+     (Button's press scale, the history row's :active), so nothing is lost. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Controls never double-tap-zoom, so the browser can fire the tap at once
+   instead of waiting to see if a second tap follows (iOS still waits on some
+   elements). Not on text fields — double-tap there selects a word. In the
+   base layer so a touch-* utility class can still override it. */
+@layer base {
+  button,
+  a,
+  summary,
+  [role="button"],
+  [role="radio"],
+  [role="tab"] {
+    touch-action: manipulation;
+  }
 }
 
 body {
@@ -213,14 +232,19 @@ body {
 .t-history-row {
   transition: background-color var(--duration-fast) var(--ease-out);
 }
-.t-history-row:hover {
-  /* surface-raised (pale gray), not navy-soft: the JSA / procedure buttons
-     right under the title are navy-soft, and a navy-soft hover here merged
-     the title and those buttons into one blue block. Gray keeps them two
-     things; the title turning navy (group-hover in HistoryList.tsx) and the
-     chevron carry the rest of the "this opens" signal. */
-  background-color: var(--surface-raised);
-  transition-duration: var(--duration-quick);
+/* Hover only where a mouse can hover: on a touch screen the browser fakes
+   :hover on tap and leaves it stuck — the row stayed gray with its chevron
+   showing after you came back to the list. Touch gets :active instead. */
+@media (hover: hover) and (pointer: fine) {
+  .t-history-row:hover {
+    /* surface-raised (pale gray), not navy-soft: the JSA / procedure buttons
+       right under the title are navy-soft, and a navy-soft hover here merged
+       the title and those buttons into one blue block. Gray keeps them two
+       things; the title turning navy (group-hover in HistoryList.tsx) and the
+       chevron carry the rest of the "this opens" signal. */
+    background-color: var(--surface-raised);
+    transition-duration: var(--duration-quick);
+  }
 }
 .t-history-row:active {
   background-color: var(--surface-raised);
@@ -234,9 +258,33 @@ body {
   opacity: 0;
   transition: opacity var(--duration-quick) var(--ease-out);
 }
-.t-history-row:hover .t-history-chevron,
 .t-history-row:focus-visible .t-history-chevron {
   opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .t-history-row:hover .t-history-chevron {
+    opacity: 1;
+  }
+}
+
+/* ThaiDatePicker: the native field's own text (device language and calendar)
+   is transparent, and the Thai label on top shows the date instead.
+   -webkit-text-fill-color as well as color — iOS Safari paints the date
+   widget's text with it. With a mouse (pointer: fine), focus swaps them back
+   so digits typed into the native day/month/year boxes are visible; on touch
+   the label stays, since tapping opens the device's picker instead. */
+.thai-date input[type="date"] {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+@media (pointer: fine) {
+  .thai-date input[type="date"]:focus {
+    color: inherit;
+    -webkit-text-fill-color: currentColor;
+  }
+  .thai-date input[type="date"]:focus ~ .thai-date-label {
+    visibility: hidden;
+  }
 }
 
 /* Hide the browser's own calendar icon but stretch its clickable area to the

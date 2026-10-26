@@ -9,9 +9,11 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
+import { motion } from "motion/react";
 
 import { Button, FieldError } from "../../components/ui";
 import { type CompanyLogo, fileToCompanyLogo, LogoError } from "../../lib/companyLogo";
+import { popIn } from "../../lib/motion";
 import { fileFrom } from "../../lib/photo";
 
 export function CompanyLogoField({
@@ -77,7 +79,9 @@ export function CompanyLogoField({
           }`}
         >
           {/* White ground: shows the logo the way it prints */}
-          <img
+          <motion.img
+            key={logo.data}
+            {...popIn}
             src={logo.data}
             alt="โลโก้บริษัท"
             className="h-12 w-auto max-w-40 rounded-xl border border-line bg-white object-contain p-1"

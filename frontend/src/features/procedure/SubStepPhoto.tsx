@@ -18,8 +18,10 @@
  */
 
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
+import { motion } from "motion/react";
 
 import { Button } from "../../components/ui";
+import { popIn } from "../../lib/motion";
 import type { StepPhoto } from "../../lib/pdf/layout";
 
 /** Icon button in the sub-step row's action column, beside the delete button */
@@ -64,7 +66,10 @@ export function PhotoPreview({
 }) {
   return (
     <div className="mt-2 flex items-start gap-2">
-      <img
+      {/* Keyed on the image: scales in when added and again when replaced */}
+      <motion.img
+        key={photo.data}
+        {...popIn}
         src={photo.data}
         alt={label}
         className="max-h-32 w-auto max-w-full rounded-xl border border-line"

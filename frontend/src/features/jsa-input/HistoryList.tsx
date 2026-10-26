@@ -140,10 +140,16 @@ export function HistoryList({
     // below is the one piece that grows (flex-1 + min-h-0) — header, search
     // box and footer note all keep their natural height.
     <section className="mt-6 flex flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">
+      {/* flex-wrap: on a 320px phone the title + count and ล้างประวัติทั้งหมด
+          don't fit one line — the button drops below instead of the title
+          breaking in two */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="flex items-center gap-2 whitespace-nowrap text-lg font-semibold text-navy">
           <History className="size-5 shrink-0" aria-hidden="true" />
           งานที่เคยวิเคราะห์
+          {/* How many there are — the list below scrolls inside itself, so
+              without this a long history looks like just its first rows */}
+          <span className="text-sm font-normal text-muted">({entries.length})</span>
         </h2>
         {/* default, not sm — this deletes up to MAX_ENTRIES saved JSAs at
             once (more consequential than EditorStep's "เริ่มใหม่", which was
@@ -241,7 +247,9 @@ export function HistoryList({
         <ul
           className={[
             "mt-3 grid content-start list-none gap-0 overflow-y-auto p-0",
-            scrollable ? "max-h-[22rem]" : "",
+            // 24rem, not 22: 22rem fit exactly three rows on a phone, so no
+            // part of a fourth peeked out and the list read as complete
+            scrollable ? "max-h-[24rem] overscroll-contain" : "",
             "xl:min-h-0 xl:flex-1 xl:max-h-none",
           ].join(" ")}
         >
@@ -279,11 +287,14 @@ export function HistoryList({
                       />
                     </span>
                     <span className="mt-0.5 block truncate text-sm text-muted">
+                      {/* Supervisor last: this line truncates at the end, and a
+                          long name (rank + title + name) used to push the step
+                          count out of view */}
                       {formatThaiDate(isoFromDate(new Date(entry.savedAt)))}
+                      {` · ${entry.doc.steps.length} ขั้นตอน`}
                       {entry.doc.header.supervisor
                         ? ` · ${entry.doc.header.supervisor}`
                         : ""}
-                      {` · ${entry.doc.steps.length} ขั้นตอน`}
                     </span>
                   </button>
 
@@ -312,7 +323,9 @@ export function HistoryList({
                     reachable only from the JSA's PDF page. Dashed and unfilled
                     so "create" never reads as "open": it starts a 1-3 minute
                     AI draft rather than opening something that exists. */}
-                <div className="mb-1.5 mt-1 grid grid-cols-2 gap-2">
+                {/* One column under 360px: side by side, both labels were cut
+                    to "ขั้นตอนปฏิบั…" on a 320px phone */}
+                <div className="mb-1.5 mt-1 grid grid-cols-2 gap-2 max-[359px]:grid-cols-1">
                   <button
                     type="button"
                     onClick={() => onOpen(entry)}

@@ -251,9 +251,28 @@ export async function buildJsaPdf(
   // freshly-started page.
   let freshPage = true;
 
-  for (const row of rows) {
+  // The analyst line goes under the last row. Worked out up front so the
+  // last row can follow it: if the row fits this page but the line under it
+  // doesn't, the line used to land alone on an otherwise empty page.
+  const analystLabel = D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst;
+  const analystName = jsa.header.analyst?.trim() || jsa.header.supervisor?.trim();
+  const signatureH = E.signatureHeight(analystLabel, analystName);
+
+  rows.forEach((row, rowIndex) => {
     const totalLines = Math.max(...row.cells.map((c) => c.length), 1);
     let drawn = 0;
+
+    // Last row: carry it to a new page with the analyst line when the two
+    // don't fit together here but do fit together on a fresh page
+    if (signatureH && rowIndex === rows.length - 1 && !freshPage) {
+      const rowH = totalLines * lineH + pad * 2;
+      const fitsHere = y + rowH + signatureH <= bodyBottom;
+      const fitsFresh = rowH + signatureH <= bodyBottom - (mT + mmToPt(60));
+      if (!fitsHere && y + rowH <= bodyBottom && fitsFresh) {
+        y = startNewPage();
+        freshPage = true;
+      }
+    }
 
     while (drawn < totalLines) {
       const remaining = totalLines - drawn;
@@ -318,28 +337,16 @@ export async function buildJsaPdf(
         freshPage = true;
       }
     }
-  }
+  });
 
   // ---------------------------------------------------------- analyst line --
-  // "ผู้วิเคราะห์ <name>" below the table on the last page. Drawn BEFORE the
-  // outer-frame pass so it sits outside the table's border.
-  //
-  // The analyst field is optional; when it's blank the supervisor is the one
-  // who did the analysis, so their name is used. (supervisor is required, so
-  // in practice this always resolves to something.)
-  //
-  // Fall back per-section, not just per-config: PublicConfig is an unchecked
-  // cast (see lib/api.ts), so a backend older than this field would leave it
-  // undefined and take the whole PDF down.
-  // The analyst field is optional; when it's blank the supervisor is the one
-  // who did the analysis, so their name is used. (supervisor is required, so
-  // in practice this always resolves to something.)
-  //
-  // Fall back per-section, not just per-config: PublicConfig is an unchecked
-  // cast (see lib/api.ts), so a backend older than this field would leave it
-  // undefined and take the whole PDF down.
-  const analystName = jsa.header.analyst?.trim() || jsa.header.supervisor?.trim();
-  E.drawSignature(D.labels.analyst ?? FALLBACK_DOCUMENT.labels.analyst, analystName, y);
+  // "ผู้วิเคราะห์ <name>" below the table on the last page (name and label
+  // worked out above the row loop). Drawn BEFORE the outer-frame pass so it
+  // sits outside the table's border. A blank analyst means the supervisor did
+  // the analysis, so their name is used; the label falls back per-section
+  // because PublicConfig is an unchecked cast (see lib/api.ts) and an older
+  // backend would leave it undefined.
+  E.drawSignature(analystLabel, analystName, y);
 
   E.drawFrames();
   // Company name only — department dropped per request, kept only the
