@@ -386,7 +386,7 @@ export function ProcedureEditorStep({
 
       {/* Fixed, matching EditorStep — on a long procedure these actions would
           otherwise only be reachable after scrolling the whole document */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
           <Button
             type="button"
@@ -483,13 +483,16 @@ function SubStepItem({
           onChange={(event) => onTextChange(event.target.value)}
           onPaste={input.onPaste}
         />
-        {photo ? (
-          <PhotoPreview
-            photo={photo}
-            label={`รูปภาพประกอบขั้นตอนย่อยที่ ${label}`}
-            onRemove={() => onPhotoChange(null)}
-          />
-        ) : null}
+        <AnimatePresence initial={false}>
+          {photo ? (
+            <PhotoPreview
+              key="photo"
+              photo={photo}
+              label={`รูปภาพประกอบขั้นตอนย่อยที่ ${label}`}
+              onRemove={() => onPhotoChange(null)}
+            />
+          ) : null}
+        </AnimatePresence>
         <FieldError>{input.error}</FieldError>
       </div>
       <div className="flex">

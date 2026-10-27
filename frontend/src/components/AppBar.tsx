@@ -91,7 +91,7 @@ export function AppBar({
       // z-30: above anything that scrolls under it — Stepper nodes and
       // StepCard's focused cell are positioned (z-10), and at an equal z the
       // later element wins — but below dialogs (z-50).
-      className="sticky top-0 z-30 border-b border-line bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md"
+      className="sticky top-0 z-30 border-b border-line t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md"
     >
       {/* Explicit height (not just py-2.5) so EditorStep's sticky column
           header — lg only, so always past this sm: breakpoint — has a fixed

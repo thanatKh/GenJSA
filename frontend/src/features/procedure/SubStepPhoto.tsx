@@ -21,7 +21,7 @@ import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 
 import { Button } from "../../components/ui";
-import { popIn } from "../../lib/motion";
+import { collapse, popIn } from "../../lib/motion";
 import type { StepPhoto } from "../../lib/pdf/layout";
 
 /** Icon button in the sub-step row's action column, beside the delete button */
@@ -65,6 +65,10 @@ export function PhotoPreview({
   onRemove: () => void;
 }) {
   return (
+    // Height + fade in and out, so removing a photo doesn't make the rows
+    // below jump. The -m-1/p-1 pair gives the (clipped-while-animating)
+    // wrapper room for the buttons' focus rings without changing the layout.
+    <motion.div {...collapse} className="-m-1 overflow-hidden p-1">
     <div className="mt-2 flex items-start gap-2">
       {/* Keyed on the image: scales in when added and again when replaced */}
       <motion.img
@@ -85,5 +89,6 @@ export function PhotoPreview({
         ลบรูปภาพ
       </Button>
     </div>
+    </motion.div>
   );
 }

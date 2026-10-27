@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Check, RotateCcw, Sparkles } from "lucide-react";
@@ -30,6 +31,7 @@ import {
 import { CompanySection } from "../company/CompanySection";
 import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
+import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
 import { inputDraft } from "../../store";
 import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
 import { GeneratingPanel, TYPICAL_MAX_SECONDS, TYPICAL_MIN_SECONDS } from "./GeneratingPanel";
@@ -272,11 +274,13 @@ export function InputStep({
           idle title showing through the whole generate, the one place JSA
           and procedure loading didn't read as the same pattern. */}
       <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
+        <span key={busy ? (withProcedure ? "both" : "jsa") : "idle"} className={FADE_IN_CLASS}>
         {busy
           ? withProcedure
             ? "กำลังสร้าง JSA และขั้นตอนปฏิบัติงาน"
             : "กำลังสร้าง JSA"
           : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
+        </span>
       </h1>
       {busy ? null : (
         <p className="mt-1.5 text-muted">
@@ -284,7 +288,11 @@ export function InputStep({
         </p>
       )}
 
+      {/* Form and progress panel trade places with a fade (mode="wait": the
+          old one leaves first, so the two are never on screen together) */}
+      <AnimatePresence mode="wait" initial={false}>
       {busy ? (
+        <motion.div key="busy" variants={screenFade} initial="initial" animate="animate" exit="exit">
         // Replace the form entirely while generating — fields are disabled anyway,
         // and this guarantees the loading state is visible immediately with no
         // scrolling, instead of appearing below a possibly-long textarea.
@@ -297,7 +305,9 @@ export function InputStep({
           typicalMinSeconds={withProcedure ? TYPICAL_MIN_SECONDS * 2 : undefined}
           typicalMaxSeconds={withProcedure ? TYPICAL_MAX_SECONDS * 2 : undefined}
         />
-      ) : (
+              </motion.div>
+) : (
+        <motion.div key="form" variants={screenFade} initial="initial" animate="animate" exit="exit">
         <form
           onSubmit={handleSubmit((values) => {
             rememberForNextTime(values);
@@ -442,7 +452,9 @@ export function InputStep({
             ข้ามขั้นตอนนี้ กรอกแบบฟอร์ม JSA เองทั้งหมด
           </button>
         </form>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <ConfirmDialog
         open={confirmReset}

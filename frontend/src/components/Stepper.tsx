@@ -1,6 +1,8 @@
 import { ListOrdered } from "lucide-react";
 import { motion } from "motion/react";
 
+import { FADE_IN_CLASS } from "../lib/motion";
+
 const STEPS = ["กรอกข้อมูล", "ตรวจทานและแก้ไข", "เอกสาร PDF"] as const;
 
 /**
@@ -41,6 +43,7 @@ function StepCircle({
       />
       {done ? (
         <path
+          className={FADE_IN_CLASS}
           d="M8.5 14.5l3.5 3.5 7.5-8"
           fill="none"
           stroke="white"

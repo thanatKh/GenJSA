@@ -37,12 +37,12 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        // ease-[cubic-bezier(...)] is --ease-smooth-out (transitions.dev #06
+        // ease-(--ease-smooth-out) is the shared token (transitions.dev #06
         // modal) — it drives --tw-ease, which tw-animate-css's animate-in/
         // animate-out keyframes read for their timing function; without it
         // they silently fall back to plain "ease", unrelated to GenJSA's own
         // motion-token scale (see styles/tokens.css's --ease-smooth-out).
-        "fixed inset-0 isolate z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:duration-150",
+        "t-glass-scrim fixed inset-0 isolate z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs ease-(--ease-smooth-out) data-open:animate-in data-open:fade-in-0 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:duration-150",
         className
       )}
       {...props}
@@ -70,7 +70,7 @@ function DialogContent({
           // --ease-smooth-out — see DialogOverlay's own comment for why
           // tw-animate-css needs it spelled out per class rather than
           // inherited from a plain CSS transition.
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-card border border-line bg-popover p-4 text-sm text-popover-foreground outline-none sm:max-w-sm ease-[cubic-bezier(0.22,1,0.36,1)] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-96 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-96 data-closed:duration-150",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-card border border-line bg-popover p-4 text-sm text-popover-foreground outline-none sm:max-w-sm ease-(--ease-smooth-out) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-96 data-open:duration-250 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-96 data-closed:duration-150",
           className
         )}
         {...props}

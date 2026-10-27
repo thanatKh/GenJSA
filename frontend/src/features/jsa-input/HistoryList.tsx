@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Button, ConfirmDialog, Input, UndoToast } from "../../components/ui";
+import { fadeSwap, FADE_IN_CLASS } from "../../lib/motion";
 import * as historyStore from "../../history";
 import type { HistoryEntry } from "../../history";
 import { formatThaiDate, isoFromDate } from "../../lib/thaidate";
@@ -139,7 +140,7 @@ export function HistoryList({
     // which looks identical to the bug this is fixing. The scrollable <ul>
     // below is the one piece that grows (flex-1 + min-h-0) — header, search
     // box and footer note all keep their natural height.
-    <section className="mt-6 flex flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
+    <motion.section {...fadeSwap} className="mt-6 flex flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
       {/* flex-wrap: on a 320px phone the title + count and ล้างประวัติทั้งหมด
           don't fit one line — the button drops below instead of the title
           breaking in two */}
@@ -164,7 +165,7 @@ export function HistoryList({
       </div>
 
       {entries.length >= SEARCH_THRESHOLD ? (
-        <div className="relative mt-4">
+        <div className={`relative mt-4 ${FADE_IN_CLASS}`}>
           <Search
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
             aria-hidden="true"
@@ -336,7 +337,9 @@ export function HistoryList({
                     <span className="truncate">JSA</span>
                     <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
                   </button>
+                  <AnimatePresence initial={false} mode="wait">
                   {entry.procedure ? (
+                    <motion.div key="open" {...fadeSwap} className="grid min-w-0">
                     <button
                       type="button"
                       onClick={() => onOpenProcedure(entry)}
@@ -347,7 +350,9 @@ export function HistoryList({
                       <span className="truncate">ขั้นตอนปฏิบัติงาน</span>
                       <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
                     </button>
+                    </motion.div>
                   ) : (
+                    <motion.div key="create" {...fadeSwap} className="grid min-w-0">
                     <button
                       type="button"
                       onClick={() => onCreateProcedure(entry)}
@@ -360,7 +365,9 @@ export function HistoryList({
                       <Plus className="size-3.5 shrink-0" aria-hidden="true" />
                       <span className="truncate">สร้างขั้นตอนปฏิบัติงาน</span>
                     </button>
+                    </motion.div>
                   )}
+                  </AnimatePresence>
                 </div>
               </motion.li>
             ))}
@@ -382,6 +389,6 @@ export function HistoryList({
         onConfirm={applyClear}
         onCancel={() => setConfirmClear(false)}
       />
-    </section>
+    </motion.section>
   );
 }

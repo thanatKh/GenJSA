@@ -11,6 +11,8 @@
 import { CircleCheck, FileDown, FileText, Save, Share2 } from "lucide-react";
 
 import { Alert, Button, Card, Reveal } from "../../components/ui";
+import { FADE_IN_CLASS } from "../../lib/motion";
+import { cn } from "../../lib/utils";
 
 export function PdfDeliveryCard({
   kicker,
@@ -79,7 +81,7 @@ export function PdfDeliveryCard({
     <Card className={className}>
       <div className="flex items-start gap-3">
         {url ? (
-          <CircleCheck className="size-6 shrink-0 text-navy" aria-hidden="true" />
+          <CircleCheck className={`size-6 shrink-0 text-navy ${FADE_IN_CLASS}`} aria-hidden="true" />
         ) : (
           <FileText className="size-6 shrink-0 text-muted" aria-hidden="true" />
         )}
@@ -130,7 +132,7 @@ export function PdfDeliveryCard({
           <Button
             asChild
             variant={secondary ? "outline" : "default"}
-            className={canSavePicker || canShareFile ? undefined : "col-span-2"}
+            className={cn(FADE_IN_CLASS, !(canSavePicker || canShareFile) && "col-span-2")}
           >
             <a href={url} target="_blank" rel="noopener">
               <FileText className="size-4" aria-hidden="true" />
@@ -167,6 +169,7 @@ export function PdfDeliveryCard({
         {canSavePicker ? (
           <Button
             variant="outline"
+            className={FADE_IN_CLASS}
             onClick={handleSave}
             loading={saving}
             status={savedFlash ? "success" : undefined}
@@ -178,6 +181,7 @@ export function PdfDeliveryCard({
         ) : canShareFile ? (
           <Button
             variant="outline"
+            className={FADE_IN_CLASS}
             onClick={handleShare}
             loading={sharing}
             status={sharedFlash ? "success" : undefined}

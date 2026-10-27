@@ -51,6 +51,23 @@ export const collapse = {
   transition: { duration: FAST, ease: EASE_OUT } satisfies Transition,
 };
 
+/** Two things trading places in one slot (logo box <-> logo, form <->
+ * progress panel): old fades out, then the new one fades in. Use with
+ * AnimatePresence mode="wait". */
+export const fadeSwap = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: QUICK, ease: EASE_OUT } satisfies Transition,
+};
+
+/** CSS-only fade-in for an element that simply appears (buttons once a file
+ * is ready, warning markers): plays when the element mounts, nothing to
+ * wire up. tw-animate-css's animate-in, on the shared easing token; switched
+ * off for reduced-motion users. A literal string so Tailwind finds it. */
+export const FADE_IN_CLASS =
+  "animate-in fade-in-0 duration-200 ease-(--ease-smooth-out) motion-reduce:animate-none";
+
 /** A picture arriving (step photo, company logo) */
 export const popIn = {
   initial: { opacity: 0, scale: 0.96 },

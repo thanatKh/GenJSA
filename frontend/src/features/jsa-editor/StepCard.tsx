@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Plus, TriangleAlert, Trash2 } from "lucide-reac
 import { AnimatePresence, motion } from "motion/react";
 
 import { AutoGrowTextarea, Button } from "../../components/ui";
-import { listItem } from "../../lib/motion";
+import { FADE_IN_CLASS, listItem } from "../../lib/motion";
 import type { JsaStep } from "../../lib/schema";
 
 // Mirrors backend/app/models/jsa.py's per-field caps — keeps the editor from
@@ -146,7 +146,7 @@ export function StepCard({
         </h3>
         {incomplete ? (
           <span
-            className="flex items-center gap-1 text-sm font-medium text-danger-text"
+            className={cx("flex items-center gap-1 text-sm font-medium text-danger-text", FADE_IN_CLASS)}
             title="ยังไม่ได้กรอกขั้นตอนการทำงาน"
           >
             <TriangleAlert className="size-4" aria-hidden="true" />
@@ -219,7 +219,7 @@ export function StepCard({
             {index + 1}
           </span>
           {incomplete ? (
-            <span title="ยังไม่ได้กรอกขั้นตอนการทำงาน">
+            <span title="ยังไม่ได้กรอกขั้นตอนการทำงาน" className={FADE_IN_CLASS}>
               <TriangleAlert
                 className="size-4 shrink-0 text-danger-text"
                 aria-hidden="true"
@@ -388,7 +388,7 @@ export function StepCard({
                   size="icon-sm"
                   onClick={() => removeHazardAt(hazardIndex)}
                   aria-label="ลบอันตรายนี้"
-                  className="absolute top-2 right-2 text-muted hover:bg-danger-soft hover:text-danger-text"
+                  className={cx("absolute top-2 right-2 text-muted hover:bg-danger-soft hover:text-danger-text", FADE_IN_CLASS)}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
@@ -468,7 +468,7 @@ export function StepCard({
                       size="icon"
                       onClick={() => removeHazardAt(hazardIndex)}
                       aria-label="ลบอันตรายนี้"
-                      className="-my-2 -mr-1.5 text-muted hover:bg-danger-soft hover:text-danger-text"
+                      className={cx("-my-2 -mr-1.5 text-muted hover:bg-danger-soft hover:text-danger-text", FADE_IN_CLASS)}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
                     </Button>

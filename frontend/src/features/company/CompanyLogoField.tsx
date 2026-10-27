@@ -9,11 +9,11 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { Button, FieldError } from "../../components/ui";
 import { type CompanyLogo, fileToCompanyLogo, LogoError } from "../../lib/companyLogo";
-import { popIn } from "../../lib/motion";
+import { fadeSwap, popIn } from "../../lib/motion";
 import { fileFrom } from "../../lib/photo";
 
 export function CompanyLogoField({
@@ -71,8 +71,11 @@ export function CompanyLogoField({
 
   return (
     <div>
+      <AnimatePresence mode="wait" initial={false}>
       {logo ? (
-        <div
+        <motion.div
+          key="logo"
+          {...fadeSwap}
           {...dropProps}
           className={`flex flex-wrap items-center gap-2 rounded-xl border p-2 transition-colors ${
             dragging ? "border-navy bg-navy-soft" : "border-transparent"
@@ -103,12 +106,14 @@ export function CompanyLogoField({
             <Trash2 className="size-4" aria-hidden="true" />
             ลบโลโก้
           </Button>
-        </div>
+        </motion.div>
       ) : (
         // A div, not a button: it holds its own button, and a button inside a
         // button is invalid. Clicking anywhere in the box opens the picker; a
         // click on the inner button is skipped here so it doesn't fire twice.
-        <div
+        <motion.div
+          key="empty"
+          {...fadeSwap}
           {...dropProps}
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("button")) return;
@@ -124,8 +129,9 @@ export function CompanyLogoField({
             เลือกไฟล์โลโก้
           </Button>
           <span className="text-muted">หรือลากไฟล์มาวางที่นี่ (PNG หรือ JPG)</span>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
       <FieldError>{error}</FieldError>
       <input
         ref={inputRef}

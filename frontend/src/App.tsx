@@ -36,6 +36,7 @@ import {
 } from "./lib/schema";
 import { screenFade } from "./lib/motion";
 import { todayIso } from "./lib/thaidate";
+import { useStageHistory } from "./useStageHistory";
 import { clearAllDrafts, currentHistoryId, docDraft, procedureDraft } from "./store";
 
 // How long to wait after the last edit before rewriting the history entry.
@@ -114,6 +115,8 @@ function computeView(
 
 export default function App() {
   const [stage, setStage] = useState<Stage>(0);
+  // Browser Back/Forward (and the phone's Back gesture) follow the screens
+  useStageHistory(stage, setStage);
   const [doc, setDoc] = useState<JsaDocument | null>(() => docDraft.load());
   const [procedure, setProcedure] = useState<ProcedureDocument | null>(() =>
     procedureDraft.load(),
@@ -596,13 +599,16 @@ export default function App() {
                   error={error}
                 />
                 {/* Hidden while generating so it doesn't compete with GeneratingPanel */}
-                {busy ? null : (
-                  <HistoryList
-                    onOpen={handleOpenHistory}
-                    onOpenProcedure={handleOpenHistoryProcedure}
-                    onCreateProcedure={handleCreateHistoryProcedure}
-                  />
-                )}
+                <AnimatePresence initial={false}>
+                  {busy ? null : (
+                    <HistoryList
+                      key="history"
+                      onOpen={handleOpenHistory}
+                      onOpenProcedure={handleOpenHistoryProcedure}
+                      onCreateProcedure={handleCreateHistoryProcedure}
+                    />
+                  )}
+                </AnimatePresence>
               </div>
             ) : null}
 

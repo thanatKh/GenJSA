@@ -433,8 +433,8 @@ export function EditorStep({
         </div>
       </Reveal>
 
-      {incomplete ? (
-        <p className="mt-4 text-sm text-danger-text">
+      <Reveal show={incomplete}>
+        <p className="pt-4 text-sm text-danger-text">
           {`กรุณากรอก${thaiList(
             [
               missingActivity && "งาน/กิจกรรม",
@@ -443,7 +443,7 @@ export function EditorStep({
             ].filter((label): label is string => !!label),
           )}ให้ครบก่อนสร้างเอกสาร (ช่องที่ยังไม่ได้กรอกมีเครื่องหมายสีแดง)`}
         </p>
-      ) : null}
+      </Reveal>
 
       {/* Spacer so the fixed bar below doesn't cover the last bit of content */}
       <div className="h-20" aria-hidden="true" />
@@ -452,7 +452,7 @@ export function EditorStep({
           steps) these actions used to only be reachable by scrolling all the
           way down every time; keeping them pinned means "restart" and
           "generate PDF" are always one tap away while reviewing. */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
         {/* max-w-[var(--page-max-w)] — same shared bound as AppBar/<main> (see
             tokens.css) so these buttons line up with the table's own edges
             above them; this bar is `fixed`, so it sits outside <main>'s own

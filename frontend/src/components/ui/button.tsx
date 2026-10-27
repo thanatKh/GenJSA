@@ -205,16 +205,16 @@ function Button({
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={disabled || loading}
-      // Press/hover scale — idea borrowed from a third-party motion button
+      // Press scale only — idea borrowed from a third-party motion button
       // primitive we reviewed but didn't adopt wholesale (different variant/
-      // size system than ours); this is the one piece worth having: a subtle
-      // tactile response CSS active: alone doesn't give. whileTap fires on
-      // every pointer/touch press regardless of hover capability; whileHover
-      // is harmless on touch (never triggers without a real hover) so it
-      // doesn't need its own capability check the way the reference
-      // implementation had one.
+      // size system than ours): a subtle tactile response CSS active: alone
+      // doesn't give. whileTap fires on every pointer/touch press regardless
+      // of hover capability.
+      // No hover grow (it was scale 1.015): it re-drew the label slightly
+      // larger on every hover, which read as the text jumping, and the icon
+      // beside it never grew with it. The hover colour change (see the
+      // variants above) is the hover cue.
       whileTap={reduceMotion || disabled || loading ? undefined : { scale: 0.96 }}
-      whileHover={reduceMotion || disabled || loading ? undefined : { scale: 1.015 }}
       transition={PRESS_TRANSITION}
       {...props}
     >

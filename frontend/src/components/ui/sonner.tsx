@@ -31,7 +31,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             "flex w-[min(92vw,26rem)] items-center justify-between gap-3 rounded-card border border-line " +
-            "bg-ink/95 px-4 py-3 font-sans text-sm text-white shadow-lg " +
+            "t-glass-dark bg-ink/95 px-4 py-3 font-sans text-sm text-white shadow-lg " +
             "supports-backdrop-filter:bg-ink/85 supports-backdrop-filter:backdrop-blur-md",
           title: "font-normal",
           actionButton:
