@@ -166,8 +166,10 @@ approved from being reworded.
 
 ### Project Mode (`frontend/src/features/project/`)
 
-The first screen has two tabs: **งานเดียว** (Single Mode — everything above)
-and **โครงการ** (Project Mode) for a big job split into phases. A project is
+The first screen opens on one three-way switch (`features/jsa-input/ModeChoice.tsx`):
+**JSA**, **JSA + Procedure** (Single Mode — everything above, with or without
+the work procedure) and **โครงการ** (Project Mode) for a big job split into
+phases. JSA and JSA + Procedure share one form; only โครงการ swaps it. A project is
 submitted as two files: one work procedure for the whole project, and every
 phase's JSA in one file (cover + contents, then one JSA per page).
 

@@ -247,7 +247,10 @@ export function HistoryList({
         // one block at the bottom instead.
         <ul
           className={[
-            "mt-3 grid content-start list-none gap-0 overflow-y-auto p-0",
+            // -mx-1 px-1: a scrolling list clips sideways too, which cut off
+            // the focus ring of every button touching its edge — this gives
+            // the ring room without moving the rows
+            "-mx-1 mt-3 grid content-start list-none gap-0 overflow-y-auto p-0 px-1",
             // 24rem, not 22: 22rem fit exactly three rows on a phone, so no
             // part of a fourth peeked out and the list read as complete
             scrollable ? "max-h-[24rem] overscroll-contain" : "",

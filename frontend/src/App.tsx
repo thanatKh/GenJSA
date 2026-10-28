@@ -10,12 +10,12 @@ import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
 import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
 import { HistoryList } from "./features/jsa-input/HistoryList";
 import { InputStep } from "./features/jsa-input/InputStep";
+import { ModeChoice } from "./features/jsa-input/ModeChoice";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import { usePhotos } from "./features/procedure/usePhotos";
 import { useCompanyLogo } from "./features/company/useCompanyLogo";
-import { ModeTabs } from "./features/project/ModeTabs";
 import { ProjectHub } from "./features/project/ProjectHub";
 import { ProjectList } from "./features/project/ProjectList";
 import { ProjectProcedureStep } from "./features/project/ProjectProcedureStep";
@@ -772,16 +772,21 @@ export default function App() {
               // next to a much taller form.
               <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
                 {/* overflow-x-clip: the sideways slide must not widen the page
-                    for its 250ms (a phone would get a horizontal scrollbar);
-                    the clip margin keeps focus rings at the edges visible */}
-                <div className="min-w-0 overflow-x-clip [overflow-clip-margin:8px]">
+                    for its 250ms (a phone would get a horizontal scrollbar).
+                    The clip would also cut off the focus ring of every
+                    full-width field — so it sits 8px outside the content
+                    (px-2) with a matching -mx-2: the ring (3px) lands in that
+                    padding, the content doesn't move. Not overflow-clip-margin,
+                    which iOS Safari doesn't support. */}
+                <div className="-mx-2 min-w-0 overflow-x-clip px-2">
                   {/* Gone while a JSA is generating: the mode can't change mid-draft */}
-                  {busy ? null : <ModeTabs mode={mode} onChange={setMode} />}
-                  {/* The tabs stay put; only the form under them swaps,
-                      sliding in from the side of the tab that was picked */}
+                  {busy ? null : <ModeChoice mode={mode} onChange={setMode} />}
+                  {/* The switch stays put; only the form under it swaps, sliding
+                      in from the side of the option that was picked. JSA and
+                      JSA + Procedure share one form, so they don't swap. */}
                   <AnimatePresence mode="wait" initial={false} custom={mode === "project" ? 1 : -1}>
                     <motion.div
-                      key={mode}
+                      key={mode === "project" ? "project" : "single"}
                       custom={mode === "project" ? 1 : -1}
                       variants={tabSlide}
                       initial="enter"
@@ -802,6 +807,7 @@ export default function App() {
                         ) : null
                       ) : (
                         <InputStep
+                          withProcedure={mode === "procedure"}
                           onGenerate={handleGenerate}
                           onSkipToManual={handleSkipToManual}
                           // Only set when reached via the stepper's back-navigation

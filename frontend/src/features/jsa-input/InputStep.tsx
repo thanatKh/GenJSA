@@ -35,7 +35,6 @@ import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
 import { inputDraft } from "../../store";
 import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
 import { GeneratingPanel, TYPICAL_MAX_SECONDS, TYPICAL_MIN_SECONDS } from "./GeneratingPanel";
-import { ModeSwitch } from "./ModeSwitch";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -141,6 +140,7 @@ const PLACEHOLDERS = [
 ] as const;
 
 export function InputStep({
+  withProcedure,
   onGenerate,
   onSkipToManual,
   onCancel,
@@ -148,6 +148,9 @@ export function InputStep({
   busy,
   error,
 }: {
+  /** Draft the work procedure along with the JSA — ModeChoice's "JSA +
+   * Procedure". Chosen above this form (App.tsx), not in it. */
+  withProcedure: boolean;
   onGenerate: (values: InputForm, withProcedure: boolean, companyLogo: CompanyLogo | null) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analyst" | "company">,
@@ -170,13 +173,6 @@ export function InputStep({
   const [placeholder] = useState(
     () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)],
   );
-  // ModeSwitch's "เฉพาะ JSA / JSA + ขั้นตอนปฏิบัติงาน" — deliberately local
-  // state, not part of InputForm/the sessionStorage draft: every fresh JSA
-  // starts on "เฉพาะ JSA" so this never silently doubles the wait for
-  // someone who didn't ask for it, while the switch at the top of the form
-  // shows every first-time visitor that GenJSA can produce both documents. The doubled-wait warning lives in GeneratingPanel once busy
-  // starts (typicalMin/MaxSeconds), not repeated here.
-  const [withProcedure, setWithProcedure] = useState(false);
 
   // The company section ("บริษัท (ไม่บังคับ)") — for documents prepared in
   // another company's name, e.g. a vendor submitting to PTTOR. Prefilled
@@ -293,12 +289,12 @@ export function InputStep({
       <AnimatePresence mode="wait" initial={false}>
       {busy ? (
         <motion.div key="busy" variants={screenFade} initial="initial" animate="animate" exit="exit">
-        // Replace the form entirely while generating — fields are disabled anyway,
-        // and this guarantees the loading state is visible immediately with no
-        // scrolling, instead of appearing below a possibly-long textarea.
-        // withProcedure is read here, not reset once busy starts, so it still
-        // reflects exactly what was submitted — safe to read mid-flight since
-        // the checkbox itself is gone from the screen while this renders.
+        {/* Replace the form entirely while generating — fields are disabled anyway,
+            and this guarantees the loading state is visible immediately with no
+            scrolling, instead of appearing below a possibly-long textarea.
+            withProcedure is read here, not reset once busy starts, so it still
+            reflects exactly what was submitted — safe to read mid-flight since
+            the checkbox itself is gone from the screen while this renders. */}
         <GeneratingPanel
           onCancel={onCancelGenerate}
           stages={withProcedure ? COMBINED_STAGES : JSA_STAGES}
@@ -316,8 +312,6 @@ export function InputStep({
           className="mt-4 grid gap-4"
           noValidate
         >
-          <ModeSwitch withProcedure={withProcedure} onChange={setWithProcedure} />
-
           <div>
             <Label htmlFor="work_description" required>
               รายละเอียดงาน

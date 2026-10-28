@@ -92,10 +92,17 @@ export const projectDraft = {
   clear: () => remove(PROJECT_KEY),
 };
 
-/** Which tab the first screen is on — งานเดียว (single) or โครงการ (project) */
-export type Mode = "single" | "project";
+/** What the first screen is set to make: a JSA, a JSA with its work
+ * procedure, or a project (ModeChoice.tsx). Remembered for the tab's session;
+ * a fresh visit starts on "jsa", so nobody gets the doubled wait of
+ * "procedure" without picking it. */
+export type Mode = "jsa" | "procedure" | "project";
 export const modeDraft = {
-  load: () => read<Mode>(MODE_KEY) ?? "single",
+  // Anything else — including "single", what this held before the three-way switch — is "jsa"
+  load: (): Mode => {
+    const saved = read<string>(MODE_KEY);
+    return saved === "procedure" || saved === "project" ? saved : "jsa";
+  },
   save: (value: Mode) => write(MODE_KEY, value),
 };
 
