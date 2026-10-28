@@ -35,3 +35,14 @@ export function docxFileName(jsa: JsaDocument): string {
 export function procedureDocxFileName(procedure: ProcedureDocument): string {
   return procedurePdfFileName(procedure).replace(/\.pdf$/, ".docx");
 }
+
+/** Project Mode's file of every phase's JSA. The project's procedure needs no
+ * helper of its own: it's a ProcedureDocument whose work_activity is the
+ * project name, so procedurePdfFileName already names it. */
+export function projectJsaPdfFileName(projectName: string, isoDate: string): string {
+  return `JSA-${safeActivity(projectName) || "project"}-${isoDate}.pdf`;
+}
+
+export function projectJsaDocxFileName(projectName: string, isoDate: string): string {
+  return projectJsaPdfFileName(projectName, isoDate).replace(/\.pdf$/, ".docx");
+}

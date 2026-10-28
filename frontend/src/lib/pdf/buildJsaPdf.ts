@@ -16,7 +16,7 @@ import type { CompanyLogo } from "../companyLogo";
 import type { JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
-import { pdfFileName } from "./fileName";
+import { pdfFileName, projectJsaPdfFileName } from "./fileName";
 import {
   FALLBACK_DOCUMENT,
   FALLBACK_LAYOUT,
@@ -49,6 +49,32 @@ export async function buildJsaPdf(
   // header fields, the signature line, the frame pass and the footer all live
   // in engine.ts so this file and buildProcedurePdf.ts can't drift apart on them
   const E = await createEngine(L, { companyLogo: options.companyLogo });
+  drawJsa(E, jsa, L, D);
+
+  E.drawFrames();
+  // Company name only — department dropped per request, kept only the
+  // top-level owner rather than department · owner
+  E.drawFooter(D.formCode, D.footerText, C?.name ?? "");
+
+  // Set the PDF's internal /Title metadata. We deliberately don't use the
+  // <a download> attribute (that forces an immediate silent save on mobile
+  // Chrome, violating the "no auto-download" requirement) — so for anyone
+  // reading the blob in the browser's own viewer, this Title is the only way
+  // it gets a meaningful name to show/suggest instead of a random blob URL
+  // fragment. (Desktop Chromium additionally gets a real Save-as dialog from
+  // PdfStep.tsx, pre-filled from the same pdfFileName().)
+  E.doc.setProperties({ title: pdfFileName(jsa) });
+
+  return E.doc.output("blob");
+}
+
+type Engine = Awaited<ReturnType<typeof createEngine>>;
+
+/** Draw one JSA — header, table and analyst line — starting at the top of
+ * the engine's current page, which must be empty. Every page it adds pushes
+ * its own pageFrames entry, so several JSAs can be drawn one after another
+ * into one document (buildProjectJsaPdf) and still frame correctly. */
+function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): void {
   const {
     doc,
     mL,
@@ -133,6 +159,12 @@ export async function buildJsaPdf(
 
     // --- header fields ---
     const { measureFieldLines, fieldRowHeight, drawField } = E;
+
+    // "โครงการ: …" — Project Mode only, above งาน/กิจกรรม so the project and
+    // this phase's work read together. A Single Mode JSA has no project and
+    // keeps the F-ปธบ.-1202 header exactly as it was.
+    const project = jsa.header.project?.trim();
+    if (project) y = E.drawCompanyRow(D.labels.project ?? "โครงการ", project, y);
 
     const activityLines = measureFieldLines(D.labels.work_activity, jsa.header.work_activity, contentW);
     const activityH = fieldRowHeight(activityLines);
@@ -347,20 +379,149 @@ export async function buildJsaPdf(
   // because PublicConfig is an unchecked cast (see lib/api.ts) and an older
   // backend would leave it undefined.
   E.drawSignature(analystLabel, analystName, y);
+}
+
+/** Project Mode's second file: every phase's JSA in one PDF.
+ *
+ * Page 1 is a cover with the contents — JSA n / งาน / หน้า — and each JSA
+ * then starts on a page of its own, drawn exactly as it prints alone (same
+ * drawJsa). Page numbers run through the whole file so the contents can
+ * point at them; like the procedure's cover, page 1 has no frame or footer.
+ * The cover is drawn last, once every JSA's first page is known. */
+export async function buildProjectJsaPdf(
+  project: { name: string; supervisor: string; company: string; date: string },
+  jsas: JsaDocument[],
+  options: BuildOptions = {},
+): Promise<Blob> {
+  const L = options.layout ?? FALLBACK_LAYOUT;
+  const D = options.document ?? FALLBACK_DOCUMENT;
+  const C = options.company;
+  const E = await createEngine(L, { companyLogo: options.companyLogo });
+  const { doc, pageW, mL, mT, contentW, bodyBottom, pad, lineH, border, fill, setFont, wrap, drawLines, logo } = E;
+
+  // Page 1: the cover, kept frameless (the zero-height placeholder keeps
+  // pageFrames' index in step with the page number)
+  E.pageFrames.push({ top: mT, bottom: mT });
+  const firstPages = jsas.map((jsa) => {
+    doc.addPage();
+    const page = doc.getNumberOfPages();
+    drawJsa(E, jsa, L, D);
+    return page;
+  });
+
+  // ---------------------------------------------------------------- cover --
+  doc.setPage(1);
+  const centerX = pageW / 2;
+  let y = mT + mmToPt(12);
+
+  if (logo) {
+    // The same OR (+ company) logo pair as the procedure's cover
+    const logoH = mmToPt(16);
+    const orBox = E.fitLogo(logo.ratio, contentW * 0.4, logoH);
+    const companyBox = E.companyLogo ? E.fitLogo(E.companyLogo.ratio, contentW * 0.4, logoH) : null;
+    const gap = mmToPt(10);
+    let x = centerX - (orBox.w + (companyBox ? gap + companyBox.w : 0)) / 2;
+    E.drawOrLogo(x, y + (logoH - orBox.h) / 2, orBox.w, orBox.h);
+    if (companyBox) {
+      x += orBox.w + gap / 2;
+      doc.setDrawColor(...border);
+      doc.setLineWidth(0.8);
+      doc.line(x, y + logoH * 0.15, x, y + logoH * 0.85);
+      E.drawCompanyLogo(x + gap / 2, y + (logoH - companyBox.h) / 2, companyBox.w, companyBox.h);
+    }
+    y += logoH + mmToPt(10);
+  }
+
+  // Text is placed by its baseline: step down by each line's ascent first
+  doc.setTextColor(0, 0, 0);
+  const titlePt = L.font.title_th_pt + 12;
+  setFont("bold", titlePt);
+  y += titlePt * 0.85;
+  doc.text(D.titleTh, centerX, y, { align: "center" });
+  y += titlePt * 0.35;
+  if (D.titleEn) {
+    setFont("normal", L.font.title_en_pt + 4);
+    y += (L.font.title_en_pt + 4) * 0.95;
+    doc.text(D.titleEn, centerX, y, { align: "center" });
+  }
+  y += mmToPt(5);
+  doc.setDrawColor(...border);
+  doc.setLineWidth(1.2);
+  doc.line(centerX - mmToPt(30), y, centerX + mmToPt(30), y);
+  y += mmToPt(8);
+
+  // The project — the answer to "which job is this file for"
+  const namePt = L.font.title_en_pt + 6;
+  const nameLines = wrap(project.name, contentW * 0.85, "bold", namePt);
+  nameLines.forEach((line) => {
+    setFont("bold", namePt);
+    y += namePt * 1.1;
+    doc.text(line.text, centerX, y, { align: "center", maxWidth: contentW * 0.85 });
+    y += namePt * (L.font.line_height - 1.1);
+  });
+  y += mmToPt(4);
+
+  const infoPt = L.font.header_label_pt + 1;
+  const info = (label: string, value: string) => {
+    if (!value.trim()) return;
+    setFont("bold", infoPt);
+    const labelText = `${label}: `;
+    const labelW = doc.getTextWidth(labelText);
+    setFont("normal", infoPt);
+    const startX = centerX - (labelW + doc.getTextWidth(value)) / 2;
+    y += infoPt * 1.1;
+    setFont("bold", infoPt);
+    doc.text(labelText, startX, y);
+    setFont("normal", infoPt);
+    doc.text(value, startX + labelW, y);
+    y += infoPt * 0.5;
+  };
+  info(D.labels.company ?? "บริษัท", project.company);
+  info(D.labels.supervisor, project.supervisor);
+  info(D.labels.analysis_date, formatThaiDate(project.date));
+  y += mmToPt(10);
+
+  // ------------------------------------------------------------- contents --
+  const headPt = L.font.table_header_pt;
+  setFont("bold", headPt + 2);
+  y += (headPt + 2) * 0.95;
+  doc.text("สารบัญ", mL, y);
+  y += mmToPt(3);
+
+  const widths = [contentW * 0.16, contentW * 0.68, contentW * 0.16];
+  const xs = [mL, mL + widths[0], mL + widths[0] + widths[1]];
+  doc.setLineWidth(L.table.border_width_pt);
+  doc.setDrawColor(...border);
+
+  const headH = headPt * 1.35 + pad * 2;
+  ["ลำดับ", "งาน", "หน้า"].forEach((label, i) => {
+    // Set per cell: drawing text resets jsPDF's fill colour to the text's
+    doc.setFillColor(...fill);
+    doc.rect(xs[i], y, widths[i], headH, "FD");
+    setFont("bold", headPt);
+    doc.text(label, xs[i] + widths[i] / 2, y + pad + headPt, { align: "center" });
+  });
+  y += headH;
+
+  jsas.forEach((jsa, i) => {
+    const cells = [
+      wrap(`JSA ${i + 1}`, widths[0] - pad * 2, "normal", L.font.body_pt),
+      wrap(jsa.header.work_activity, widths[1] - pad * 2, "normal", L.font.body_pt),
+      wrap(String(firstPages[i]), widths[2] - pad * 2, "normal", L.font.body_pt),
+    ];
+    const rowH = Math.max(...cells.map((c) => c.length), 1) * lineH + pad * 2;
+    // A contents list long enough to reach the footer would need its own
+    // pages; projects run to a handful of phases, so stop rather than overprint
+    if (y + rowH > bodyBottom) return;
+    cells.forEach((lines, c) => {
+      doc.rect(xs[c], y, widths[c], rowH);
+      drawLines(lines, xs[c] + pad, y + pad, widths[c] - pad * 2);
+    });
+    y += rowH;
+  });
 
   E.drawFrames();
-  // Company name only — department dropped per request, kept only the
-  // top-level owner rather than department · owner
-  E.drawFooter(D.formCode, D.footerText, C?.name ?? "");
-
-  // Set the PDF's internal /Title metadata. We deliberately don't use the
-  // <a download> attribute (that forces an immediate silent save on mobile
-  // Chrome, violating the "no auto-download" requirement) — so for anyone
-  // reading the blob in the browser's own viewer, this Title is the only way
-  // it gets a meaningful name to show/suggest instead of a random blob URL
-  // fragment. (Desktop Chromium additionally gets a real Save-as dialog from
-  // PdfStep.tsx, pre-filled from the same pdfFileName().)
-  doc.setProperties({ title: pdfFileName(jsa) });
-
+  E.drawFooter(D.formCode, D.footerText, C?.name ?? "", true);
+  doc.setProperties({ title: projectJsaPdfFileName(project.name, project.date) });
   return doc.output("blob");
 }

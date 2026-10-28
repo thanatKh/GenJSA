@@ -445,7 +445,7 @@ export function ProcedureEditorStep({
 /** One sub-step row: number, text, photo + delete buttons, and the photo
  * (if any) under the text. Its own component so each row gets its own
  * usePhotoInput state — busy spinner, error, drag highlight. */
-function SubStepItem({
+export function SubStepItem({
   label,
   sub,
   photo,

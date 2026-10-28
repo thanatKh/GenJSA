@@ -29,6 +29,9 @@ document:
     references: "เอกสารอ้างอิง"
     tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
     procedure: "ขั้นตอนการปฏิบัติงาน"
+    # Project Mode only — the project's ข้อจำกัด/หมายเหตุ and its tag list
+    notes: "ข้อจำกัด / หมายเหตุ"
+    tags: "รายการวาล์ว / Blind / Tag"
 
   # Prefix for the generated เอกสารอ้างอิง line pointing back at the source JSA
   jsa_reference_label: "การวิเคราะห์งานเพื่อความปลอดภัย (JSA)"

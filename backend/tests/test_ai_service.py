@@ -193,3 +193,63 @@ async def test_generate_jsa_always_uses_the_plain_model(settings):
     await generate_jsa(request, provider, settings)
 
     assert provider.calls[0]["model"] == settings.ai.model
+
+
+def _project_request(**project):
+    return GenerateRequest(
+        supervisor="สมชาย",
+        analysis_date=date(2026, 11, 1),
+        work_description="ใส่ Blind 3 จุดและ N2 Purging ท่อ Liquid 8 นิ้ว",
+        project={
+            "name": "ซ่อมท่อ KBY 2569",
+            "notes": "ข้อจำกัดด้าน IGG",
+            "references": [{"tag": "HSV-335", "note": "8 นิ้ว Breather Blind"}],
+            "phases": ["Empty ระบบ", "ใส่ Blind และ N2 Purging", "Cold Cut"],
+            "phase_index": 1,
+            **project,
+        },
+    )
+
+
+_ONE_STEP = """{"work_activity": "ชื่อที่ระบบตั้งเอง", "steps": [{"no": 1,
+  "procedure": "ขั้นตอน", "details": "", "hazards": []}], "assumptions": []}"""
+
+
+async def test_project_context_reaches_the_prompt(settings):
+    """Project Mode sends the phase list (with this phase marked), the notes
+    and the tag list — the tags are the only equipment numbers the model may use."""
+    provider = FakeProvider(_ONE_STEP)
+    await generate_jsa(_project_request(), provider, settings)
+
+    prompt = provider.calls[0]["user_prompt"]
+    assert "ซ่อมท่อ KBY 2569" in prompt
+    assert "2. ใส่ Blind และ N2 Purging  ← ร่าง JSA เฉพาะขั้นตอนนี้" in prompt
+    assert "ข้อจำกัดด้าน IGG" in prompt
+    assert "- HSV-335: 8 นิ้ว Breather Blind" in prompt
+    # The description still comes last, after the context
+    assert prompt.rstrip().endswith("ท่อ Liquid 8 นิ้ว")
+
+
+async def test_project_jsa_takes_the_users_phase_name_and_project(settings):
+    provider = FakeProvider(_ONE_STEP)
+    doc = await generate_jsa(_project_request(), provider, settings)
+
+    assert doc.header.work_activity == "ใส่ Blind และ N2 Purging"
+    assert doc.header.project == "ซ่อมท่อ KBY 2569"
+
+
+async def test_single_mode_prompt_is_unchanged(settings):
+    provider = FakeProvider(_ONE_STEP)
+    request = GenerateRequest(
+        supervisor="สมชาย", analysis_date=date(2026, 11, 1), work_description="เปลี่ยนวาล์ว Drain ถัง V-101"
+    )
+    doc = await generate_jsa(request, provider, settings)
+
+    assert provider.calls[0]["user_prompt"] == "รายละเอียดงานที่จะปฏิบัติ:\n\nเปลี่ยนวาล์ว Drain ถัง V-101"
+    assert doc.header.project == ""
+    assert doc.header.work_activity == "ชื่อที่ระบบตั้งเอง"
+
+
+def test_phase_index_must_point_at_a_phase():
+    with pytest.raises(ValueError):
+        _project_request(phase_index=3)

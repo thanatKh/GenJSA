@@ -158,12 +158,16 @@ export function Stepper({
   current,
   onNavigate,
   branch,
+  steps = STEPS,
 }: {
-  current: 0 | 1 | 2;
+  current: number;
   // Completed steps only — jumping ahead to a step that has no data yet
   // isn't offered. Preserves whatever's in progress; callers should never
   // wire this to anything that clears the document.
-  onNavigate?: (index: 0 | 1 | 2) => void;
+  onNavigate?: (index: number) => void;
+  /** The track's labels. Defaults to the Single Mode JSA wizard's three;
+   * Project Mode passes its own four. */
+  steps?: readonly string[];
   /** The work procedure is optional and branches off step 3 rather than
    * extending the JSA wizard — giving it a permanent 4th circle would imply
    * the JSA isn't finished without it, which is false for most users. So this
@@ -202,12 +206,12 @@ export function Stepper({
   // Titles wrap onto at most two centered lines instead of truncating, so
   // they stay readable even with 4 nodes on a phone (the old side-by-side
   // layout had to hide every label below sm: in that case).
-  const nodes = branch ? STEPS.length + 1 : STEPS.length;
+  const nodes = branch ? steps.length + 1 : steps.length;
 
   return (
     <nav aria-label="ขั้นตอนการทำงาน" className="mb-5">
       <ol className={`grid ${nodes === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
-        {STEPS.map((label, index) => {
+        {steps.map((label, index) => {
           // While on the procedure branch, the JSA truly is finished — all
           // three steps get the checkmark, not just the ones strictly before
           // `current`. Without the `branch` override, step 3 (index === current)
@@ -222,7 +226,7 @@ export function Stepper({
               <Connectors
                 left={index > 0 ? (index - 1 < current || !!branch ? "done" : "todo") : null}
                 right={
-                  index < STEPS.length - 1
+                  index < steps.length - 1
                     ? index < current || !!branch
                       ? "done"
                       : "todo"
@@ -234,7 +238,7 @@ export function Stepper({
               {done && onNavigate ? (
                 <button
                   type="button"
-                  onClick={() => onNavigate(index as 0 | 1 | 2)}
+                  onClick={() => onNavigate(index)}
                   aria-label={`กลับไปขั้นตอน ${label}`}
                   className={`${nodeClass} group rounded-md focus-visible:outline-none
                               focus-visible:ring-2 focus-visible:ring-ring/50`}

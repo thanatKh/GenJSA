@@ -135,6 +135,10 @@ html {
 html {
   scroll-padding-top: calc(var(--appbar-h) + 0.75rem);
   scroll-padding-bottom: 6rem;
+  /* Always keep the scrollbar's space: a short page (the งานเดียว form) and
+     a tall one (the โครงการ form) otherwise differ by a scrollbar's width,
+     and switching between them shifted the whole page sideways */
+  scrollbar-gutter: stable;
 }
 
 @layer base {

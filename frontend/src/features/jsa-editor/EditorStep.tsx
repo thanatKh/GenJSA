@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { ArrowRight, Info, Plus, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Info, Plus, RotateCcw } from "lucide-react";
 
 import {
   Alert,
@@ -65,6 +65,7 @@ export function EditorStep({
   companyLogo,
   onCompanyLogoChange,
   saveState,
+  project,
 }: {
   doc: JsaDocument;
   onChange: (next: JsaDocument) => void;
@@ -76,6 +77,10 @@ export function EditorStep({
   onContinue: () => void;
   onStartOver: () => void;
   error: string | null;
+  /** Project Mode: this JSA is one phase of a project. The page is the same
+   * editor, but it isn't the session's draft (the project owns it), and its
+   * bar goes back to the project's JSA list instead of starting over. */
+  project?: { name: string; position: string; onBack: () => void };
 }) {
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [liveMessage, setLiveMessage] = useState("");
@@ -83,8 +88,10 @@ export function EditorStep({
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    docDraft.save(doc);
-  }, [doc]);
+    // A project's JSA is saved with its project — writing it here would
+    // overwrite the Single Mode draft
+    if (!project) docDraft.save(doc);
+  }, [doc, project]);
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -203,9 +210,17 @@ export function EditorStep({
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานและแก้ไข</h1>
+        <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
+          {project ? `ตรวจทาน ${project.position}` : "ตรวจทานและแก้ไข"}
+        </h1>
         <SaveStatus state={saveState} />
       </div>
+      {project ? (
+        <p className="mt-1 text-sm font-medium text-ink">
+          {/* The project name, shown not edited here — it's set on the project's own page */}
+          โครงการ: {project.name}
+        </p>
+      ) : null}
       <p className="mt-1.5 text-muted">
         เอกสารนี้ระบบร่างให้เป็นจุดเริ่มต้น{" "}
         <strong className="font-semibold text-ink">
@@ -464,13 +479,30 @@ export function EditorStep({
               edit); one row is ~65px. size="lg" on both so they sit at one
               height; the primary fills the rest of the row on phones, keeping
               it the big thumb target. */}
-          <Button variant="ghost" size="lg" onClick={() => setConfirmRestart(true)}>
-            <RotateCcw className="size-4" aria-hidden="true" />
-            เริ่มใหม่
-          </Button>
+          {project ? (
+            // Nothing to lose by leaving: every edit is already saved with the project
+            <Button variant="ghost" size="lg" onClick={project.onBack}>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              กลับ
+            </Button>
+          ) : (
+            <Button variant="ghost" size="lg" onClick={() => setConfirmRestart(true)}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              เริ่มใหม่
+            </Button>
+          )}
           <Button size="lg" onClick={onContinue} disabled={incomplete} className="flex-1 sm:flex-none">
-            สร้าง PDF
-            <ArrowRight className="size-5" aria-hidden="true" />
+            {project ? (
+              <>
+                <Check className="size-5" aria-hidden="true" />
+                ตรวจแล้ว
+              </>
+            ) : (
+              <>
+                สร้าง PDF
+                <ArrowRight className="size-5" aria-hidden="true" />
+              </>
+            )}
           </Button>
         </div>
       </div>

@@ -28,6 +28,9 @@ export const jsaHeaderSchema = z.object({
   // vendor) — printed as an extra header row only when filled in. Defaulted
   // for the same reason as `analyst`.
   company: z.string().default(""),
+  // Project Mode: the project this JSA is one phase of, printed as a row
+  // above งาน/กิจกรรม. Blank on a Single Mode JSA. Defaulted like the above.
+  project: z.string().default(""),
 });
 
 export const jsaDocumentSchema = z.object({
@@ -85,6 +88,53 @@ export const inputFormSchema = z.object({
     .max(5000, "รายละเอียดยาวเกิน 5,000 ตัวอักษร กรุณาย่อหรือแยกเป็นหลาย JSA"),
 });
 
+/* Project Mode — a big job split into phases, one JSA per phase. Browser-only
+ * (projects.ts); the backend only ever sees one phase's request at a time, as
+ * GenerateRequest.project (backend/app/models/jsa.py's ProjectContext). */
+
+/** One row of the shared tag list — a valve, blind or tag and what's done with it */
+export const projectReferenceSchema = z.object({
+  tag: z.string(),
+  note: z.string().default(""),
+});
+
+export const projectPhaseSchema = z.object({
+  /** Stable on-screen identity — phases can be reordered */
+  id: z.string(),
+  /** This phase's work name. Becomes its JSA's งาน/กิจกรรม, and the two are kept in step */
+  work: z.string(),
+  /** What's done in this phase — the prompt for its JSA */
+  description: z.string(),
+  jsa: jsaDocumentSchema.nullable().default(null),
+  /** Ticked when the user finishes reviewing this JSA ("ตรวจแล้ว") */
+  reviewed: z.boolean().default(false),
+  /** This phase's section of the project's work procedure, drafted from its
+   * JSA. Only its steps are used; the project-level sections live in
+   * ProjectDocument.procedureIntro. */
+  procedure: procedureDocumentSchema.nullable().default(null),
+});
+
+/** The project procedure's own opening sections, written once for the whole
+ * project (the first drafted section supplies them; tools grow as sections
+ * are drafted) */
+export const projectProcedureIntroSchema = z.object({
+  purpose: z.string().default(""),
+  scope: z.string().default(""),
+  tools: z.array(z.string()).default([]),
+});
+
+export const projectDocumentSchema = z.object({
+  name: z.string(),
+  supervisor: z.string(),
+  analyst: z.string().default(""),
+  company: z.string().default(""),
+  /** ข้อจำกัด / หมายเหตุ — sent to the system as background for every phase */
+  notes: z.string().default(""),
+  references: z.array(projectReferenceSchema).default([]),
+  phases: z.array(projectPhaseSchema),
+  procedureIntro: projectProcedureIntroSchema.nullable().default(null),
+});
+
 export type Hazard = z.infer<typeof hazardSchema>;
 export type JsaStep = z.infer<typeof stepSchema>;
 export type JsaDocument = z.infer<typeof jsaDocumentSchema>;
@@ -92,6 +142,10 @@ export type InputForm = z.infer<typeof inputFormSchema>;
 export type SubStep = z.infer<typeof subStepSchema>;
 export type ProcedureStep = z.infer<typeof procedureStepSchema>;
 export type ProcedureDocument = z.infer<typeof procedureDocumentSchema>;
+export type ProjectReference = z.infer<typeof projectReferenceSchema>;
+export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
+export type ProjectDocument = z.infer<typeof projectDocumentSchema>;
+export type ProjectProcedureIntro = z.infer<typeof projectProcedureIntroSchema>;
 
 /** Identifies the JSA step list a procedure was generated from.
  *

@@ -19,6 +19,9 @@ document:
     # Extra header row naming the company that prepared the document — only
     # printed when the user fills one in (e.g. a vendor working on a PTTOR site)
     company: "บริษัท"
+    # Project Mode: extra header row above งาน/กิจกรรม naming the project this
+    # JSA is one phase of — only printed on a project's JSAs
+    project: "โครงการ"
 
   # Table column names — per the original form
   columns:

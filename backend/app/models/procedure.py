@@ -15,7 +15,7 @@ never allowed to invent the step list — see AiProcedurePayload below.
 
 from pydantic import BaseModel, Field, field_validator
 
-from .jsa import JsaDocument, JsaHeader
+from .jsa import JsaDocument, JsaHeader, ProjectReference
 
 
 class SubStep(BaseModel):
@@ -69,6 +69,35 @@ class ProcedureDocument(BaseModel):
 # --------------------------------------------------------------------------- #
 # API request / response
 # --------------------------------------------------------------------------- #
+class ProjectPhaseOutline(BaseModel):
+    """One phase of a project, as far as another phase's section needs to know:
+    its work name and its JSA's step titles (never hazards or controls)."""
+
+    work: str = Field(min_length=1, max_length=500)
+    steps: list[str] = Field(default_factory=list, max_length=200)
+
+
+class ProjectProcedureContext(BaseModel):
+    """Project Mode: the procedure is one document for the whole project,
+    drafted one phase's section at a time. This is what one section needs to
+    stay continuous with the rest — the phases before it (so it can refer back
+    to what they left in place instead of redoing it) and after it, the tag
+    list, and the notes. Used for this request only and never stored."""
+
+    name: str = Field(min_length=1, max_length=300)
+    notes: str = Field(default="", max_length=2000)
+    references: list[ProjectReference] = Field(default_factory=list, max_length=100)
+    phases: list[ProjectPhaseOutline] = Field(min_length=1, max_length=50)
+    phase_index: int = Field(ge=0)
+
+    @field_validator("phase_index")
+    @classmethod
+    def index_in_range(cls, v: int, info) -> int:
+        if v >= len(info.data.get("phases") or []):
+            raise ValueError("phase_index out of range")
+        return v
+
+
 class GenerateProcedureRequest(BaseModel):
     """The finished JSA to expand.
 
@@ -78,6 +107,9 @@ class GenerateProcedureRequest(BaseModel):
     """
 
     jsa: JsaDocument
+    # Project Mode only: `jsa` is one phase's JSA and the result is that
+    # phase's section of the project's procedure
+    project: ProjectProcedureContext | None = None
 
 
 class AiProcedureStep(BaseModel):

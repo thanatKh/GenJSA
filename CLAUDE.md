@@ -164,6 +164,43 @@ Hazards and controls are deliberately **not** sent in the prompt: they aren't
 needed to write how-to steps, and it keeps safety text a human already
 approved from being reworded.
 
+### Project Mode (`frontend/src/features/project/`)
+
+The first screen has two tabs: **งานเดียว** (Single Mode — everything above)
+and **โครงการ** (Project Mode) for a big job split into phases. A project is
+submitted as two files: one work procedure for the whole project, and every
+phase's JSA in one file (cover + contents, then one JSA per page).
+
+- **Stages 10–13** in `App.tsx` (10 JSA list, 11 a phase's JSA in the normal
+  `EditorStep`, 12 the procedure, 13 the files); step 1, ข้อมูลโครงการ, is
+  stage 0 on the โครงการ tab. Its own 4-step Stepper.
+- **One phase = one JSA.** Each phase is drafted with the normal
+  `/api/jsa/generate`, plus a `project` context (name, notes, tag list, every
+  phase's name, which one this is) — `ai_service._project_context`. The
+  phase's work name becomes its JSA's งาน/กิจกรรม; `projectModel.ts`'s
+  `withProject`/`withPhaseJsa` keep the two (and the printed project name) in step.
+- **The procedure is drafted one phase's section at a time** with
+  `/api/procedure/generate` plus a `project` context listing the earlier
+  phases' steps, so a section builds on what came before instead of
+  repeating it (`procedure_service._project_context`). Same structural rules
+  as Single Mode: step titles from the phase's JSA, references built in code.
+  Numbered by phase everywhere — 2.1, 2.1.1 — via the builders' `project`
+  option (`ProjectProcedureLayout`), in PDF and Word alike.
+- **Drafting is one request at a time** (`usePhaseDrafting.ts`), queued for
+  "ร่างทั้งหมด"; results apply against the latest project so the user can
+  keep reviewing meanwhile.
+- **Stored like history, but separately**: `projects.ts` (localStorage,
+  `MAX_PROJECTS`), session draft in `store.ts`'s `projectDraft`. Never sent
+  anywhere except one phase's context per request.
+- `buildJsaPdf.ts`'s `drawJsa` and `buildJsaDocx.ts`'s `jsaBody` draw one JSA
+  and are shared by the single file and the project's combined file — a
+  change to the JSA layout lands in both.
+- Sub-step photos work as in Single Mode (same `usePhotos`/IndexedDB store,
+  under the project's id), keyed `"<phase id>:<step>.<sub>"`
+  (`projectModel.ts`'s `projectPhotoKey`) — the phase's id, not its number,
+  so reordering phases never moves a photo to another phase. The builders
+  find them through `ProjectProcedureLayout.photoPrefix`.
+
 ### Provider abstraction (`backend/app/providers/llm/`)
 
 `base.py` defines the `LLMProvider` interface; `thaillm.py` implements it for
@@ -262,6 +299,9 @@ first, then hand-merge.
 | Word (.docx) export layout | `frontend/src/lib/word/` (keep in step with the PDF builders) |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
 | History entry cap | `frontend/src/history.ts` → `MAX_ENTRIES` |
+| Saved projects cap (Project Mode) | `frontend/src/projects.ts` → `MAX_PROJECTS` |
+| "โครงการ" header-row wording | `config/document.yaml` → `labels.project` |
+| Project procedure's notes / tag-list headings | `config/procedure.yaml` → `sections.notes` / `sections.tags` |
 | Request size / rate limit / CORS | `config/app.yaml` |
 
 ## Fonts

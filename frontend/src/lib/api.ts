@@ -47,6 +47,14 @@ type GenerateInput = {
   work_description: string;
   analyst?: string;
   company?: string;
+  /** Project Mode only — mirrors backend/app/models/jsa.py's ProjectContext */
+  project?: {
+    name: string;
+    notes: string;
+    references: { tag: string; note: string }[];
+    phases: string[];
+    phase_index: number;
+  };
 };
 
 /** POST JSON to a generate endpoint, with the shared timeout/abort handling. */
@@ -113,8 +121,21 @@ export async function generateJsa(
 export async function generateProcedure(
   jsa: JsaDocument,
   options?: { signal?: AbortSignal },
+  /** Project Mode: `jsa` is one phase's, and the result is that phase's
+   * section — mirrors backend/app/models/procedure.py's ProjectProcedureContext */
+  project?: {
+    name: string;
+    notes: string;
+    references: { tag: string; note: string }[];
+    phases: { work: string; steps: string[] }[];
+    phase_index: number;
+  },
 ): Promise<ProcedureDocument> {
-  const response = await postGenerate("/api/procedure/generate", { jsa }, options?.signal);
+  const response = await postGenerate(
+    "/api/procedure/generate",
+    project ? { jsa, project } : { jsa },
+    options?.signal,
+  );
   try {
     return procedureDocumentSchema.parse(await response.json());
   } catch {

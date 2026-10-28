@@ -38,11 +38,15 @@ import {
   type PhotoMap,
   type ProcedureMeta,
 } from "../pdf/layout";
+import type { ProjectProcedureLayout } from "../pdf/buildProcedurePdf";
 import type { ProcedureDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createWordKit, halfPt, markerIndent, mm, toBlob } from "./common";
 
 type BuildProcedureOptions = {
+  /** Project Mode — the same layout buildProcedurePdf takes: phases as
+   * sections numbered by phase (2.1, 2.1.1), then notes and the tag list */
+  project?: ProjectProcedureLayout;
   layout?: PdfLayout;
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
@@ -205,7 +209,15 @@ export async function buildProcedureDocx(
   const font = { ascii: L.font.family, hAnsi: L.font.family, cs: L.font.family, eastAsia: L.font.family };
   const LIST = "procedure";
   const BULLETS = "procedure-bullets";
-  const subTextLeft = markerIndent("1.1", subIndent).left;
+  // Project Mode numbers its steps by phase — "2." phase, "2.1" step,
+  // "2.1.1" sub-step — from a list of its own, one level deeper, still
+  // carried by the styles so Word renumbers on insert/delete the same way
+  const PHASES = "procedure-phases";
+  const project = options.project;
+  const deeper = mm(6);
+  const subTextLeft = project
+    ? markerIndent("1.1.1", subIndent + deeper).left
+    : markerIndent("1.1", subIndent).left;
 
   const numbering = {
     config: [
@@ -221,6 +233,14 @@ export async function buildProcedureDocx(
         reference: BULLETS,
         levels: [
           { level: 0, format: LevelFormat.BULLET, text: "•", style: { paragraph: { indent: markerIndent("•", stepIndent) } } },
+        ],
+      },
+      {
+        reference: PHASES,
+        levels: [
+          { level: 0, format: LevelFormat.DECIMAL, text: "%1.", style: { paragraph: { indent: markerIndent("1.", stepIndent) } } },
+          { level: 1, format: LevelFormat.DECIMAL, text: "%1.%2", style: { paragraph: { indent: markerIndent("1.1", stepIndent + deeper) } } },
+          { level: 2, format: LevelFormat.DECIMAL, text: "%1.%2.%3", style: { paragraph: { indent: markerIndent("1.1.1", subIndent + deeper) } } },
         ],
       },
     ],
@@ -241,10 +261,22 @@ export async function buildProcedureDocx(
         run: { font, size: halfPt(headingPt), bold: true, color: "000000" },
         paragraph: { keepNext: true, spacing: { before: sectionGap, after: 0 }, numbering: { reference: LIST, level: 0 } },
       },
-      heading2: {
+      // Single Mode: Heading 2 = step. Project Mode: Heading 2 = phase and
+      // Heading 3 = step, so phases and steps both show in the Navigation Pane
+      heading2: project
+        ? {
+            run: { font, size: halfPt(headingPt), bold: true, color: "000000" },
+            paragraph: { keepNext: true, spacing: { before: sectionGap, after: 0 }, numbering: { reference: PHASES, level: 0 } },
+          }
+        : {
+            next: STYLE.subStep,
+            run: { font, size: halfPt(stepPt), bold: true, color: "000000" },
+            paragraph: { keepNext: true, spacing: { before: stepGap, after: 0 }, numbering: { reference: LIST, level: 1 } },
+          },
+      heading3: {
         next: STYLE.subStep,
         run: { font, size: halfPt(stepPt), bold: true, color: "000000" },
-        paragraph: { keepNext: true, spacing: { before: stepGap, after: 0 }, numbering: { reference: LIST, level: 1 } },
+        paragraph: { keepNext: true, spacing: { before: stepGap, after: 0 }, numbering: { reference: PHASES, level: 1 } },
       },
     },
     // Thai names: what people see in Word's Styles list
@@ -264,7 +296,7 @@ export async function buildProcedureDocx(
         basedOn: "Normal",
         next: STYLE.subStep,
         quickFormat: true,
-        paragraph: { numbering: { reference: LIST, level: 2 } },
+        paragraph: { numbering: { reference: project ? PHASES : LIST, level: 2 } },
       },
       {
         id: STYLE.photo,
@@ -311,13 +343,23 @@ export async function buildProcedureDocx(
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
   listSection(P.sections.tools, procedure.tools);
+  if (project) {
+    textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);
+    listSection(
+      P.sections.tags ?? "รายการวาล์ว / Blind / Tag",
+      project.references.map((ref) => (ref.note.trim() ? `${ref.tag}: ${ref.note}` : ref.tag)),
+    );
+  }
 
   // ------------------------------------------------- the procedure itself --
   heading(P.sections.procedure);
-  procedure.steps.forEach((step) => {
-    body.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: text(step.procedure) }));
+  const pushSteps = (steps: ProcedureDocument["steps"], prefix: string, photoPrefix: string) =>
+  steps.forEach((step) => {
+    body.push(
+      new Paragraph({ heading: project ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2, children: text(step.procedure) }),
+    );
     step.sub_steps.forEach((sub) => {
-      const photo = photos[photoKey(step.no, sub.no)];
+      const photo = photos[photoPrefix + photoKey(step.no, sub.no)];
       // keepNext: a photo never lands on the next page without its sub-step
       body.push(new Paragraph({ style: STYLE.subStep, keepNext: !!photo, children: text(sub.action) }));
       if (!photo) return;
@@ -330,10 +372,18 @@ export async function buildProcedureDocx(
           style: STYLE.photo,
           children: [K.image({ data: photo.data, ratio: photo.ratio > 0 ? photo.ratio : 1 }, maxWmm, photoMaxHmm)],
         }),
-        new Paragraph({ style: STYLE.caption, children: text(`ภาพประกอบขั้นตอน ${step.no}.${sub.no}`) }),
+        new Paragraph({ style: STYLE.caption, children: text(`ภาพประกอบขั้นตอน ${prefix}${step.no}.${sub.no}`) }),
       );
     });
   });
+  if (project) {
+    project.phases.forEach((phase, index) => {
+      body.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: text(phase.title) }));
+      pushSteps(phase.steps, `${index + 1}.`, phase.photoPrefix);
+    });
+  } else {
+    pushSteps(procedure.steps, "", "");
+  }
 
   const footer = K.footer(P.formCode, P.footerText, options.company?.name ?? "");
   const doc = new Document({

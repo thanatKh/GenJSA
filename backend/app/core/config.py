@@ -112,6 +112,7 @@ class DocLabels(BaseModel):
     analysis_date: str = "วันที่วิเคราะห์"
     analyst: str = "ผู้วิเคราะห์"
     company: str = "บริษัท"
+    project: str = "โครงการ"
 
 
 class DocColumns(BaseModel):
@@ -238,6 +239,10 @@ class ProcedureSections(BaseModel):
     references: str = "เอกสารอ้างอิง"
     tools: str = "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
     procedure: str = "ขั้นตอนการปฏิบัติงาน"
+    # Project Mode only: the project's notes and its tag list, printed before
+    # the procedure section
+    notes: str = "ข้อจำกัด / หมายเหตุ"
+    tags: str = "รายการวาล์ว / Blind / Tag"
 
 
 class ProcedureDocumentMeta(BaseModel):

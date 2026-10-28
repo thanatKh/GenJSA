@@ -41,6 +41,10 @@ class JsaHeader(BaseModel):
     # blank means PTTOR's own document, and the PDF prints no company row.
     # Never sent to the AI; like analyst, it only rides along on the header.
     company: str = Field(default="", max_length=200)
+    # Project Mode: the project this JSA is one phase of, printed as an extra
+    # header row above งาน/กิจกรรม. Blank on a Single Mode JSA, which then
+    # prints no project row. Optional for the same reason as company.
+    project: str = Field(default="", max_length=300)
 
 
 class JsaDocument(BaseModel):
@@ -70,12 +74,44 @@ class JsaDocument(BaseModel):
 # --------------------------------------------------------------------------- #
 # API request / response
 # --------------------------------------------------------------------------- #
+class ProjectReference(BaseModel):
+    """One row of a project's shared tag list — a valve, blind or tag number
+    and what's done with it (e.g. "HSV-335" / "ปิด + 8\" Breather Blind")."""
+
+    tag: str = Field(min_length=1, max_length=100)
+    note: str = Field(default="", max_length=300)
+
+
+class ProjectContext(BaseModel):
+    """Project Mode: what a phase's JSA needs to know about the rest of the
+    project. Used for this one request's prompt and never stored, like the
+    work description itself."""
+
+    name: str = Field(min_length=1, max_length=300)
+    notes: str = Field(default="", max_length=2000)
+    references: list[ProjectReference] = Field(default_factory=list, max_length=100)
+    # Every phase's work name, in order, so the model knows where this one
+    # sits — and can keep other phases' work out of it
+    phases: list[str] = Field(min_length=1, max_length=50)
+    phase_index: int = Field(ge=0)
+
+    @field_validator("phase_index")
+    @classmethod
+    def index_in_range(cls, v: int, info) -> int:
+        phases = info.data.get("phases") or []
+        if v >= len(phases):
+            raise ValueError("phase_index out of range")
+        return v
+
+
 class GenerateRequest(BaseModel):
     supervisor: str = Field(min_length=1, max_length=200)
     analysis_date: date
     work_description: str = Field(min_length=10, max_length=5000)
     analyst: str = Field(default="", max_length=200)
     company: str = Field(default="", max_length=200)
+    # Project Mode only — absent for a Single Mode JSA
+    project: ProjectContext | None = None
 
 
 class AiJsaPayload(BaseModel):

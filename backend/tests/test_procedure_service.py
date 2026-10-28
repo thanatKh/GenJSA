@@ -155,3 +155,46 @@ def test_user_prompt_omits_hazards_and_controls(jsa):
     assert "ตัดแยกระบบและ LOTO" in prompt
     assert "ไฟฟ้าดูด" not in prompt
     assert "ตรวจสอบแรงดันก่อนสัมผัส" not in prompt
+
+
+def _context(phase_index=1):
+    from app.models.procedure import ProjectProcedureContext
+
+    return ProjectProcedureContext(
+        name="ซ่อมท่อ KBY 2569",
+        notes="ข้อจำกัดด้าน IGG",
+        references=[{"tag": "HSV-335", "note": "8 นิ้ว Breather Blind"}],
+        phases=[
+            {"work": "ใส่ Blind และ N2 Purging", "steps": ["ปิดวาล์วและ LOTO", "ใส่ Blind 3 จุด"]},
+            {"work": "Cold Cut และเชื่อม", "steps": ["ตัดท่อเดิม"]},
+            {"work": "ถอด Blind และคืนระบบ", "steps": ["ถอด Blind"]},
+        ],
+        phase_index=phase_index,
+    )
+
+
+def test_project_section_prompt_builds_on_earlier_phases(jsa):
+    """A project section is told what the phases before it already did (so it
+    can refer back instead of redoing it), which phase it is, the tag list and
+    the notes — the continuity separately drafted procedures lack."""
+    prompt = _build_user_prompt(jsa, _context(phase_index=1))
+
+    assert "ซ่อมท่อ KBY 2569" in prompt
+    assert "2. Cold Cut และเชื่อม  ← ส่วนที่ต้องร่างครั้งนี้" in prompt
+    # The earlier phase's steps are listed; the later phase's are not
+    assert "   - ใส่ Blind 3 จุด" in prompt
+    assert "   - ถอด Blind" not in prompt
+    assert "- HSV-335: 8 นิ้ว Breather Blind" in prompt
+    assert "ข้อจำกัดด้าน IGG" in prompt
+    # The JSA's own skeleton still follows
+    assert prompt.rstrip().endswith(_build_user_prompt(jsa).rstrip())
+
+
+def test_single_mode_procedure_prompt_is_unchanged(jsa):
+    assert _build_user_prompt(jsa, None) == _build_user_prompt(jsa)
+    assert "โครงการ" not in _build_user_prompt(jsa)
+
+
+def test_project_phase_index_must_point_at_a_phase():
+    with pytest.raises(ValueError):
+        _context(phase_index=3)

@@ -56,6 +56,8 @@ export type DocumentMeta = {
     analyst: string;
     /** Optional so an older backend that doesn't send it still works */
     company?: string;
+    /** Project Mode's extra header row — optional for the same reason */
+    project?: string;
   };
   columns: {
     procedure: string;
@@ -80,6 +82,9 @@ export type ProcedureMeta = {
     references: string;
     tools: string;
     procedure: string;
+    /** Project Mode only — optional so an older backend that doesn't send them still works */
+    notes?: string;
+    tags?: string;
   };
 };
 
@@ -133,6 +138,7 @@ export const FALLBACK_DOCUMENT: DocumentMeta = {
     analysis_date: "วันที่วิเคราะห์",
     analyst: "ผู้วิเคราะห์",
     company: "บริษัท",
+    project: "โครงการ",
   },
   columns: {
     procedure: "ขั้นตอนการทำงาน",
@@ -156,6 +162,8 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
     references: "เอกสารอ้างอิง",
     tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม",
     procedure: "ขั้นตอนการปฏิบัติงาน",
+    notes: "ข้อจำกัด / หมายเหตุ",
+    tags: "รายการวาล์ว / Blind / Tag",
   },
 };
 

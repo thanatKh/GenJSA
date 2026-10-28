@@ -15,6 +15,16 @@ import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import { usePhotos } from "./features/procedure/usePhotos";
 import { useCompanyLogo } from "./features/company/useCompanyLogo";
+import { ModeTabs } from "./features/project/ModeTabs";
+import { ProjectHub } from "./features/project/ProjectHub";
+import { ProjectList } from "./features/project/ProjectList";
+import { ProjectProcedureStep } from "./features/project/ProjectProcedureStep";
+import { ProjectFilesStep } from "./features/project/ProjectFilesStep";
+import { ProjectSetup } from "./features/project/ProjectSetup";
+import { blankPhaseJsa, blankProject, withPhaseJsa } from "./features/project/projectModel";
+import { usePhaseDrafting } from "./features/project/usePhaseDrafting";
+import * as projectStore from "./projects";
+import type { ProjectEntry } from "./projects";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
 import {
@@ -25,19 +35,43 @@ import {
   generateProcedure,
   type PublicConfig,
 } from "./lib/api";
-import type { CompanyLogo } from "./lib/companyLogo";
+import { loadCompanyProfile, type CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
 import * as photoStore from "./lib/photoStore";
 import {
+  projectDocumentSchema,
   stepFingerprint,
   type InputForm,
   type JsaDocument,
   type ProcedureDocument,
+  type ProjectDocument,
+  type ProjectPhase,
 } from "./lib/schema";
-import { screenFade } from "./lib/motion";
+import { fadeSwap, screenFade, tabSlide } from "./lib/motion";
 import { todayIso } from "./lib/thaidate";
 import { useStageHistory } from "./useStageHistory";
-import { clearAllDrafts, currentHistoryId, docDraft, procedureDraft } from "./store";
+import { saveNames } from "./lib/rememberedNames";
+import {
+  clearAllDrafts,
+  currentHistoryId,
+  docDraft,
+  modeDraft,
+  procedureDraft,
+  projectDraft,
+  type Mode,
+  type ProjectDraft,
+} from "./store";
+
+// Project Mode's track — its own four steps instead of the JSA wizard's three
+const PROJECT_STEPS = ["ข้อมูลโครงการ", "JSA แต่ละขั้นตอน", "ขั้นตอนปฏิบัติงาน", "ไฟล์ที่ส่ง"] as const;
+
+/** The session's project draft, if it still parses — sessionStorage outlives
+ * code changes within a tab just like history does */
+function loadProjectDraft(): ProjectDraft | null {
+  const draft = projectDraft.load();
+  const project = projectDocumentSchema.safeParse(draft?.project);
+  return draft && project.success ? { ...draft, project: project.data } : null;
+}
 
 // How long to wait after the last edit before rewriting the history entry.
 // The editor changes `doc` on every keystroke; localStorage writes serialize
@@ -51,7 +85,7 @@ function buildBlankDocument(
   values: Pick<InputForm, "supervisor" | "analyst" | "company">,
 ): JsaDocument {
   return {
-    header: { work_activity: "", analysis_date: todayIso(), ...values },
+    header: { work_activity: "", analysis_date: todayIso(), project: "", ...values },
     steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] }],
     assumptions: [],
   };
@@ -60,7 +94,10 @@ function buildBlankDocument(
 // 0-2 are the JSA wizard and map 1:1 onto the Stepper. 3-4 are the optional
 // work procedure, reached only from stage 2 — see the Stepper note in the JSX
 // for why they don't get their own step in the progress bar.
-type Stage = 0 | 1 | 2 | 3 | 4;
+// 10+ are Project Mode: 10 the project's JSA list, 11 one phase's JSA in the
+// editor, 12 the project's work procedure, 13 its two files. Its first step,
+// ข้อมูลโครงการ, is stage 0 on the โครงการ tab.
+type Stage = 0 | 1 | 2 | 3 | 4 | 10 | 11 | 12 | 13;
 
 /** What <main> actually renders, computed once from (stage, doc, procedure,
  * busy, procedureBusy) instead of re-derived at each of 7 separate JSX
@@ -87,15 +124,30 @@ type View =
   | { kind: "procedureGenerating"; doc: JsaDocument; heading: string }
   | { kind: "pdf"; doc: JsaDocument }
   | { kind: "procedureEditing"; doc: JsaDocument; procedure: ProcedureDocument }
-  | { kind: "procedurePdf"; doc: JsaDocument; procedure: ProcedureDocument };
+  | { kind: "procedurePdf"; doc: JsaDocument; procedure: ProcedureDocument }
+  | { kind: "projectHub"; project: ProjectDocument }
+  | { kind: "projectProcedure"; project: ProjectDocument }
+  | { kind: "projectFiles"; project: ProjectDocument }
+  | { kind: "projectEditing"; project: ProjectDocument; phase: ProjectPhase; jsa: JsaDocument; index: number };
 
 function computeView(
   stage: Stage,
   doc: JsaDocument | null,
   procedure: ProcedureDocument | null,
   procedureBusy: boolean,
+  project: ProjectDraft | null,
 ): View | null {
+  // Both tabs: the tabs themselves stay put while the form under them swaps
   if (stage === 0) return { kind: "input" };
+  if (stage === 10) return project?.id ? { kind: "projectHub", project: project.project } : null;
+  if (stage === 12) return project?.id ? { kind: "projectProcedure", project: project.project } : null;
+  if (stage === 13) return project?.id ? { kind: "projectFiles", project: project.project } : null;
+  if (stage === 11) {
+    const phase = project?.id ? project.project.phases[project.openPhase] : undefined;
+    return project && phase?.jsa
+      ? { kind: "projectEditing", project: project.project, phase, jsa: phase.jsa, index: project.openPhase }
+      : null;
+  }
   if (stage === 1) return doc ? { kind: "editing", doc } : null;
   if (stage === 2) {
     if (!doc) return null;
@@ -164,14 +216,82 @@ export default function App() {
     setLogoFor: setCompanyLogoFor,
   } = useCompanyLogo(historyId);
 
-  // If a draft JSA is left over (refresh mid-flow), jump straight back to the editor step
+  // ---- Project Mode -------------------------------------------------------
+  // Which tab the first screen is on. Remembered for the tab's session, so a
+  // refresh doesn't drop someone back onto the other mode.
+  const [mode, setModeState] = useState<Mode>(() => modeDraft.load());
+  const setMode = (next: Mode) => {
+    setModeState(next);
+    modeDraft.save(next);
+  };
+  // The open project — its projects.ts id (null until first saved), the
+  // project itself, and which phase's JSA the editor has open
+  const [projectState, setProjectState] = useState<ProjectDraft | null>(loadProjectDraft);
+  const setProject = (update: (current: ProjectDocument) => ProjectDocument) =>
+    setProjectState((state) => (state ? { ...state, project: update(state.project) } : state));
+  const drafting = usePhaseDrafting(projectState?.project ?? null, setProject, "jsa");
+  const procedureDrafting = usePhaseDrafting(projectState?.project ?? null, setProject, "procedure");
+  // The project's company logo: in IndexedDB under the project's id once it
+  // has one, held here until then (a new project isn't saved yet)
+  const projectLogo = useCompanyLogo(projectState?.id ?? null);
+  // The project procedure's sub-step photos — same store as Single Mode's,
+  // under the project's id (keys: ProjectProcedureStep's projectPhotoKey)
+  const projectPhotos = usePhotos(projectState?.id ?? null, null);
+  const [pendingProjectLogo, setPendingProjectLogo] = useState<CompanyLogo | null>(
+    () => loadCompanyProfile()?.logo ?? null,
+  );
+  const [projectSave, setProjectSave] = useState<SaveState>("idle");
+
+  // The โครงการ tab always has a project to fill in
   useEffect(() => {
-    if (doc) setStage(1);
+    if (mode === "project" && !projectState) {
+      setProjectState({ id: null, project: blankProject(), openPhase: 0 });
+    }
+  }, [mode, projectState]);
+
+  useEffect(() => {
+    if (projectState) projectDraft.save(projectState);
+  }, [projectState]);
+
+  // Saved projects follow every edit, like history does for single jobs
+  const savedProjectId = projectState?.id ?? null;
+  const savedProject = projectState?.project;
+  useEffect(() => {
+    if (!savedProjectId || !savedProject) return;
+    setProjectSave("saving");
+    const timer = setTimeout(
+      () => setProjectSave(projectStore.upsert(savedProjectId, savedProject) ? "saved" : "failed"),
+      HISTORY_SAVE_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [savedProjectId, savedProject]);
+
+  // If a draft is left over (refresh mid-flow), jump straight back into it —
+  // the project's JSA list on the โครงการ tab, the JSA editor otherwise
+  useEffect(() => {
+    if (mode === "project" && projectState?.id) {
+      // The guard below bounces anything that can't be shown back to the list
+      const screen = projectState.screen;
+      setStage(screen === 11 || screen === 12 || screen === 13 ? screen : 10);
+    }
+    else if (doc) setStage(1);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Remember which project screen is open, for a refresh (see ProjectDraft.screen)
+  useEffect(() => {
+    if (stage < 10) return;
+    setProjectState((state) => (state && state.screen !== stage ? { ...state, screen: stage } : state));
+  }, [stage]);
+
+  // Project Mode's screens need a saved project, and the editor a JSA to edit
+  useEffect(() => {
+    if (stage >= 10 && !projectState?.id) setStage(0);
+    else if (stage === 11 && !projectState?.project.phases[projectState.openPhase]?.jsa) setStage(10);
+  }, [stage, projectState]);
 
   // Guard against a blank screen: if the draft disappears (cleared elsewhere), never stay stuck on step 2/3
   useEffect(() => {
-    if (stage !== 0 && !doc) {
+    if (stage >= 1 && stage <= 4 && !doc) {
       setHistoryId(null);
       clearAllDrafts();
       setStage(0);
@@ -182,7 +302,7 @@ export default function App() {
   // 0 on purpose: losing the procedure says nothing about the JSA, which is
   // still perfectly usable.
   useEffect(() => {
-    if (stage >= 3 && !procedure) setStage(2);
+    if ((stage === 3 || stage === 4) && !procedure) setStage(2);
   }, [stage, procedure]);
 
   // Keep the history entry in step with the document being edited. The
@@ -402,6 +522,10 @@ export default function App() {
     discardProcedure();
     setError(null);
     setHistoryId(null);
+    // The project stays in projects.ts; this only closes it
+    drafting.cancel();
+    procedureDrafting.cancel();
+    setProjectState(null);
     // Drafts only — past work in historyStore.ts deliberately survives "เริ่มใหม่"
     clearAllDrafts();
     setStage(0);
@@ -490,6 +614,52 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
+  /** ข้อมูลโครงการ -> the JSA list. Saving the project for the first time
+   * (getting its id) happens here, not on the first keystroke, so a project
+   * started and abandoned on the form never lands in the saved list. */
+  const continueFromProjectSetup = () => {
+    if (!projectState) return;
+    if (!projectState.id) {
+      const id = projectStore.newId();
+      setProjectState({ ...projectState, id });
+      projectLogo.setLogoFor(id, pendingProjectLogo);
+    }
+    saveNames({ supervisor: projectState.project.supervisor, analyst: projectState.project.analyst });
+    goto(10);
+  };
+
+  const startNewProject = () => {
+    drafting.cancel();
+    procedureDrafting.cancel();
+    setProjectState({ id: null, project: blankProject(), openPhase: 0 });
+    setPendingProjectLogo(loadCompanyProfile()?.logo ?? null);
+  };
+
+  const openSavedProject = (entry: ProjectEntry) => {
+    drafting.cancel();
+    procedureDrafting.cancel();
+    setProjectState({ id: entry.id, project: entry.project, openPhase: 0 });
+    goto(10);
+  };
+
+  const openPhase = (phaseId: string) => {
+    setProjectState((state) =>
+      state
+        ? { ...state, openPhase: Math.max(0, state.project.phases.findIndex((p) => p.id === phaseId)) }
+        : state,
+    );
+    goto(11);
+  };
+
+  /** "กรอกเอง" — a blank JSA for this phase, straight into the editor */
+  const fillPhaseByHand = (phaseId: string) => {
+    setProject((project) => {
+      const phase = project.phases.find((p) => p.id === phaseId);
+      return phase ? withPhaseJsa(project, phaseId, blankPhaseJsa(project, phase), false) : project;
+    });
+    openPhase(phaseId);
+  };
+
   // The procedure mirrors the JSA's step list, so edits to those steps leave
   // it describing work that no longer matches — warn rather than silently
   // resync, which would throw away the user's own edits to the procedure
@@ -503,7 +673,8 @@ export default function App() {
   // stage on the next render, so <main> just renders nothing that one frame,
   // the same "briefly blank, never wrong" behavior the old JSX had by
   // falling through every condition.
-  const view = computeView(stage, doc, procedure, procedureBusy);
+  const view = computeView(stage, doc, procedure, procedureBusy, projectState);
+  const inProject = (mode === "project" && stage === 0) || stage >= 10;
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface">
@@ -539,16 +710,27 @@ export default function App() {
             instead of shrinking to 45rem above a wider table. */}
         <div
           className={
-            stage === 1
+            stage === 1 || stage === 11
               ? undefined
               : stage === 0
                 ? "mx-auto max-w-[45rem] xl:max-w-none"
                 : "mx-auto max-w-[45rem]"
           }
         >
+          {/* Switching modes swaps the track (3 steps <-> 4): fade across
+              rather than snapping between the two */}
+          <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={inProject ? "project" : "single"} {...fadeSwap}>
+          {inProject ? (
+            <Stepper
+              steps={PROJECT_STEPS}
+              current={stage === 0 ? 0 : stage === 12 ? 2 : stage === 13 ? 3 : 1}
+              onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
+            />
+          ) : (
           <Stepper
             current={Math.min(stage, 2) as 0 | 1 | 2}
-            onNavigate={goto}
+            onNavigate={(index) => goto(index as Stage)}
             branch={
               stage >= 3
                 ? {
@@ -562,6 +744,9 @@ export default function App() {
                 : undefined
             }
           />
+          )}
+          </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* One fade between screens (#1). Keyed on the screen, not the
@@ -586,21 +771,58 @@ export default function App() {
               // list), instead of sizing to its own short content and floating
               // next to a much taller form.
               <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
-                <InputStep
-                  onGenerate={handleGenerate}
-                  onSkipToManual={handleSkipToManual}
-                  // Only set when reached via the stepper's back-navigation
-                  // (doc already exists then — see the effect above that jumps
-                  // stage to 1 whenever a fresh mount finds a doc) — never on a
-                  // genuinely fresh session, where there's nothing to cancel back to
-                  onCancel={doc ? () => goto(1) : undefined}
-                  onCancelGenerate={cancelGenerate}
-                  busy={busy}
-                  error={error}
-                />
-                {/* Hidden while generating so it doesn't compete with GeneratingPanel */}
-                <AnimatePresence initial={false}>
-                  {busy ? null : (
+                {/* overflow-x-clip: the sideways slide must not widen the page
+                    for its 250ms (a phone would get a horizontal scrollbar);
+                    the clip margin keeps focus rings at the edges visible */}
+                <div className="min-w-0 overflow-x-clip [overflow-clip-margin:8px]">
+                  {/* Gone while a JSA is generating: the mode can't change mid-draft */}
+                  {busy ? null : <ModeTabs mode={mode} onChange={setMode} />}
+                  {/* The tabs stay put; only the form under them swaps,
+                      sliding in from the side of the tab that was picked */}
+                  <AnimatePresence mode="wait" initial={false} custom={mode === "project" ? 1 : -1}>
+                    <motion.div
+                      key={mode}
+                      custom={mode === "project" ? 1 : -1}
+                      variants={tabSlide}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                    >
+                      {mode === "project" ? (
+                        projectState ? (
+                          <ProjectSetup
+                            project={projectState.project}
+                            onChange={(next) => setProject(() => next)}
+                            onContinue={continueFromProjectSetup}
+                            onStartNew={startNewProject}
+                            started={!!projectState.id}
+                            logo={projectState.id ? projectLogo.logo : pendingProjectLogo}
+                            onLogoChange={projectState.id ? projectLogo.setLogo : setPendingProjectLogo}
+                          />
+                        ) : null
+                      ) : (
+                        <InputStep
+                          onGenerate={handleGenerate}
+                          onSkipToManual={handleSkipToManual}
+                          // Only set when reached via the stepper's back-navigation
+                          // (doc already exists then — see the effect above that jumps
+                          // stage to 1 whenever a fresh mount finds a doc) — never on a
+                          // genuinely fresh session, where there's nothing to cancel back to
+                          onCancel={doc ? () => goto(1) : undefined}
+                          onCancelGenerate={cancelGenerate}
+                          busy={busy}
+                          error={error}
+                        />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+                {/* Each tab lists its own kind of saved work. Hidden while
+                    generating so it doesn't compete with GeneratingPanel. */}
+                <AnimatePresence initial={false} mode="wait">
+                  {busy ? null : mode === "project" ? (
+                    <ProjectList key="projects" onOpen={openSavedProject} />
+                  ) : (
                     <HistoryList
                       key="history"
                       onOpen={handleOpenHistory}
@@ -682,6 +904,69 @@ export default function App() {
               </div>
             ) : null}
 
+            {view?.kind === "projectHub" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <ProjectHub
+                  project={view.project}
+                  drafting={drafting}
+                  saveState={projectSave}
+                  onOpen={openPhase}
+                  onManual={fillPhaseByHand}
+                  onEditProject={() => goto(0)}
+                  onProcedure={() => goto(12)}
+                />
+              </div>
+            ) : null}
+
+            {view?.kind === "projectProcedure" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <ProjectProcedureStep
+                  project={view.project}
+                  onChange={setProject}
+                  drafting={procedureDrafting}
+                  saveState={projectSave}
+                  onBack={() => goto(10)}
+                  onContinue={() => goto(13)}
+                  photos={projectPhotos.photos}
+                  onPhotoChange={projectPhotos.setPhoto}
+                />
+              </div>
+            ) : null}
+
+            {view?.kind === "projectFiles" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <ProjectFilesStep
+                  project={view.project}
+                  config={config}
+                  companyLogo={projectLogo.logo}
+                  photos={projectPhotos.photos}
+                  onBack={() => goto(12)}
+                />
+              </div>
+            ) : null}
+
+            {/* The same JSA editor as Single Mode, on one phase's JSA */}
+            {view?.kind === "projectEditing" ? (
+              <EditorStep
+                doc={view.jsa}
+                onChange={(next) => setProject((project) => withPhaseJsa(project, view.phase.id, next))}
+                companyLogo={projectLogo.logo}
+                onCompanyLogoChange={projectLogo.setLogo}
+                saveState={projectSave}
+                onContinue={() => {
+                  setProject((project) => withPhaseJsa(project, view.phase.id, view.jsa, true));
+                  goto(10);
+                }}
+                onStartOver={() => goto(10)}
+                error={null}
+                project={{
+                  name: view.project.name,
+                  position: `JSA ${view.index + 1} จาก ${view.project.phases.length}`,
+                  onBack: () => goto(10),
+                }}
+              />
+            ) : null}
+
             {view?.kind === "procedurePdf" ? (
               <div className="mx-auto max-w-[45rem]">
                 <ProcedurePdfStep
@@ -709,7 +994,12 @@ export default function App() {
           the screen, hence the extra bottom padding there. */}
       <footer
         className={`space-y-1 px-4 pt-2 text-center text-xs text-muted ${
-          view?.kind === "editing" || view?.kind === "procedureEditing" ? "pb-24" : "pb-6"
+          view?.kind === "editing" ||
+          view?.kind === "procedureEditing" ||
+          view?.kind === "projectEditing" ||
+          view?.kind === "projectProcedure"
+            ? "pb-24"
+            : "pb-6"
         }`}
       >
         {/* Two inline-blocks so a narrow screen breaks between the phrases,

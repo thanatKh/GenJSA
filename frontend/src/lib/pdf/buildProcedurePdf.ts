@@ -16,7 +16,7 @@
  */
 
 import type { CompanyLogo } from "../companyLogo";
-import type { ProcedureDocument } from "../schema";
+import type { ProcedureDocument, ProcedureStep } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
 import { procedurePdfFileName } from "./fileName";
@@ -34,7 +34,25 @@ import {
   type StepPhoto,
 } from "./layout";
 
+/** Project Mode: one procedure for the whole project. Its steps are printed
+ * as one section per phase, numbered by phase — phase 2's steps 2.1, 2.2…
+ * and their sub-steps 2.1.1… — followed the project's notes and tag list
+ * as their own sections. The ProcedureDocument passed alongside supplies the
+ * header and the opening sections only; its own `steps` are not printed. */
+export type ProjectProcedureLayout = {
+  phases: {
+    title: string;
+    steps: ProcedureStep[];
+    /** Prepended to photoKey(step, sub) — a project's photos are keyed per phase */
+    photoPrefix: string;
+  }[];
+  notes: string;
+  references: { tag: string; note: string }[];
+};
+
 type BuildProcedureOptions = {
+  /** Project Mode — see ProjectProcedureLayout */
+  project?: ProjectProcedureLayout;
   layout?: PdfLayout;
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
@@ -473,6 +491,14 @@ export async function buildProcedurePdf(
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
   listSection(P.sections.tools, procedure.tools);
+  const project = options.project;
+  if (project) {
+    textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);
+    listSection(
+      P.sections.tags ?? "รายการวาล์ว / Blind / Tag",
+      project.references.map((ref) => (ref.note.trim() ? `${ref.tag}: ${ref.note}` : ref.tag)),
+    );
+  }
 
   // ------------------------------------------------- the procedure itself --
   // Steps are numbered on their own — "1.", sub-steps "1.1" — exactly as the
@@ -486,20 +512,26 @@ export async function buildProcedurePdf(
   drawHeading(P.sections.procedure);
   y += blockGap;
 
-  procedure.steps.forEach((step, stepIndex) => {
+  /** One run of steps and their sub-steps. Single Mode: "1." / "1.1".
+   * Project Mode passes the phase's number as `prefix` ("2.") for "2.1" /
+   * "2.1.1", indented one level further under the phase's own heading. */
+  const drawSteps = (steps: ProcedureStep[], prefix: string, extraIndent: number, photoPrefix: string) => {
+  const stepX = stepIndent + extraIndent;
+  const subX = subIndent + extraIndent;
+  steps.forEach((step, stepIndex) => {
     if (stepIndex > 0) y += stepGap;
-    const titleLines = wrap(step.procedure, contentW - stepIndent, "bold", stepPt, `${step.no}.`);
+    const titleLines = wrap(step.procedure, contentW - stepX, "bold", stepPt, prefix ? `${prefix}${step.no}` : `${step.no}.`);
 
     const subLines = step.sub_steps.map((sub) =>
       wrap(
         sub.action,
-        contentW - subIndent,
+        contentW - subX,
         "normal",
         L.font.body_pt,
-        `${step.no}.${sub.no}`,
+        `${prefix}${step.no}.${sub.no}`,
       ),
     );
-    const subPhotos = step.sub_steps.map((sub) => photos[photoKey(step.no, sub.no)]);
+    const subPhotos = step.sub_steps.map((sub) => photos[photoPrefix + photoKey(step.no, sub.no)]);
 
     // Keep a step title with its first sub-step — a heading alone at the foot
     // of a page is the one pagination problem a flowing layout still has.
@@ -511,8 +543,8 @@ export async function buildProcedurePdf(
     // keep-together below would carry them to the next page and strand the
     // title on this one anyway.
     // Photos align with their sub-step's text, after the "1.1" marker
-    const photoX = (lines: Line[]) => mL + subIndent + (lines[0]?.indent ?? 0);
-    const photoMaxW = (lines: Line[]) => contentW - subIndent - (lines[0]?.indent ?? 0);
+    const photoX = (lines: Line[]) => mL + subX + (lines[0]?.indent ?? 0);
+    const photoMaxW = (lines: Line[]) => contentW - subX - (lines[0]?.indent ?? 0);
 
     let keepTogether = Math.min(titleLines.length, 1) * stepLineH;
     if (subLines.length) {
@@ -527,7 +559,7 @@ export async function buildProcedurePdf(
     }
     need(keepTogether);
 
-    drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent, stepLineH, stepPt);
+    drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
 
     step.sub_steps.forEach((_, subIndex) => {
       const actionLines = subLines[subIndex];
@@ -543,7 +575,7 @@ export async function buildProcedurePdf(
         if (blockH <= usableBodyH) need(blockH);
       }
 
-      drawFlowing(actionLines, mL + subIndent, contentW - subIndent);
+      drawFlowing(actionLines, mL + subX, contentW - subX);
 
       // Right under its own line, so it reads as "this is what that action
       // looks like" rather than a picture of the step as a whole.
@@ -552,11 +584,27 @@ export async function buildProcedurePdf(
           photo,
           photoX(actionLines),
           photoMaxW(actionLines),
-          `ภาพประกอบขั้นตอน ${step.no}.${step.sub_steps[subIndex].no}`,
+          `ภาพประกอบขั้นตอน ${prefix}${step.no}.${step.sub_steps[subIndex].no}`,
         );
       }
     });
   });
+  };
+
+  if (project) {
+    project.phases.forEach((phase, phaseIndex) => {
+      if (phaseIndex > 0) y += sectionGap;
+      const titleLines = wrap(phase.title, contentW - stepIndent, "bold", headingPt, `${phaseIndex + 1}.`);
+      // The phase heading with its first step title and sub-step line, so a
+      // phase never opens on the last line of a page
+      need(titleLines.length * headingLineH + stepLineH + lineH);
+      drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent, headingLineH, headingPt);
+      y += blockGap;
+      drawSteps(phase.steps, `${phaseIndex + 1}.`, mmToPt(6), phase.photoPrefix);
+    });
+  } else {
+    drawSteps(procedure.steps, "", 0, "");
+  }
 
   // ผู้จัดทำ used to be printed here as a sign-off after the last step —
   // moved to the cover page's info summary instead (drawCoverPage above),

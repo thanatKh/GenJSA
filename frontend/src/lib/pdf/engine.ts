@@ -78,6 +78,17 @@ function breakUnits(paragraph: string, words: Intl.Segmenter): string[] {
   return units;
 }
 
+// Subscript/superscript digits → plain ones. TH Sarabun New has no glyphs
+// for them, so "N₂" printed as "N" — the 2 silently gone, in a document
+// about nitrogen purging. "N2" reads the same on site.
+const SCRIPT_DIGITS: Record<string, string> = {
+  "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+  "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+};
+function printable(text: string): string {
+  return text.replace(/[₀-₉⁰¹²³⁴-⁹]/g, (c) => SCRIPT_DIGITS[c] ?? c);
+}
+
 /**
  * Create a jsPDF instance with the Thai font registered and every derived
  * geometry value precomputed, plus the drawing helpers that operate on it.
@@ -160,7 +171,8 @@ export async function createEngine(
    * number) still gets cut by jsPDF per character — the only case a
    * mid-word break remains. Falls back to splitTextToSize entirely where
    * Intl.Segmenter doesn't exist (old browsers), never worse than before. */
-  const splitLines = (text: string, maxW: number): string[] => {
+  const splitLines = (raw: string, maxW: number): string[] => {
+    const text = printable(raw);
     if (!thaiWords) return doc.splitTextToSize(text, maxW);
 
     const lines: string[] = [];

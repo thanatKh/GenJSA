@@ -68,6 +68,22 @@ export const fadeSwap = {
 export const FADE_IN_CLASS =
   "animate-in fade-in-0 duration-200 ease-(--ease-smooth-out) motion-reduce:animate-none";
 
+/** Switching tabs (งานเดียว / โครงการ): the new form slides in from the side
+ * of the tab that was picked and the old one leaves the other way, so the
+ * move reads as sideways navigation rather than a page reload. `custom` is
+ * the direction: 1 = moving to the right-hand tab, -1 = to the left. With
+ * "reduce motion" on, MotionConfig drops the slide and keeps the fade. */
+export const tabSlide: Variants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 24 }),
+  center: { opacity: 1, x: 0, pointerEvents: "auto", transition: { duration: FAST, ease: EASE_OUT } },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction * -24,
+    pointerEvents: "none",
+    transition: { duration: QUICK, ease: EASE_OUT },
+  }),
+};
+
 /** A picture arriving (step photo, company logo) */
 export const popIn = {
   initial: { opacity: 0, scale: 0.96 },
