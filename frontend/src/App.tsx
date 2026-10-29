@@ -63,7 +63,7 @@ import {
 } from "./store";
 
 // Project Mode's track — its own four steps instead of the JSA wizard's three
-const PROJECT_STEPS = ["ข้อมูลโครงการ", "JSA แต่ละขั้นตอน", "ขั้นตอนปฏิบัติงาน", "ไฟล์ที่ส่ง"] as const;
+const PROJECT_STEPS = ["ข้อมูลโครงการ", "JSA แต่ละขั้นตอน", "ขั้นตอนปฏิบัติงาน", "เอกสาร PDF"] as const;
 
 /** The session's project draft, if it still parses — sessionStorage outlives
  * code changes within a tab just like history does */

@@ -358,7 +358,7 @@ export function ProjectProcedureStep({
               onContinue();
             }}
           >
-            ไฟล์ที่ส่ง
+            เอกสาร PDF
             <ArrowRight className="size-5" aria-hidden="true" />
           </Button>
         </div>

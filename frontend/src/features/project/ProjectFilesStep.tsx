@@ -1,4 +1,4 @@
-/* Project Mode, step 4 — ไฟล์ที่ส่ง
+/* Project Mode, step 4 — เอกสาร PDF
  *
  * What a big job is submitted as: two files, each as PDF and Word.
  *   1. The project's work procedure — one document, phases as sections
@@ -134,7 +134,7 @@ export function ProjectFilesStep({
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ไฟล์ที่ส่ง</h1>
+      <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">เอกสาร PDF</h1>
       <p className="mt-1.5 text-muted">2 ไฟล์ แต่ละไฟล์เปิดเป็น PDF หรือดาวน์โหลดเป็น Word ได้</p>
 
       {undrafted || stale ? (

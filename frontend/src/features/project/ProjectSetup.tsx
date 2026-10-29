@@ -174,8 +174,8 @@ export function ProjectSetup({
         </div>
 
         <Section
-          title="รายการอ้างอิง"
-          hint="วาล์ว / Blind / Tag ที่ใช้ในโครงการ กรอกครั้งเดียว ระบบใช้เลขตามนี้เท่านั้น ไม่คิดเลขขึ้นเอง"
+          title="รายการวาล์ว / Blind / Tag"
+          hint="จุดแยกระบบ (isolation) ที่ใช้ในโครงการ กรอกครั้งเดียว ระบบใช้เลขตามนี้เท่านั้น ไม่คิดเลขขึ้นเอง"
         >
           <ul className="grid list-none gap-2 p-0">
             <AnimatePresence initial={false}>
