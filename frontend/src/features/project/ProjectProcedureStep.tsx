@@ -33,6 +33,7 @@ import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { fadeSwap } from "../../lib/motion";
 import type { PhotoMap, StepPhoto } from "../../lib/pdf/layout";
 import { SubStepItem } from "../procedure/ProcedureEditorStep";
+import { PhotoHint } from "../procedure/SubStepPhoto";
 import type { ProcedureDocument, ProjectDocument, ProjectPhase, SubStep } from "../../lib/schema";
 import { Elapsed } from "./ProjectHub";
 import { projectPhotoKey, sectionStale } from "./projectModel";
@@ -180,9 +181,7 @@ export function ProjectProcedureStep({
       <p className="mt-0.5 text-sm text-muted">
         ฉบับเดียวทั้งโครงการ ร่างทีละส่วนจาก JSA ของแต่ละขั้นตอน โดยระบบรู้ว่าขั้นตอนก่อนหน้าทำอะไรไว้แล้ว
       </p>
-      <p className="mt-0.5 text-sm text-muted">
-        แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อย (รูปภาพจะถูกลบหากลบโครงการนี้)
-      </p>
+      <PhotoHint note="รูปภาพจะถูกลบหากลบโครงการนี้" />
 
       {undrafted.length > 0 && !busy ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-raised p-3 sm:p-4">

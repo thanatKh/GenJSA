@@ -24,6 +24,22 @@ import { Button } from "../../components/ui";
 import { collapse, popIn } from "../../lib/motion";
 import type { StepPhoto } from "../../lib/pdf/layout";
 
+/** The line under each procedure editor's heading that says how photos get
+ * in. Drag-and-drop and Ctrl+V have nothing on screen of their own, so
+ * without it nobody finds them — they're only mentioned where a mouse and
+ * keyboard are (pointer-fine); a phone gets just the button. */
+export function PhotoHint({ note }: { note?: string }) {
+  return (
+    <p className="mt-1 text-sm text-muted">
+      แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อยด้วยปุ่มรูปภาพ
+      <span className="hidden pointer-fine:inline">
+        {" "}ลากรูปมาวางที่ขั้นตอนย่อย หรือคัดลอกรูปแล้ววาง (Ctrl+V) ในช่องข้อความ
+      </span>
+      {note ? ` (${note})` : null}
+    </p>
+  );
+}
+
 /** Icon button in the sub-step row's action column, beside the delete button */
 export function PhotoButton({
   label,

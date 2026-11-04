@@ -37,7 +37,6 @@ import {
 } from "./lib/api";
 import { loadCompanyProfile, type CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
-import * as photoStore from "./lib/photoStore";
 import {
   projectDocumentSchema,
   stepFingerprint,
@@ -64,6 +63,11 @@ import {
 
 // Project Mode's track — its own four steps instead of the JSA wizard's three
 const PROJECT_STEPS = ["ข้อมูลโครงการ", "JSA แต่ละขั้นตอน", "ขั้นตอนปฏิบัติงาน", "เอกสาร PDF"] as const;
+// JSA + Procedure — same last step as the other two tracks, so every mode
+// ends on "เอกสาร PDF" with every file of the job on it
+const PROCEDURE_STEPS = ["กรอกข้อมูล", "ตรวจทาน JSA", "ขั้นตอนปฏิบัติงาน", "เอกสาร PDF"] as const;
+/** JSA + Procedure's stages, by stepper index */
+const PROCEDURE_TRACK = [0, 1, 3, 4] as const;
 
 /** The session's project draft, if it still parses — sessionStorage outlives
  * code changes within a tab just like history does */
@@ -91,9 +95,11 @@ function buildBlankDocument(
   };
 }
 
-// 0-2 are the JSA wizard and map 1:1 onto the Stepper. 3-4 are the optional
-// work procedure, reached only from stage 2 — see the Stepper note in the JSX
-// for why they don't get their own step in the progress bar.
+// Single Mode runs one of two tracks, picked by the first screen's switch:
+// JSA (0 -> 1 -> 2: the JSA's PDF) or JSA + Procedure (0 -> 1 -> 3 -> 4: the
+// procedure is drafted from the JSA once it has been reviewed, and 4 delivers
+// both documents). Stage 2 is the JSA track's last page only; its procedure
+// card moves a job onto the other track.
 // 10+ are Project Mode: 10 the project's JSA list, 11 one phase's JSA in the
 // editor, 12 the project's work procedure, 13 its two files. Its first step,
 // ข้อมูลโครงการ, is stage 0 on the โครงการ tab.
@@ -148,7 +154,13 @@ function computeView(
       ? { kind: "projectEditing", project: project.project, phase, jsa: phase.jsa, index: project.openPhase }
       : null;
   }
-  if (stage === 1) return doc ? { kind: "editing", doc } : null;
+  if (stage === 1) {
+    if (!doc) return null;
+    // JSA + Procedure's first draft, started by the editor's ถัดไป
+    return procedureBusy
+      ? { kind: "procedureGenerating", doc, heading: "กำลังสร้างขั้นตอนปฏิบัติงาน" }
+      : { kind: "editing", doc };
+  }
   if (stage === 2) {
     if (!doc) return null;
     return procedureBusy
@@ -298,11 +310,11 @@ export default function App() {
     }
   }, [stage, doc]);
 
-  // The procedure pages need a procedure. Falling back to stage 2 rather than
-  // 0 on purpose: losing the procedure says nothing about the JSA, which is
-  // still perfectly usable.
+  // The procedure pages need a procedure. Falling back to the JSA editor
+  // rather than 0 on purpose: losing the procedure says nothing about the JSA,
+  // which is still perfectly usable — and its ถัดไป drafts a new one.
   useEffect(() => {
-    if ((stage === 3 || stage === 4) && !procedure) setStage(2);
+    if ((stage === 3 || stage === 4) && !procedure) setStage(1);
   }, [stage, procedure]);
 
   // Keep the history entry in step with the document being edited. The
@@ -366,18 +378,11 @@ export default function App() {
     procedureDraft.clear();
   };
 
-  const handleGenerate = async (
-    values: InputForm,
-    withProcedure: boolean,
-    logo: CompanyLogo | null,
-  ) => {
+  const handleGenerate = async (values: InputForm, logo: CompanyLogo | null) => {
     setBusy(true);
     setError(null);
     const controller = new AbortController();
     generateController.current = controller;
-    // The history id this run allocates, if it gets that far — the cancel
-    // branch below rolls back the logo saved under it along with the rest
-    let newEntryId: string | null = null;
     try {
       // The date is today, stamped at the moment of creating — the first
       // screen no longer asks for it (a saved draft used to carry yesterday's
@@ -390,73 +395,16 @@ export default function App() {
       docDraft.save(generated);
       // A new JSA means any procedure on screen describes a different job
       discardProcedure();
-      newEntryId = startHistoryEntry();
-      setCompanyLogoFor(newEntryId, logo);
-
-      // Chained under the SAME controller/signal as the JSA call, so ยกเลิก
-      // (cancelGenerate) aborts either half — including after the JSA already
-      // succeeded, per the "cancel always discards everything" choice made
-      // for this feature. The JSA is only committed to history below, once
-      // this whole block (both calls) is past the point where it can still
-      // be cancelled — see the CancelledError branch, which intentionally
-      // discards a JSA that finished but whose procedure call was cancelled.
-      if (withProcedure) {
-        setProcedureBusy(true);
-        setProcedureError(null);
-        try {
-          const procedureGenerated = await generateProcedure(generated, {
-            signal: controller.signal,
-          });
-          setProcedure(procedureGenerated);
-          procedureDraft.save(procedureGenerated);
-        } catch (procedureCaught) {
-          // The JSA already succeeded and is kept regardless — losing the
-          // procedure never costs the user the document they actually asked
-          // to review first. Cancellation here is handled by the outer catch
-          // (the same AbortSignal rejects both fetches), so this only ever
-          // reports a genuine procedure failure.
-          if (!(procedureCaught instanceof CancelledError)) {
-            setProcedureError(
-              procedureCaught instanceof ApiError
-                ? procedureCaught.message
-                : "สร้างขั้นตอนปฏิบัติงานไม่สำเร็จ กรุณาลองอีกครั้ง",
-            );
-          } else {
-            throw procedureCaught;
-          }
-        } finally {
-          setProcedureBusy(false);
-        }
-      }
-
+      setCompanyLogoFor(startHistoryEntry(), logo);
       setStage(1);
       window.scrollTo({ top: 0 });
     } catch (caught) {
       // Cancelled by the user (see cancelGenerate) — not a failure, so no
       // error banner; just fall through to the form as if nothing happened.
       // Form data is otherwise left untouched on a real error too — never
-      // clear anything just because the request failed. A cancel during the
-      // procedure half also discards the JSA that already finished, matching
-      // "ยกเลิก always aborts everything" — setStage/setDoc above already ran
-      // for the JSA, so undo them rather than leaving a half-finished result
-      // stage 0 has no way to explain.
-      if (caught instanceof CancelledError) {
-        // Only reachable once the JSA already succeeded and the cancel landed
-        // during the procedure half — a plain single-JSA cancel never gets
-        // here at all, since setDoc/startHistoryEntry below only run after
-        // generateJsa resolves. Roll back exactly what this function itself
-        // set: the JSA, its draft, and the history id it allocated.
-        //
-        // Deliberately NOT inputDraft — GeneratingPanel's cancel button relies
-        // on the typed description surviving any cancel with no confirm
-        // dialog; clearing it here would break that promise for this one path.
-        setDoc(null);
-        docDraft.clear();
-        discardProcedure();
-        if (newEntryId) void photoStore.remove(newEntryId, photoStore.COMPANY_LOGO_KEY);
-        setHistoryId(null);
-        currentHistoryId.clear();
-      } else {
+      // clear anything just because the request failed. Nothing to roll back
+      // on a cancel: nothing above is set until generateJsa resolves.
+      if (!(caught instanceof CancelledError)) {
         setError(
           caught instanceof ApiError
             ? caught.message
@@ -505,6 +453,9 @@ export default function App() {
     setHistoryId(entry.id);
     currentHistoryId.save(entry.id);
     setError(null);
+    // A job with a procedure is a JSA + Procedure job, whichever option the
+    // switch was on (see the track note on Stage)
+    setMode(entry.procedure ? "procedure" : "jsa");
     setStage(to);
     window.scrollTo({ top: 0 });
   };
@@ -513,7 +464,7 @@ export default function App() {
 
   /** Straight to the procedure editor, for the "+ ขั้นตอนปฏิบัติงาน" badge.
    * Safe even if the procedure fails to restore: the guard above bounces
-   * stage 3 back to 2 rather than leaving a blank screen. */
+   * stage 3 back to the JSA editor rather than leaving a blank screen. */
   const handleOpenHistoryProcedure = (entry: HistoryEntry) =>
     openHistoryEntry(entry, 3);
 
@@ -532,14 +483,17 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  /** Draft a procedure from the current JSA.
+  /** On to the procedure from the current JSA: the JSA editor's ถัดไป on
+   * the JSA + Procedure track, and the JSA PDF page's procedure card.
    *
-   * From the PDF page this reopens an existing one rather than spending
-   * another AI call; `force` is the editor's "regenerate" path, which has
-   * already confirmed that the user's edits are being discarded. */
+   * An existing procedure is reopened rather than spending another AI call
+   * (the editor warns if the JSA's steps have changed since); `force` is the
+   * procedure editor's "regenerate" path, which has already confirmed that
+   * the user's edits are being discarded. */
   const handleCreateProcedure = ({ force = false } = {}) => {
     if (!doc) return;
     if (procedure && !force) {
+      setMode("procedure");
       goto(3);
       return;
     }
@@ -547,15 +501,15 @@ export default function App() {
   };
 
   /** "สร้างขั้นตอนปฏิบัติงาน" on a history row with no procedure yet: open
-   * that job on its JSA PDF page and start drafting straight away. Stage 2
-   * is where the wait already lives (computeView shows the busy panel there),
-   * and it's also where a cancel or a failed draft leaves the user — on the
-   * job's own PDF page, with PdfStep showing the error and its retry button.
+   * that job on its JSA editor and start drafting straight away — the same
+   * place JSA + Procedure drafts from, so a cancel or a failed draft leaves
+   * the user on the job's JSA, with the error and ถัดไป to try again.
    *
    * Passes entry.doc rather than relying on `doc`: openHistoryEntry's state
    * updates haven't rendered yet when this runs. */
   const handleCreateHistoryProcedure = (entry: HistoryEntry) => {
-    openHistoryEntry(entry, 2);
+    openHistoryEntry(entry, 1);
+    setMode("procedure");
     void generateProcedureFrom(entry.doc);
   };
 
@@ -576,6 +530,9 @@ export default function App() {
       pruneToLiveKeys(
         generated.steps.flatMap((step) => step.sub_steps.map((sub) => photoKey(step.no, sub.no))),
       );
+      // Having a procedure puts the job on the JSA + Procedure track — also
+      // how the JSA PDF page's card moves a JSA-only job onto it
+      setMode("procedure");
       goto(3);
     } catch (caught) {
       // Cancelled via ยกเลิก on the busy panel — not a failure, so no error
@@ -599,7 +556,7 @@ export default function App() {
   };
 
   // "ยกเลิก" on the busy panel shown for every generateProcedureFrom path
-  // (first draft at stage 2, regenerate at stage 3) — aborts the
+  // (first draft at stage 1 or 2, regenerate at stage 3) — aborts the
   // in-flight fetch so the wait actually stops, same reasoning as
   // cancelGenerate above.
   const cancelCreateProcedure = () => procedureController.current?.abort();
@@ -675,6 +632,8 @@ export default function App() {
   // falling through every condition.
   const view = computeView(stage, doc, procedure, procedureBusy, projectState);
   const inProject = (mode === "project" && stage === 0) || stage >= 10;
+  // Single Mode's track (see the note on Stage)
+  const withProcedure = mode === "procedure";
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface">
@@ -694,13 +653,9 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
-        {/* current stays clamped to 2: the work procedure (stages 3-4) is
-            optional and branches off the JSA's last step rather than
-            extending the wizard — most users will stop at the JSA, and a
-            permanent fourth circle would imply it isn't finished without one.
-            `branch` is how stages 3-4 still get a "you are here": see its doc
-            comment in Stepper.tsx for why it's a dashed branch node rather
-            than a fourth step.
+        {/* One track per mode: JSA 3 steps, JSA + Procedure 4, โครงการ 4 —
+            the procedure is a real step once the user has asked for it, not
+            a side branch off the JSA's PDF page.
 
             Width: every stage but 1 wraps its own content at max-w-[45rem]
             (stage 0 escapes that at xl: via its own grid — see below), so the
@@ -720,30 +675,21 @@ export default function App() {
           {/* Switching modes swaps the track (3 steps <-> 4): fade across
               rather than snapping between the two */}
           <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={inProject ? "project" : "single"} {...fadeSwap}>
+          <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
           {inProject ? (
             <Stepper
               steps={PROJECT_STEPS}
               current={stage === 0 ? 0 : stage === 12 ? 2 : stage === 13 ? 3 : 1}
               onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
             />
+          ) : withProcedure ? (
+            <Stepper
+              steps={PROCEDURE_STEPS}
+              current={stage === 0 ? 0 : stage === 1 ? 1 : stage === 3 ? 2 : 3}
+              onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
+            />
           ) : (
-          <Stepper
-            current={Math.min(stage, 2) as 0 | 1 | 2}
-            onNavigate={(index) => goto(index as Stage)}
-            branch={
-              stage >= 3
-                ? {
-                    label: "ขั้นตอนปฏิบัติงาน",
-                    onBack: () => goto(2),
-                    // Inert on stage 3 (ProcedureEditorStep) — that's the page
-                    // this node itself represents. Stays a live back-link on
-                    // stage 4 (ProcedurePdfStep), a genuinely different page.
-                    isCurrent: stage === 3,
-                  }
-                : undefined
-            }
-          />
+            <Stepper current={Math.min(stage, 2)} onNavigate={(index) => goto(index as Stage)} />
           )}
           </motion.div>
           </AnimatePresence>
@@ -851,9 +797,12 @@ export default function App() {
                 companyLogo={companyLogo}
                 onCompanyLogoChange={setCompanyLogo}
                 saveState={docSave}
-                onContinue={() => goto(2)}
+                // JSA + Procedure: on to the procedure, drafted now from the
+                // JSA as reviewed (or reopened if there is one already)
+                onContinue={withProcedure ? () => handleCreateProcedure() : () => goto(2)}
+                continueLabel={withProcedure ? "ถัดไป" : undefined}
                 onStartOver={startOver}
-                error={error}
+                error={withProcedure ? (error ?? procedureError) : error}
               />
             ) : null}
 
@@ -861,8 +810,9 @@ export default function App() {
                 honest wait — elapsed counter and all — rather than a lone spinner
                 on a button. Replaces the page content for the same reason
                 InputStep does: the wait should be the only thing on screen.
-                Covers both stage 2's first-time draft and stage 3's regenerate —
-                computeView picks the right heading for whichever stage this is. */}
+                Covers the first-time draft (from the JSA editor, or the JSA
+                PDF page's card) and stage 3's regenerate — computeView picks
+                the right heading for whichever stage this is. */}
             {view?.kind === "procedureGenerating" ? (
               <div className="mx-auto max-w-[45rem]">
                 <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">{view.heading}</h1>
@@ -902,7 +852,7 @@ export default function App() {
                   onStepPhotosReplace={replaceStepPhotos}
                   saveState={procedureSave}
                   onContinue={() => goto(4)}
-                  onBack={() => goto(2)}
+                  onBack={() => goto(1)}
                   onRegenerate={() => handleCreateProcedure({ force: true })}
                   stale={procedureStale}
                   error={procedureError}
@@ -982,7 +932,6 @@ export default function App() {
                   companyLogo={companyLogo}
                   config={config}
                   onBack={() => goto(3)}
-                  onBackToJsa={() => goto(2)}
                   onNewJsa={startOver}
                 />
               </div>

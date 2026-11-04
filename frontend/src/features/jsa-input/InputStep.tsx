@@ -33,8 +33,7 @@ import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm } from "../../lib/schema";
 import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
 import { inputDraft } from "../../store";
-import { COMBINED_STAGES, JSA_STAGES } from "./generatingStages";
-import { GeneratingPanel, TYPICAL_MAX_SECONDS, TYPICAL_MIN_SECONDS } from "./GeneratingPanel";
+import { GeneratingPanel } from "./GeneratingPanel";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -148,10 +147,11 @@ export function InputStep({
   busy,
   error,
 }: {
-  /** Draft the work procedure along with the JSA — ModeChoice's "JSA +
-   * Procedure". Chosen above this form (App.tsx), not in it. */
+  /** ModeChoice's "JSA + Procedure", chosen above this form (App.tsx). Only
+   * changes the wording here: this screen drafts the JSA either way, and the
+   * procedure is drafted later, from the JSA once it has been reviewed. */
   withProcedure: boolean;
-  onGenerate: (values: InputForm, withProcedure: boolean, companyLogo: CompanyLogo | null) => void;
+  onGenerate: (values: InputForm, companyLogo: CompanyLogo | null) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analyst" | "company">,
     companyLogo: CompanyLogo | null,
@@ -270,17 +270,15 @@ export function InputStep({
           idle title showing through the whole generate, the one place JSA
           and procedure loading didn't read as the same pattern. */}
       <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
-        <span key={busy ? (withProcedure ? "both" : "jsa") : "idle"} className={FADE_IN_CLASS}>
-        {busy
-          ? withProcedure
-            ? "กำลังสร้าง JSA และขั้นตอนปฏิบัติงาน"
-            : "กำลังสร้าง JSA"
-          : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
+        <span key={busy ? "busy" : "idle"} className={FADE_IN_CLASS}>
+        {busy ? "กำลังสร้าง JSA" : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
         </span>
       </h1>
       {busy ? null : (
         <p className="mt-1.5 text-muted">
-          ระบุรายละเอียดงานที่จะปฏิบัติ ระบบจะร่าง JSA เพื่อให้ตรวจทาน
+          {withProcedure
+            ? "ระบุรายละเอียดงานที่จะปฏิบัติ ระบบจะร่าง JSA ให้ตรวจทานก่อน แล้วจึงร่างขั้นตอนปฏิบัติงานจาก JSA ที่ตรวจแล้ว"
+            : "ระบุรายละเอียดงานที่จะปฏิบัติ ระบบจะร่าง JSA เพื่อให้ตรวจทาน"}
         </p>
       )}
 
@@ -291,23 +289,15 @@ export function InputStep({
         <motion.div key="busy" variants={screenFade} initial="initial" animate="animate" exit="exit">
         {/* Replace the form entirely while generating — fields are disabled anyway,
             and this guarantees the loading state is visible immediately with no
-            scrolling, instead of appearing below a possibly-long textarea.
-            withProcedure is read here, not reset once busy starts, so it still
-            reflects exactly what was submitted — safe to read mid-flight since
-            the checkbox itself is gone from the screen while this renders. */}
-        <GeneratingPanel
-          onCancel={onCancelGenerate}
-          stages={withProcedure ? COMBINED_STAGES : JSA_STAGES}
-          typicalMinSeconds={withProcedure ? TYPICAL_MIN_SECONDS * 2 : undefined}
-          typicalMaxSeconds={withProcedure ? TYPICAL_MAX_SECONDS * 2 : undefined}
-        />
+            scrolling, instead of appearing below a possibly-long textarea. */}
+        <GeneratingPanel onCancel={onCancelGenerate} />
               </motion.div>
 ) : (
         <motion.div key="form" variants={screenFade} initial="initial" animate="animate" exit="exit">
         <form
           onSubmit={handleSubmit((values) => {
             rememberForNextTime(values);
-            onGenerate(values, withProcedure, companyLogo);
+            onGenerate(values, companyLogo);
           })}
           className="mt-4 grid gap-4"
           noValidate
@@ -403,13 +393,10 @@ export function InputStep({
               most consequential actions in the app share one convention
               instead of each page inventing its own button arrangement.
               "สร้างเอกสาร" rather than "สร้าง JSA" — the label the rest of
-              the app already uses for this generic case (ProcedureEditorStep's
-              own submit button, PdfDeliveryCard's in-flight/error states).
-              With "JSA + ขั้นตอนปฏิบัติงาน" chosen it becomes "สร้าง 2 เอกสาร", so
-              the choice is visible at the moment of clicking. Deliberately
-              short: a prior version swapped in the full "สร้าง JSA และ
-              ขั้นตอนปฏิบัติงาน", which forced a full-width, two-line-tall
-              button at narrow widths, disproportionate next to ล้างฟอร์ม. */}
+              the app already uses for this generic case (PdfDeliveryCard's
+              in-flight/error states). The same with JSA + Procedure: this
+              button drafts the JSA either way (the procedure comes after
+              it's reviewed), and the line under the heading says so. */}
           {/* px-3 on the ghost button below 360px: at size="lg"'s px-6 the
               two buttons can't shrink (whitespace-nowrap) and came to 309px,
               wider than a 320px phone's 288px column — the page scrolled
@@ -429,7 +416,7 @@ export function InputStep({
             </Button>
             <Button type="submit" size="lg" className="max-[359px]:px-4">
               <Sparkles className="size-5" aria-hidden="true" />
-              {withProcedure ? "สร้าง 2 เอกสาร" : "สร้างเอกสาร"}
+              สร้างเอกสาร
             </Button>
           </div>
 

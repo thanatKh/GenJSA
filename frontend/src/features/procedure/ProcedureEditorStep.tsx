@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
-  FileText,
+  ArrowRight,
   Info,
   Plus,
   RotateCcw,
@@ -34,7 +34,7 @@ import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
-import { PhotoButton, PhotoPreview } from "./SubStepPhoto";
+import { PhotoButton, PhotoHint, PhotoPreview } from "./SubStepPhoto";
 import { usePhotoInput } from "./usePhotoInput";
 
 // Same undo window as EditorStep's step/hazard deletion
@@ -197,7 +197,7 @@ export function ProcedureEditorStep({
     text.split("\n").map((line) => line.trim()).filter(Boolean);
 
   // Commit toolsText into the document. Normally fires on blur; also called
-  // right before leaving this page (สร้างเอกสาร / กลับไปหน้าเอกสาร JSA) in
+  // right before leaving this page (สร้าง PDF / กลับไปตรวจทาน JSA) in
   // case the user clicks straight from the textarea without blurring it
   // first — otherwise the last line they typed would ship in the editor's
   // local state but never reach procedure.tools or the PDF.
@@ -309,9 +309,7 @@ export function ProcedureEditorStep({
       </p>
       {/* Said once here rather than under every photo — with a photo on
           each sub-step, a per-photo note would repeat down the whole page */}
-      <p className="mt-1 text-sm text-muted">
-        แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อย (รูปภาพจะถูกลบหากลบงานนี้ออกจากประวัติ)
-      </p>
+      <PhotoHint note="รูปภาพจะถูกลบหากลบงานนี้ออกจากประวัติ" />
 
       <ul className="mt-4 grid list-none gap-4 p-0">
         {procedure.steps.map((step, stepIndex) => (
@@ -396,13 +394,13 @@ export function ProcedureEditorStep({
               flushTools();
               onBack();
             }}
-            aria-label="กลับไปหน้าเอกสาร JSA"
+            aria-label="กลับไปตรวจทาน JSA"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
             {/* Short on phones so both buttons fit one row (see EditorStep's
                 bottom bar) */}
             <span className="sm:hidden">กลับ</span>
-            <span className="hidden sm:inline">กลับไปหน้าเอกสาร JSA</span>
+            <span className="hidden sm:inline">กลับไปตรวจทาน JSA</span>
           </Button>
           <Button
             type="button"
@@ -413,8 +411,8 @@ export function ProcedureEditorStep({
               onContinue();
             }}
           >
-            <FileText className="size-5" aria-hidden="true" />
-            สร้างเอกสาร
+            สร้าง PDF
+            <ArrowRight className="size-5" aria-hidden="true" />
           </Button>
         </div>
       </div>

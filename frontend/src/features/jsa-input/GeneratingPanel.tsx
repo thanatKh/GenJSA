@@ -44,9 +44,6 @@ const LINE_MS = 3500;
 // against a since-changed model — re-measure with the command above and
 // update these whenever config/ai.yaml's model changes, or the panel starts
 // quietly lying about the wait again in either direction.
-// Exported so callers that chain a second AI call (see COMBINED_STAGES) can
-// derive an honest doubled range instead of re-declaring their own numbers
-// that could drift from these.
 export const TYPICAL_MIN_SECONDS = 10;
 export const TYPICAL_MAX_SECONDS = 30;
 
@@ -61,7 +58,7 @@ function formatDuration(totalSeconds: number): string {
 /** 60,180 -> "1–3 นาที"; 10,30 -> "10–30 วินาที" — the unit is said once, not
  * on both ends. Two cases share that shape (whole minutes on both sides, or
  * plain seconds on both sides — the only two this app's real values ever
- * take: TYPICAL_MIN/MAX_SECONDS below, and COMBINED_STAGES' doubled range);
+ * take: TYPICAL_MIN/MAX_SECONDS below, or a caller's own range);
  * anything mixed (a minutes value paired with a seconds one) falls back to
  * formatDuration on each side, which does repeat the unit — an honest range
  * still beats a wrong compact one for a shape this file doesn't expect. */

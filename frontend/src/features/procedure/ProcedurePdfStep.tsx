@@ -1,8 +1,8 @@
-/* The work procedure document, built in the browser.
+/* JSA + Procedure's last step, เอกสาร PDF: both documents of the job.
  *
- * By the time a user reaches this page they're done with both documents, so
- * this offers both PDFs — the procedure and the JSA it was generated from —
- * rather than making JSA download a detour back through onBackToJsa. Each
+ * By the time a user reaches this page they've reviewed both, so this is the
+ * one place they get their files — the procedure and the JSA it was drafted
+ * from, as two numbered files like Project Mode's own เอกสาร PDF page. Each
  * card is independent: two separate usePdfDelivery() calls, two separate
  * blobs, built in parallel as soon as this page mounts.
  *
@@ -36,15 +36,12 @@ export function ProcedurePdfStep({
   companyLogo,
   config,
   onBack,
-  onBackToJsa,
   onNewJsa,
 }: {
   procedure: ProcedureDocument;
   /** The JSA this procedure was generated from — always available here: a
    * procedure can only exist once its source JSA does (see App.tsx's
-   * handleCreateProcedure guard). Its own PDF is offered on this page too, so
-   * finishing the procedure doesn't mean detouring back through onBackToJsa
-   * just to download the JSA. */
+   * handleCreateProcedure guard). */
   doc: JsaDocument;
   /** Sub-step photos, keyed by photoKey(step.no, sub.no) — persisted in IndexedDB, see usePhotos.ts */
   photos: PhotoMap;
@@ -52,10 +49,7 @@ export function ProcedurePdfStep({
   companyLogo: CompanyLogo | null;
   config: PublicConfig | null;
   onBack: () => void;
-  onBackToJsa: () => void;
-  /** Same action as PdfStep's "สร้าง JSA ใหม่" — this was the one page in the
-   * two-document flow missing it, leaving no way out but the header logo or
-   * several taps back through กลับไปแก้ไข / กลับไปหน้าเอกสาร JSA. */
+  /** Same action as PdfStep's "สร้าง JSA ใหม่" */
   onNewJsa: () => void;
 }) {
   // Same wording as the printed PDFs (config/document.yaml, config/procedure.yaml)
@@ -145,34 +139,16 @@ export function ProcedurePdfStep({
 
   return (
     <section>
-      {/* Above the H1 — this is the second document of two, so the way back
-          to the first belongs where the eye starts, not only in the link row
-          past the cards. (The procedure editor doesn't repeat this: its fixed
-          bottom bar already carries the same action.) */}
-      <button
-        type="button"
-        onClick={onBackToJsa}
-        className="mb-3 flex items-center gap-1 text-sm text-muted hover:text-navy"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        กลับไปหน้าเอกสาร JSA
-      </button>
-
-      <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
-        เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)
-      </h1>
+      <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">เอกสาร PDF</h1>
       <p className="mt-1.5 text-muted">
-        {procedureDelivery.savePickerSupported
-          ? "กด “เปิดเอกสาร PDF” เพื่อดูหรือพิมพ์เอกสารในเบราว์เซอร์ หรือกด “บันทึกไฟล์” เพื่อเลือกที่จัดเก็บในเครื่อง"
-          : "กดปุ่มด้านล่างเพื่อเปิดเอกสารในโปรแกรมอ่าน PDF ของเบราว์เซอร์ จากนั้นเลือกบันทึก พิมพ์ หรือแชร์ได้เองจากเมนูของเบราว์เซอร์"}
+        2 ไฟล์ แต่ละไฟล์เปิดเป็น PDF หรือดาวน์โหลดเป็น Word ได้
       </p>
 
-      {/* The procedure first — it's what this page is about. It used to come
-          second, after the JSA, with identical solid buttons on both cards,
-          so nothing said which document was the point of the page. */}
+      {/* Two equal files, numbered — the same as Project Mode's page. The
+          kicker is what tells them apart: both titles are the same job. */}
       <PdfDeliveryCard
         className="mt-4"
-        kicker="เอกสารขั้นตอนปฏิบัติงาน (Work Procedure)"
+        kicker="ไฟล์ 1 · ขั้นตอนปฏิบัติงาน (Work Procedure)"
         title={procedure.header.work_activity}
         summary={[
           { label: labels.supervisor, value: procedure.header.supervisor },
@@ -186,15 +162,9 @@ export function ProcedurePdfStep({
         word={procedureWord}
       />
 
-      {/* The JSA second, as a supporting document: outline buttons, so the
-          procedure above keeps the page's only solid button. Its own card,
-          not folded into the procedure's: two separate files with two
-          separate blobs. Both titles read identically (same job), so the
-          kicker is what tells them apart at a glance. */}
       <PdfDeliveryCard
         className="mt-4"
-        secondary
-        kicker="เอกสาร JSA"
+        kicker="ไฟล์ 2 · JSA"
         title={doc.header.work_activity}
         summary={[
           { label: labels.supervisor, value: doc.header.supervisor },
@@ -205,11 +175,8 @@ export function ProcedurePdfStep({
         word={jsaWord}
       />
 
-      {/* กลับไปแก้ไข plus สร้าง JSA ใหม่ — the way back to the JSA itself moved
-          above the H1, so this row only needs the two actions PdfStep's own
-          footer has, not a third repeating that link. Without สร้าง JSA ใหม่
-          here, this was the one page in the whole two-document flow with no
-          way to start over except the header logo. */}
+      {/* The same two links as PdfStep's footer: back to the step before
+          (the procedure), or a new job */}
       <div className="mt-5 flex items-center justify-center gap-4 text-sm">
         <button
           type="button"

@@ -60,6 +60,7 @@ export function EditorStep({
   doc,
   onChange,
   onContinue,
+  continueLabel,
   onStartOver,
   error,
   companyLogo,
@@ -75,6 +76,9 @@ export function EditorStep({
   /** This document's save to history, for the "บันทึกแล้ว" indicator */
   saveState: SaveState;
   onContinue: () => void;
+  /** The forward button's wording when it doesn't lead to the PDF — "ถัดไป"
+   * on the JSA + Procedure track, where the procedure comes next */
+  continueLabel?: string;
   onStartOver: () => void;
   error: string | null;
   /** Project Mode: this JSA is one phase of a project. The page is the same
@@ -499,7 +503,7 @@ export function EditorStep({
               </>
             ) : (
               <>
-                สร้าง PDF
+                {continueLabel ?? "สร้าง PDF"}
                 <ArrowRight className="size-5" aria-hidden="true" />
               </>
             )}

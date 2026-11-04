@@ -10,19 +10,19 @@ the JSA, the user reviews/edits every field, and the finished document is
 exported as an A4 PDF — entirely client-side.
 
 ```
-Enter work details  →  AI drafts JSA  →  Review and edit  →  Open PDF
-                                                               │
-                                        (optional) ────────────┘
-                                             ↓
-              AI drafts work procedure  →  Review and edit  →  Open PDF
+JSA:              Enter work details → AI drafts JSA → Review JSA → PDF
+JSA + Procedure:  Enter work details → AI drafts JSA → Review JSA
+                    → AI drafts procedure from the reviewed JSA → Review procedure → PDF (both files)
 ```
 
 **The second document — ขั้นตอนปฏิบัติงาน (work procedure).** The JSA is
 task-level by rule: its prompt bans move-by-move instructions. That leaves a
-gap, because whoever actually does the job still needs the how-to. From the
-JSA's PDF page the user can expand it into a work procedure — each JSA step
-becomes concrete sub-steps — which is reviewed and exported the same way.
-It's optional, and most users will stop at the JSA.
+gap, because whoever actually does the job still needs the how-to. Picking
+"JSA + Procedure" on the first screen expands the JSA into a work procedure —
+each JSA step becomes concrete sub-steps — drafted only once the JSA has been
+reviewed (so it matches the JSA the user approved), then reviewed and
+exported the same way. It's optional, and most users will stop at the JSA; a
+JSA-only job can still add one later from its PDF page or the history list.
 
 Unlike the JSA, the procedure matches no official company form, so its
 structure is GenJSA's own (`config/procedure.yaml`) and can be changed freely.
@@ -220,19 +220,23 @@ browser — never the model name or API key.
 
 ### Frontend structure (`frontend/src/`)
 
-`App.tsx`'s `stage` state drives everything. 0-2 are the JSA wizard and map
-1:1 onto `Stepper`; 3-4 are the optional work procedure, reached only from
-stage 2. **The Stepper stays three steps** (`Math.min(stage, 2)`) — a fourth
-circle would imply the JSA is unfinished without a procedure, and most users
-will stop at the JSA.
+`App.tsx`'s `stage` state drives everything. Single Mode has two tracks,
+chosen by the first screen's switch (`mode`): **JSA** is 0 → 1 → 2 (the JSA's
+PDF) on a 3-step `Stepper`; **JSA + Procedure** is 0 → 1 → 3 → 4 on its own
+4-step one (`PROCEDURE_STEPS`/`PROCEDURE_TRACK`) — the JSA editor's ถัดไป
+drafts the procedure from the reviewed JSA, and stage 4 delivers both files.
+Having a procedure puts a job on the second track: `generateProcedureFrom`
+and `openHistoryEntry` set `mode` to match, which is how the JSA PDF page's
+procedure card and the history list's procedure button move a JSA-only job
+onto it. Every track, Project Mode's included, ends on "เอกสาร PDF".
 
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
 - `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Each row has two buttons side by side: JSA (loads it into `EditorStep`) and the work procedure — which opens the procedure editor, or, when the job has none yet, drafts one straight from the list.
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
-- `features/pdf-view/PdfStep.tsx` — the JSA PDF, plus the card that starts a work procedure.
+- `features/pdf-view/PdfStep.tsx` — the JSA track's last page: the JSA PDF, plus the card that adds a work procedure (moving the job onto the JSA + Procedure track).
 - `features/pdf-view/usePdfDelivery.ts` — **shared by both PDF pages**: builds the blob and routes save/share by browser capability. Its header documents the popup-blocking, iOS-viewer and user-activation constraints behind every rule in it; each one is a fix for something that actually broke. Read it before changing how those buttons behave, and don't reimplement it inline for a third document.
-- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA) and a warning appears if the JSA's steps changed after the procedure was generated.
-- `features/procedure/ProcedurePdfStep.tsx` — the procedure PDF, same delivery hook.
+- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA) and a warning appears if the JSA's steps changed after the procedure was generated (going back to the JSA and editing it; ถัดไป then reopens the existing procedure rather than redrafting). Photos come in three ways (`SubStepPhoto.tsx`'s header) — the button, drag-and-drop, Ctrl+V — and `PhotoHint` says so, since the last two have nothing on screen of their own.
+- `features/procedure/ProcedurePdfStep.tsx` — JSA + Procedure's last page, "เอกสาร PDF": both files (procedure, then JSA), numbered like Project Mode's page, same delivery hook.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai lines break between words via `engine.ts`'s `splitLines` (the browser's built-in `Intl.Segmenter` — no dictionary shipped); only a single word wider than its column is cut mid-word, and browsers without `Intl.Segmenter` fall back to jsPDF's space-only breaking.

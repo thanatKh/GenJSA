@@ -1,4 +1,8 @@
-/* Step 3 — PDF document (built in the browser)
+/* Step 3 of the JSA track — PDF document (built in the browser)
+ *
+ * JSA + Procedure jobs never come here: they end on ProcedurePdfStep, which
+ * has both files. The procedure card below is how a JSA-only job joins that
+ * track afterwards (App.tsx's generateProcedureFrom switches the mode).
  *
  * The PDF is built client-side with jsPDF — the JSA is never sent back to the
  * server to render it, and the server needs no Chromium.
