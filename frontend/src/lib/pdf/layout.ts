@@ -199,18 +199,20 @@ export type StepPhoto = {
  * removeSub does that shift. */
 export type PhotoMap = Record<string, StepPhoto>;
 
+/** subNo 0 is the main step's own heading photo ("2.0"); sub-steps count from 1 */
 export function photoKey(stepNo: number, subNo: number): string {
   return `${stepNo}.${subNo}`;
 }
 
 /** Photos are downscaled on ingest, before they ever reach state.
  *
- * 1000px across the PDF's ~160mm text column is roughly 160 DPI — ample for a
- * printed work instruction — and measured at ~190KB per photo even for a
- * worst-case noisy source. Raw 12MP originals would bloat the PDF and make
- * addImage slow for no visible gain. */
-export const PHOTO_MAX_EDGE_PX = 1000;
-export const PHOTO_JPEG_QUALITY = 0.7;
+ * 1000px / quality 0.7 looked soft in print: a photo is drawn at most ~160mm
+ * wide, and 1000px over that is only ~160 DPI, with JPEG artifacts on top —
+ * valve tags and small text turned to mush. 2000px at 0.88 is ~300 DPI at the
+ * widest, still a few hundred KB per photo, and still keeps raw 12MP
+ * originals from bloating the PDF. */
+export const PHOTO_MAX_EDGE_PX = 2000;
+export const PHOTO_JPEG_QUALITY = 0.88;
 
 const MM_PER_PT = 0.352777778;
 

@@ -528,7 +528,10 @@ export default function App() {
       // unreachable images (both the in-memory map and the persisted copy —
       // see usePhotos.ts).
       pruneToLiveKeys(
-        generated.steps.flatMap((step) => step.sub_steps.map((sub) => photoKey(step.no, sub.no))),
+        generated.steps.flatMap((step) => [
+          photoKey(step.no, 0), // the step's own heading photo
+          ...step.sub_steps.map((sub) => photoKey(step.no, sub.no)),
+        ]),
       );
       // Having a procedure puts the job on the JSA + Procedure track — also
       // how the JSA PDF page's card moves a JSA-only job onto it

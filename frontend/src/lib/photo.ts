@@ -59,6 +59,7 @@ export async function fileToStepPhoto(file: File): Promise<StepPhoto> {
     if (!ctx) throw new PhotoError("เบราว์เซอร์นี้ไม่รองรับการเพิ่มรูปภาพ กรุณาใช้เบราว์เซอร์อื่น");
 
     // White ground so a transparent source doesn't turn black once flattened
+    ctx.imageSmoothingQuality = "high";
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(bitmap, 0, 0, w, h);

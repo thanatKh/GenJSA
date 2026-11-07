@@ -358,6 +358,19 @@ export async function buildProcedureDocx(
     body.push(
       new Paragraph({ heading: project ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2, children: text(step.procedure) }),
     );
+    // The step's own photo ("N.0"), right under its heading
+    const stepPhoto = photos[photoPrefix + photoKey(step.no, 0)];
+    if (stepPhoto) {
+      const maxWmm = ((K.contentW - subTextLeft) / 1440) * 25.4;
+      body.push(
+        new Paragraph({
+          style: STYLE.photo,
+          keepNext: true,
+          children: [K.image({ data: stepPhoto.data, ratio: stepPhoto.ratio > 0 ? stepPhoto.ratio : 1 }, maxWmm, photoMaxHmm)],
+        }),
+        new Paragraph({ style: STYLE.caption, children: text(`ภาพประกอบขั้นตอน ${prefix}${step.no}`) }),
+      );
+    }
     step.sub_steps.forEach((sub) => {
       const photo = photos[photoPrefix + photoKey(step.no, sub.no)];
       // keepNext: a photo never lands on the next page without its sub-step

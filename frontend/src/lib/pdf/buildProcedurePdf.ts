@@ -546,8 +546,19 @@ export async function buildProcedurePdf(
     const photoX = (lines: Line[]) => mL + subX + (lines[0]?.indent ?? 0);
     const photoMaxW = (lines: Line[]) => contentW - subX - (lines[0]?.indent ?? 0);
 
+    // The step's own photo ("1.0"): under the title, before its sub-steps,
+    // aligned with the title text
+    const stepPhoto = photos[photoPrefix + photoKey(step.no, 0)];
+    const stepPhotoX = mL + stepX + (titleLines[0]?.indent ?? 0);
+    const stepPhotoMaxW = contentW - stepX - (titleLines[0]?.indent ?? 0);
+
     let keepTogether = Math.min(titleLines.length, 1) * stepLineH;
-    if (subLines.length) {
+    if (stepPhoto) {
+      // Title and its photo share a page when they fit one
+      const withStepPhoto =
+        titleLines.length * stepLineH + photoBlockH(stepPhoto, stepPhotoMaxW);
+      keepTogether = withStepPhoto <= usableBodyH ? withStepPhoto : keepTogether;
+    } else if (subLines.length) {
       const firstPhoto = subPhotos[0];
       const withPhoto = firstPhoto
         ? titleLines.length * stepLineH +
@@ -560,6 +571,9 @@ export async function buildProcedurePdf(
     need(keepTogether);
 
     drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
+    if (stepPhoto) {
+      drawPhoto(stepPhoto, stepPhotoX, stepPhotoMaxW, `ภาพประกอบขั้นตอน ${prefix}${step.no}`);
+    }
 
     step.sub_steps.forEach((_, subIndex) => {
       const actionLines = subLines[subIndex];

@@ -17,12 +17,14 @@
  * only, same as the rest of history.ts.
  */
 
+import { useState } from "react";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
-import { Button } from "../../components/ui";
+import { Button, FieldError } from "../../components/ui";
 import { collapse, popIn } from "../../lib/motion";
 import type { StepPhoto } from "../../lib/pdf/layout";
+import { usePhotoInput } from "./usePhotoInput";
 
 /** The line under each procedure editor's heading that says how photos get
  * in. Drag-and-drop and Ctrl+V have nothing on screen of their own, so
@@ -31,9 +33,9 @@ import type { StepPhoto } from "../../lib/pdf/layout";
 export function PhotoHint({ note }: { note?: string }) {
   return (
     <p className="mt-1 text-sm text-muted">
-      แนบรูปภาพประกอบได้ที่แต่ละขั้นตอนย่อยด้วยปุ่มรูปภาพ
+      แนบรูปภาพประกอบได้ทั้งที่หัวข้อหลักและที่แต่ละขั้นตอนย่อยด้วยปุ่มรูปภาพ
       <span className="hidden pointer-fine:inline">
-        {" "}ลากรูปมาวางที่ขั้นตอนย่อย หรือคัดลอกรูปแล้ววาง (Ctrl+V) ในช่องข้อความ
+        {" "}ลากรูปมาวางที่ขั้นตอนย่อย (หรือหัวข้อ) หรือคัดลอกรูปแล้ววาง (Ctrl+V) ในช่องข้อความ
       </span>
       {note ? ` (${note})` : null}
     </p>
@@ -70,6 +72,61 @@ export function PhotoButton({
   );
 }
 
+/** The photo slot of a main step's own heading ("1.", "2.1") — the overview
+ * picture for the whole step, above its sub-steps. Keyed photoKey(step, 0).
+ * Empty: a text button (the sub-steps' icon buttons sit in a row of their own,
+ * this one has no row), also a drop target. Filled: the preview with ลบรูปภาพ. */
+export function StepPhotoSlot({
+  label,
+  photo,
+  onChange,
+}: {
+  /** "1" or "2.1", as printed on the heading */
+  label: string;
+  photo: StepPhoto | undefined;
+  onChange: (photo: StepPhoto | null) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const input = usePhotoInput(onChange);
+
+  return (
+    <div
+      {...input.dropProps(setDragging)}
+      className={`mt-1 rounded-field transition-colors ${dragging ? "bg-navy-soft" : ""}`}
+    >
+      <AnimatePresence initial={false}>
+        {photo ? (
+          <PhotoPreview
+            key="photo"
+            photo={photo}
+            label={`รูปภาพประกอบหัวข้อ ${label}`}
+            onRemove={() => onChange(null)}
+          />
+        ) : null}
+      </AnimatePresence>
+      {photo ? null : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={input.busy}
+          onClick={input.openPicker}
+          className="-ml-2 text-sm text-muted hover:text-navy"
+        >
+          {input.busy ? (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <ImagePlus className="size-4" aria-hidden="true" />
+          )}
+          เพิ่มรูปภาพประกอบหัวข้อ {label}
+        </Button>
+      )}
+      <FieldError>{input.error}</FieldError>
+      {input.fileInput}
+    </div>
+  );
+}
+
 /** The attached photo, shown under the sub-step's text */
 export function PhotoPreview({
   photo,
@@ -92,7 +149,7 @@ export function PhotoPreview({
         {...popIn}
         src={photo.data}
         alt={label}
-        className="max-h-32 w-auto max-w-full rounded-xl border border-line"
+        className="max-h-40 w-auto max-w-full rounded-xl border border-line"
       />
       <Button
         type="button"

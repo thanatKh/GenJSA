@@ -34,7 +34,7 @@ import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
-import { PhotoButton, PhotoHint, PhotoPreview } from "./SubStepPhoto";
+import { PhotoButton, PhotoHint, PhotoPreview, StepPhotoSlot } from "./SubStepPhoto";
 import { usePhotoInput } from "./usePhotoInput";
 
 // Same undo window as EditorStep's step/hazard deletion
@@ -160,8 +160,15 @@ export function ProcedureEditorStep({
     const keysBefore = keysFor(stepIndex, before.length);
     rowKeys.current[stepIndex] = keysBefore.filter((_, i) => i !== subIndex);
 
+    // The step's own heading photo ("N.0") rides along unchanged: it's in
+    // the same replace-by-prefix swap, so leaving it out would delete it
     const photosBefore: PhotoMap = {};
     const photosAfter: PhotoMap = {};
+    const headPhoto = photos[photoKey(step.no, 0)];
+    if (headPhoto) {
+      photosBefore[photoKey(step.no, 0)] = headPhoto;
+      photosAfter[photoKey(step.no, 0)] = headPhoto;
+    }
     before.forEach((sub, i) => {
       const photo = photos[photoKey(step.no, sub.no)];
       if (!photo) return;
@@ -318,6 +325,11 @@ export function ProcedureEditorStep({
               <h3 className="font-display text-base font-semibold text-ink">
                 {stepIndex + 1}. {step.procedure || "(ไม่มีชื่อขั้นตอน)"}
               </h3>
+              <StepPhotoSlot
+                label={`${stepIndex + 1}`}
+                photo={photos[photoKey(step.no, 0)]}
+                onChange={(photo) => onPhotoChange(photoKey(step.no, 0), photo)}
+              />
 
               <ul className="mt-3 grid list-none gap-3 p-0">
                 <AnimatePresence initial={false}>

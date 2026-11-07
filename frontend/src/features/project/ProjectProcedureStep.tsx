@@ -33,7 +33,7 @@ import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { fadeSwap } from "../../lib/motion";
 import type { PhotoMap, StepPhoto } from "../../lib/pdf/layout";
 import { SubStepItem } from "../procedure/ProcedureEditorStep";
-import { PhotoHint } from "../procedure/SubStepPhoto";
+import { PhotoHint, StepPhotoSlot } from "../procedure/SubStepPhoto";
 import type { ProcedureDocument, ProjectDocument, ProjectPhase, SubStep } from "../../lib/schema";
 import { Elapsed } from "./ProjectHub";
 import { projectPhotoKey, sectionStale } from "./projectModel";
@@ -148,8 +148,15 @@ export function ProjectProcedureStep({
     const keysBefore = keysFor(slot, subs.length);
     rowKeys.current[slot] = keysBefore.filter((_, i) => i !== subIndex);
 
+    // The step's own heading photo (sub 0) stays put through the swap
     const photosBefore: PhotoMap = {};
     const photosAfter: PhotoMap = {};
+    const headKey = projectPhotoKey(phaseId, stepNo, 0);
+    const headPhoto = photosRef.current[headKey];
+    if (headPhoto) {
+      photosBefore[headKey] = headPhoto;
+      photosAfter[headKey] = headPhoto;
+    }
     subs.forEach((_, i) => {
       const photo = photosRef.current[projectPhotoKey(phaseId, stepNo, i + 1)];
       if (!photo) return;
@@ -424,6 +431,11 @@ function Section({
               <h3 className="font-display text-base font-semibold text-ink">
                 {stepNo} {step.procedure || "(ไม่มีชื่อขั้นตอน)"}
               </h3>
+              <StepPhotoSlot
+                label={stepNo}
+                photo={photos[projectPhotoKey(phaseId, stepIndex + 1, 0)]}
+                onChange={(photo) => onPhotoChange(projectPhotoKey(phaseId, stepIndex + 1, 0), photo)}
+              />
               <ul className="mt-2 grid list-none gap-2 p-0">
                 <AnimatePresence initial={false}>
                   {step.sub_steps.map((sub, subIndex) => {
