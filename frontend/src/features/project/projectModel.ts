@@ -11,7 +11,7 @@ import { loadCompanyProfile } from "../../lib/companyLogo";
 import { photoKey } from "../../lib/pdf/layout";
 import { loadNames } from "../../lib/rememberedNames";
 import {
-  stepFingerprint,
+  procedureIsStale,
   type JsaDocument,
   type ProcedureDocument,
   type ProjectDocument,
@@ -113,7 +113,7 @@ export function withPhaseJsa(
             ...phase,
             jsa,
             work: jsa.header.work_activity,
-            reviewed: reviewed ?? phase.reviewed,
+            reviewed: reviewed ?? (JSON.stringify(jsa) === JSON.stringify(phase.jsa) && phase.reviewed),
           }
         : phase,
     ),
@@ -162,7 +162,7 @@ export function generateInput(project: ProjectDocument, index: number) {
 /** The phase's JSA steps changed after its procedure section was drafted —
  * the same check as Single Mode's stale-procedure warning */
 export function sectionStale(phase: ProjectPhase): boolean {
-  return !!phase.jsa && !!phase.procedure && stepFingerprint(phase.jsa) !== stepFingerprint(phase.procedure);
+  return !!phase.jsa && !!phase.procedure && procedureIsStale(phase.jsa, phase.procedure);
 }
 
 /** Put a freshly drafted section on its phase. The first section drafted

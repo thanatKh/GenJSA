@@ -7,7 +7,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  ChevronRight,
   FileText,
   History,
   ListOrdered,
@@ -41,14 +40,10 @@ const UNDO_TIMEOUT_MS = 6000;
 
 const UNTITLED = "JSA ไม่มีชื่องาน";
 
-// The two "open this document" buttons on each row — tinted so they read as
-// controls, not one more line of the row's metadata
-// (border-transparent: same box as the dashed "create" button beside it, so
-// every row is the same height)
+// Both document actions stay beside the job details, in one compact row.
 const docButton =
-  "flex min-w-0 items-center gap-1.5 rounded-full border border-transparent bg-navy-soft px-2.5 py-2 text-xs " +
-  "font-medium text-navy hover:bg-navy-soft/70 focus-visible:outline-none " +
-  "focus-visible:ring-2 focus-visible:ring-ring/50";
+  "inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-xs " +
+  "font-medium text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ";
 
 function entryTitle(entry: HistoryEntry): string {
   return entry.doc.header.work_activity.trim() || UNTITLED;
@@ -68,6 +63,11 @@ export function HistoryList({
   onCreateProcedure: (entry: HistoryEntry) => void;
 }) {
   const [entries, setEntries] = useState<HistoryEntry[]>(() => historyStore.list());
+  useEffect(() => {
+    const refresh = () => setEntries(historyStore.list());
+    window.addEventListener("genjsa-library-changed", refresh);
+    return () => window.removeEventListener("genjsa-library-changed", refresh);
+  }, []);
   const [query, setQuery] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   const [undoEntry, setUndoEntry] = useState<HistoryEntry | null>(null);
@@ -140,7 +140,7 @@ export function HistoryList({
     // which looks identical to the bug this is fixing. The scrollable <ul>
     // below is the one piece that grows (flex-1 + min-h-0) — header, search
     // box and footer note all keep their natural height.
-    <motion.section {...fadeSwap} className="mt-6 flex flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
+    <motion.section {...fadeSwap} className="mt-6 flex min-w-0 flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
       {/* flex-wrap: on a 320px phone the title + count and ล้างประวัติทั้งหมด
           don't fit one line — the button drops below instead of the title
           breaking in two */}
@@ -250,9 +250,8 @@ export function HistoryList({
             // -mx-1 px-1: a scrolling list clips sideways too, which cut off
             // the focus ring of every button touching its edge — this gives
             // the ring room without moving the rows
-            "-mx-1 mt-3 grid content-start list-none gap-0 overflow-y-auto p-0 px-1",
-            // 24rem, not 22: 22rem fit exactly three rows on a phone, so no
-            // part of a fourth peeked out and the list read as complete
+            "-mx-1 mt-3 grid min-w-0 grid-cols-1 content-start list-none gap-0 overflow-y-auto p-0 px-1",
+            // Compact rows keep more jobs visible within the same scroll area
             scrollable ? "max-h-[24rem] overscroll-contain" : "",
             "xl:min-h-0 xl:flex-1 xl:max-h-none",
           ].join(" ")}
@@ -273,104 +272,64 @@ export function HistoryList({
                   // a long list's stagger doesn't drag on for a full second.
                   delay: searching ? 0 : Math.min(index, 10) * 0.04,
                 }}
-                className="group border-b border-line py-1"
+                className="group min-w-0 border-b border-line py-0.5 last:border-b-0"
               >
-                <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(entry)}
-                    className="t-history-row min-w-0 rounded-field py-2 pl-3 pr-1 text-left"
+                <div className="flex min-w-0 items-center gap-1">
+                  <div
+                    title={entryTitle(entry)}
+                    className="min-w-0 flex-1 py-2.5 pl-2 pr-1 text-left"
                   >
                     <span className="flex min-w-0 items-center gap-1">
-                      <span className="truncate font-medium text-ink group-hover:text-navy">
+                      <span className="line-clamp-2 break-words text-sm font-medium text-ink sm:line-clamp-1">
                         {entryTitle(entry)}
                       </span>
-                      <ChevronRight
-                        className="t-history-chevron size-4 shrink-0 text-navy"
-                        aria-hidden="true"
-                      />
                     </span>
-                    <span className="mt-0.5 block truncate text-sm text-muted">
-                      {/* Supervisor last: this line truncates at the end, and a
-                          long name (rank + title + name) used to push the step
-                          count out of view */}
+                    <span className="mt-0.5 block truncate text-xs text-muted">
                       {formatThaiDate(isoFromDate(new Date(entry.savedAt)))}
                       {` · ${entry.doc.steps.length} ขั้นตอน`}
-                      {entry.doc.header.supervisor
-                        ? ` · ${entry.doc.header.supervisor}`
-                        : ""}
+                      {entry.doc.header.supervisor ? ` · ${entry.doc.header.supervisor}` : ""}
                     </span>
+                  </div>
+
+                  <button type="button" onClick={() => onOpen(entry)}
+                    aria-label={`เปิด JSA ของ ${entryTitle(entry)}`}
+                    title="เปิด JSA"
+                    className={docButton + "bg-navy-soft hover:bg-navy-soft/70"}>
+                    <FileText className="hidden size-3.5 min-[400px]:block" aria-hidden="true" />
+                    JSA
                   </button>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-lg"
+                  <AnimatePresence initial={false} mode="wait">
+                    {entry.procedure ? (
+                      <motion.div key="open" {...fadeSwap} className="shrink-0">
+                        <button type="button" onClick={() => onOpenProcedure(entry)}
+                          aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                          title="เปิดขั้นตอนปฏิบัติงาน"
+                          className={docButton + "bg-navy-soft hover:bg-navy-soft/70"}>
+                          <ListOrdered className="size-3.5" aria-hidden="true" />
+                          ขั้นตอน
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div key="create" {...fadeSwap} className="shrink-0">
+                        <button type="button" onClick={() => onCreateProcedure(entry)}
+                          aria-label={`สร้างขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
+                          title="สร้างขั้นตอนปฏิบัติงานด้วย AI"
+                          className={docButton + "border border-line hover:bg-navy-soft"}>
+                          <Plus className="size-3.5" aria-hidden="true" />
+                          ขั้นตอน
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <Button type="button" variant="ghost" size="icon-sm"
                     onClick={() => deleteEntry(entry)}
                     aria-label={`ลบ ${entryTitle(entry)}`}
-                    // max-sm:size-11 — this button is a destructive action and,
-                    // unlike on desktop (hover-gated, mouse-precise), it's
-                    // always visible and touch-tapped below sm, so it gets the
-                    // app's full 44px minimum there instead of icon-lg's
-                    // stock 36px; desktop keeps the more compact hover size.
-                    className="text-muted opacity-100 transition-opacity hover:bg-danger-soft hover:text-danger-text max-sm:size-10 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
+                    title="ลบรายการ"
+                    className="h-9 w-8 shrink-0 text-muted hover:bg-danger-soft hover:text-danger-text">
+                    <Trash2 className="size-3.5" aria-hidden="true" />
                   </Button>
-                </div>
-
-                {/* The job's two documents side by side, the same two columns
-                    on every row: JSA on the left, work procedure on the right.
-                    Without a procedure the right-hand slot becomes the button
-                    that drafts one, instead of being left out — that used to
-                    make rows different heights and left the procedure
-                    reachable only from the JSA's PDF page. Dashed and unfilled
-                    so "create" never reads as "open": it starts a 1-3 minute
-                    AI draft rather than opening something that exists. */}
-                {/* One column under 360px: side by side, both labels were cut
-                    to "ขั้นตอนปฏิบั…" on a 320px phone */}
-                <div className="mb-1.5 mt-1 grid grid-cols-2 gap-2 max-[359px]:grid-cols-1">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(entry)}
-                    aria-label={`เปิด JSA ของ ${entryTitle(entry)}`}
-                    className={docButton}
-                  >
-                    <FileText className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="truncate">JSA</span>
-                    <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
-                  </button>
-                  <AnimatePresence initial={false} mode="wait">
-                  {entry.procedure ? (
-                    <motion.div key="open" {...fadeSwap} className="grid min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => onOpenProcedure(entry)}
-                      aria-label={`เปิดขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                      className={docButton}
-                    >
-                      <ListOrdered className="size-3.5 shrink-0" aria-hidden="true" />
-                      <span className="truncate">ขั้นตอนปฏิบัติงาน</span>
-                      <ChevronRight className="ml-auto size-3.5 shrink-0" aria-hidden="true" />
-                    </button>
-                    </motion.div>
-                  ) : (
-                    <motion.div key="create" {...fadeSwap} className="grid min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => onCreateProcedure(entry)}
-                      aria-label={`สร้างขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                      className="flex min-w-0 items-center gap-1.5 rounded-full border border-dashed
-                                 border-navy/40 px-2.5 py-2 text-xs font-medium text-navy
-                                 hover:border-navy hover:bg-navy-soft focus-visible:outline-none
-                                 focus-visible:ring-2 focus-visible:ring-ring/50"
-                    >
-                      <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                      <span className="truncate">สร้างขั้นตอนปฏิบัติงาน</span>
-                    </button>
-                    </motion.div>
-                  )}
-                  </AnimatePresence>
                 </div>
               </motion.li>
             ))}

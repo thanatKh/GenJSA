@@ -7,13 +7,16 @@ the model's own step list or lets `references` into the AI contract, these fail.
 """
 
 from datetime import date
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app.core.config import get_settings
+from app.core.errors import Errors
 from app.models.jsa import Hazard, JsaDocument, JsaHeader, JsaStep
-from app.models.procedure import AiProcedurePayload, AiProcedureStep, SubStep
-from app.services.procedure_service import _assemble, _build_user_prompt
+from app.models.procedure import AiProcedurePayload, AiProcedureStep, SubStep, GenerateProcedureRequest
+from app.providers.llm.base import LLMProvider
+from app.services.procedure_service import _assemble, _build_user_prompt, generate_procedure
 
 
 @pytest.fixture
@@ -74,6 +77,21 @@ def test_step_titles_come_from_the_jsa(jsa, settings):
 def test_header_is_inherited_unchanged(jsa, settings):
     doc = _assemble(jsa, _payload(), settings)
     assert doc.header == jsa.header
+
+
+async def test_procedure_failover_preserves_reviewed_jsa(jsa, settings):
+    settings.ai.detailed_model = "primary"
+    settings.ai.detailed_fallback_models = ["backup"]
+    provider = AsyncMock(spec=LLMProvider)
+    provider.complete.side_effect = [Errors.AI_UNAVAILABLE, _payload().model_dump_json()]
+
+    doc = await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
+
+    assert [c.kwargs["model"] for c in provider.complete.await_args_list] == ["primary", "backup"]
+    assert doc.header == jsa.header
+    assert [s.procedure for s in doc.steps] == [s.procedure for s in jsa.steps]
+    assert all(s.sub_steps for s in doc.steps)
+    assert doc.references == _assemble(jsa, _payload(), settings).references
 
 
 def test_extra_ai_steps_cannot_grow_the_step_list(jsa, settings):

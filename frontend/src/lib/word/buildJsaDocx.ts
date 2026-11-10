@@ -2,11 +2,11 @@
  *
  * One table, like the form: title bar, header fields and column heads as
  * header rows (repeated on every page when config/pdf.yaml says so, as the
- * PDF does), then one row per step. Word paginates and splits rows itself,
+ * PDF does), then one row per hazard, with the step vertically merged. Word paginates rows itself,
  * which is why none of buildJsaPdf's orphan/widow logic is needed here.
  */
 
-import { AlignmentType, Document, Paragraph, Table, TableRow, WidthType } from "docx";
+import { AlignmentType, Document, Paragraph, Table, TableLayoutType, TableRow, WidthType } from "docx";
 
 import type { CompanyLogo } from "../companyLogo";
 import { loadOrLogo } from "../orLogo";
@@ -121,30 +121,23 @@ function jsaBody(
 
   // ------------------------------------------------------------------ steps --
   const dash = () => K.markedParagraph("—");
-  const rows = jsa.steps.map((step, stepIndex) => {
+  const rows = jsa.steps.flatMap((step, stepIndex) => {
     const procedure = [K.markedParagraph(step.procedure, { marker: `${stepIndex + 1}.`, bold: true })];
     if (step.details.trim()) procedure.push(K.markedParagraph(step.details));
-
     const multiple = step.hazards.length > 1;
-    const hazards: Paragraph[] = [];
-    const controls: Paragraph[] = [];
-    step.hazards.forEach((hazard, hazardIndex) => {
-      hazards.push(K.markedParagraph(hazard.hazard, { marker: multiple ? `${hazardIndex + 1}.` : undefined }));
-      const list = hazard.controls.filter((c) => c && c.trim());
-      if (list.length === 0) controls.push(dash());
-      list.forEach((control, controlIndex) => {
-        // Multiple hazards: 1.1 / 1.2 pair up with the numbers in the hazard column
-        controls.push(K.markedParagraph(control, { marker: multiple ? `${hazardIndex + 1}.${controlIndex + 1}` : "-" }));
+    const hazards = step.hazards.length ? step.hazards : [{ hazard: "—", controls: [] }];
+    return hazards.map((hazard, hazardIndex) => {
+      const controls = hazard.controls.filter((c) => c && c.trim()).map((control, controlIndex) =>
+        K.markedParagraph(control, { marker: multiple ? `${hazardIndex + 1}.${controlIndex + 1}` : "-" }),
+      );
+      return new TableRow({
+        children: [
+          // docx creates continuation cells for the vertically merged column.
+          ...(hazardIndex === 0 ? [K.cell(procedure, { width: colW[0], rowSpan: hazards.length, top: true })] : []),
+          K.cell([K.markedParagraph(hazard.hazard, { marker: multiple ? `${hazardIndex + 1}.` : undefined })], { width: colW[1], top: true }),
+          K.cell(controls.length ? controls : [dash()], { width: colW[2], top: true }),
+        ],
       });
-    });
-    if (hazards.length === 0) hazards.push(dash());
-
-    return new TableRow({
-      children: [
-        K.cell(procedure, { width: colW[0], top: true }),
-        K.cell(hazards, { width: colW[1], top: true }),
-        K.cell(controls.length ? controls : [dash()], { width: colW[2], top: true }),
-      ],
     });
   });
 
@@ -168,6 +161,7 @@ function jsaBody(
   return [
     new Table({
       width: { size: K.contentW, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
       columnWidths: colW,
       borders: K.tableBorders,
       rows: [...header, ...rows],

@@ -4,17 +4,15 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { AutoGrowTextarea, Button } from "../../components/ui";
 import { FADE_IN_CLASS, listItem } from "../../lib/motion";
+import { ControlsEditor } from "./ControlsEditor";
 import type { JsaStep } from "../../lib/schema";
 
 // Mirrors backend/app/models/jsa.py's per-field caps — keeps the editor from
 // growing a document past what the backend would accept if it were ever
-// re-validated (procedure/details/hazard max_length, controls joined by "\n").
+// re-validated (procedure/details/hazard max_length).
 const PROCEDURE_MAX = 2000;
 const DETAILS_MAX = 4000;
 const HAZARD_MAX = 1000;
-// controls is a list[str] capped at 20 items server-side, joined here by "\n"
-// for editing — 20 lines x ~200 chars/line is a generous per-line budget.
-const CONTROLS_MAX = 20 * 200;
 
 function cx(...parts: Array<string | false | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -118,6 +116,7 @@ export function StepCard({
 
   return (
     <motion.li
+      id={`jsa-step-${index}`}
       layout
       {...listItem}
       className={cx(
@@ -321,9 +320,9 @@ export function StepCard({
             >
               <label
                 htmlFor={`hazard-${index}-${hazardIndex}`}
-                className="sr-only"
+                className="mb-1 text-xs font-semibold text-navy"
               >
-                อันตรายที่อาจเกิดขึ้น
+                อันตรายที่ {hazardIndex + 1}
               </label>
               <AutoGrowTextarea
                 id={`hazard-${index}-${hazardIndex}`}
@@ -359,24 +358,15 @@ export function StepCard({
                 CELL_FOCUS_WITHIN,
               )}
             >
-              <label
-                htmlFor={`controls-${index}-${hazardIndex}`}
-                className="sr-only"
-              >
-                มาตรการป้องกัน/ควบคุม
-              </label>
-              <AutoGrowTextarea
+              <p className="mb-1 pr-8 text-xs font-semibold text-navy">
+                อันตรายที่ {hazardIndex + 1}
+              </p>
+              <ControlsEditor
                 id={`controls-${index}-${hazardIndex}`}
-                minRows={1}
-                maxLength={CONTROLS_MAX}
-                // One line = one control — easier for users to manage than adding fields one at a time
-                value={hazard.controls.join("\n")}
-                onChange={(event) =>
-                  patchHazard(hazardIndex, {
-                    controls: event.target.value.split("\n"),
-                  })
-                }
-                className={cx(CELL_INPUT, step.hazards.length > 1 && "pr-9")}
+                controls={hazard.controls}
+                hazardIndex={hazardIndex}
+                multiple={step.hazards.length > 1}
+                onChange={(controls) => patchHazard(hazardIndex, { controls })}
               />
               {/* Top-right corner of the cell, not a row of its own under the
                   text — that row made every hazard ~40px taller than its
@@ -455,7 +445,7 @@ export function StepCard({
                     htmlFor={`hazard-m-${index}-${hazardIndex}`}
                     className="text-sm font-medium text-muted"
                   >
-                    อันตรายที่อาจเกิดขึ้น
+                    อันตรายที่ {hazardIndex + 1}
                   </label>
                   {step.hazards.length > 1 ? (
                     // ghost + danger hover, matching the desktop table's own
@@ -486,29 +476,16 @@ export function StepCard({
                 />
               </div>
               <div>
-                <label
-                  htmlFor={`controls-m-${index}-${hazardIndex}`}
-                  className="text-sm font-medium text-muted"
-                >
-                  มาตรการป้องกัน/ควบคุม
-                </label>
-                <AutoGrowTextarea
+                <p className="mb-1 text-sm font-medium text-muted">
+                  มาตรการป้องกัน/ควบคุม · อันตรายที่ {hazardIndex + 1}
+                </p>
+                <ControlsEditor
                   id={`controls-m-${index}-${hazardIndex}`}
-                  minRows={1}
-                  maxLength={CONTROLS_MAX}
-                  value={hazard.controls.join("\n")}
-                  onChange={(event) =>
-                    patchHazard(hazardIndex, {
-                      controls: event.target.value.split("\n"),
-                    })
-                  }
-                  className="mt-1 bg-white"
+                  controls={hazard.controls}
+                  hazardIndex={hazardIndex}
+                  multiple={step.hazards.length > 1}
+                  onChange={(controls) => patchHazard(hazardIndex, { controls })}
                 />
-                {/* Said once, on the first hazard of the first step — repeated
-                    under every hazard it was a line of noise per box */}
-                {index === 0 && hazardIndex === 0 ? (
-                  <p className="mt-1 text-xs text-muted">พิมพ์หนึ่งมาตรการต่อบรรทัด</p>
-                ) : null}
               </div>
             </div>
           </motion.div>

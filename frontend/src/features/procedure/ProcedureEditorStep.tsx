@@ -35,6 +35,9 @@ import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import type { ProcedureDocument, SubStep } from "../../lib/schema";
 import { PhotoButton, PhotoHint, PhotoPreview, StepPhotoSlot } from "./SubStepPhoto";
+import { StepNavigator } from "../../components/StepNavigator";
+import { UnassignedPhotos } from "./UnassignedPhotos";
+import { restorePhotoAt } from "../../lib/restorePhotoAt";
 import { usePhotoInput } from "./usePhotoInput";
 
 // Same undo window as EditorStep's step/hazard deletion
@@ -81,6 +84,11 @@ export function ProcedureEditorStep({
 }) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
+  const latestProcedure = useRef(procedure);
+  latestProcedure.current = procedure;
+  const latestPhotos = useRef(photos);
+  latestPhotos.current = photos;
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Local, uncommitted text for the tools textarea — see its onChange/onBlur
@@ -184,11 +192,17 @@ export function ProcedureEditorStep({
     armUndo({
       label: "ลบขั้นตอนย่อยแล้ว",
       restore: () => {
-        // The same row keys too, so undo brings back that row rather than
-        // re-animating the whole step
-        rowKeys.current[stepIndex] = keysBefore;
-        patchStep(stepIndex, before);
-        onStepPhotosReplace(step.no, photosBefore);
+        const current = latestProcedure.current;
+        const subs = [...current.steps[stepIndex].sub_steps];
+        const keys = [...keysFor(stepIndex, subs.length)];
+        const nextKey = keysBefore[subIndex + 1];
+        const found = nextKey ? keys.indexOf(nextKey) : -1;
+        const at = found >= 0 ? found : Math.min(subIndex, subs.length);
+        subs.splice(at, 0, before[subIndex]);
+        keys.splice(at, 0, keysBefore[subIndex]);
+        rowKeys.current[stepIndex] = keys;
+        onChange({ ...current, steps: current.steps.map((s, i) => i === stepIndex ? { ...s, sub_steps: renumber(subs) } : s) });
+        onStepPhotosReplace(step.no, restorePhotoAt(latestPhotos.current, `${step.no}.`, at + 1, photosBefore[photoKey(step.no, subIndex + 1)]));
       },
     });
   };
@@ -209,6 +223,11 @@ export function ProcedureEditorStep({
   // first — otherwise the last line they typed would ship in the editor's
   // local state but never reach procedure.tools or the PDF.
   const flushTools = () => patch({ tools: linesToList(toolsText) });
+  const exportIssues = [
+    ...(stale ? ["JSA เปลี่ยนหลังจากร่างขั้นตอนปฏิบัติงาน"] : []),
+    ...(procedure.steps.some((s) => !s.sub_steps.length || s.sub_steps.some((sub) => !sub.action.trim())) ? ["บางขั้นตอนยังไม่มีรายละเอียดครบ"] : []),
+    ...(Object.keys(photos).some((key) => key.startsWith("unassigned:")) ? ["มีรูปที่ยังไม่ได้จับคู่ (จะไม่อยู่ในเอกสาร)"] : []),
+  ];
 
   return (
     <section>
@@ -220,6 +239,11 @@ export function ProcedureEditorStep({
         ระบบร่างขั้นตอนย่อยจาก JSA กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
       </p>
 
+      <UnassignedPhotos photos={photos} onChange={onPhotoChange}
+        targets={procedure.steps.flatMap((step) => [
+          { key: photoKey(step.no, 0), label: `${step.no}. ${step.procedure}` },
+          ...step.sub_steps.map((sub) => ({ key: photoKey(step.no, sub.no), label: `${step.no}.${sub.no} ${sub.action}` })),
+        ])} />
       {/* Height + fade in, so a warning that appears while you're on the
           page (the JSA was changed in another tab) doesn't shove the form */}
       <Reveal show={stale}>
@@ -310,6 +334,7 @@ export function ProcedureEditorStep({
         </div>
       </Card>
 
+      <StepNavigator steps={procedure.steps.map((s) => ({ id: `procedure-step-${s.no}`, label: `${s.no}. ${s.procedure}` }))} />
       <h2 className="mt-8 text-lg font-semibold text-navy">ขั้นตอนการปฏิบัติงาน</h2>
       <p className="mt-1 text-sm text-muted">
         ชื่อขั้นตอนหลักมาจาก JSA — แก้ไขได้ที่หน้าตรวจทาน JSA
@@ -320,7 +345,7 @@ export function ProcedureEditorStep({
 
       <ul className="mt-4 grid list-none gap-4 p-0">
         {procedure.steps.map((step, stepIndex) => (
-          <li key={stepIndex}>
+          <li key={stepIndex} id={`procedure-step-${step.no}`}>
             <Card>
               <h3 className="font-display text-base font-semibold text-ink">
                 {stepIndex + 1}. {step.procedure || "(ไม่มีชื่อขั้นตอน)"}
@@ -419,8 +444,8 @@ export function ProcedureEditorStep({
             size="lg"
             className="flex-1 sm:flex-none"
             onClick={() => {
-              flushTools();
-              onContinue();
+              if (exportIssues.length) setConfirmExport(true);
+              else { flushTools(); onContinue(); }
             }}
           >
             สร้าง PDF
@@ -434,13 +459,17 @@ export function ProcedureEditorStep({
         message={pendingDelete?.label ?? ""}
         onUndo={undoDelete}
       />
+      <ConfirmDialog open={confirmExport} title="ส่งออกเอกสารที่ยังต้องตรวจสอบ?"
+        description={exportIssues.join(" · ") + " กรุณาตรวจเอกสารก่อนนำไปใช้งานจริง"}
+        confirmLabel="ยืนยันส่งออก" onCancel={() => setConfirmExport(false)}
+        onConfirm={() => { setConfirmExport(false); flushTools(); onContinue(); }} />
 
       {/* Unlike a step deletion this can't be undone with a toast — it
           replaces the whole document — so it asks first */}
       <ConfirmDialog
         open={confirmRegenerate}
         title="สร้างขั้นตอนปฏิบัติงานใหม่?"
-        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่แก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้ (รูปภาพที่แนบไว้จะยังอยู่)"
+        description="ระบบจะร่างขั้นตอนย่อยใหม่ทั้งหมดจาก JSA ปัจจุบัน สิ่งที่แก้ไขไว้ในหน้านี้จะหายไปและกู้คืนไม่ได้ (รูปเดิมจะเก็บไว้ให้จับคู่กับขั้นตอนใหม่ก่อนส่งออก)"
         confirmLabel="สร้างใหม่"
         onConfirm={() => {
           setConfirmRegenerate(false);

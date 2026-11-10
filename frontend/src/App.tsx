@@ -1,4 +1,6 @@
+import { BackupControls } from "./features/jsa-input/BackupControls";
 import { useEffect, useRef, useState } from "react";
+import { usePageHeading } from "./usePageHeading";
 import { AnimatePresence, motion } from "motion/react";
 
 import { AppBar } from "./components/AppBar";
@@ -39,7 +41,7 @@ import { loadCompanyProfile, type CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
 import {
   projectDocumentSchema,
-  stepFingerprint,
+  procedureIsStale,
   type InputForm,
   type JsaDocument,
   type ProcedureDocument,
@@ -178,6 +180,18 @@ function computeView(
 }
 
 export default function App() {
+  const [libraryVersion, setLibraryVersion] = useState(0);
+  const [, refreshCounts] = useState(0);
+  useEffect(() => {
+    const refresh = () => setLibraryVersion((v) => v + 1);
+    const count = () => refreshCounts((v) => v + 1);
+    window.addEventListener("genjsa-library-changed", refresh);
+    window.addEventListener("genjsa-library-count", count);
+    return () => {
+      window.removeEventListener("genjsa-library-changed", refresh);
+      window.removeEventListener("genjsa-library-count", count);
+    };
+  }, []);
   const [stage, setStage] = useState<Stage>(0);
   // Browser Back/Forward (and the phone's Back gesture) follow the screens
   useStageHistory(stage, setStage);
@@ -219,6 +233,7 @@ export default function App() {
     setPhoto: updatePhoto,
     replaceStepPhotos,
     pruneToLiveKeys,
+    quarantine,
   } = usePhotos(historyId, procedure);
   // The open document's company logo — browser-only, like photos. See
   // useCompanyLogo.ts for why a new job gets its logo via setLogoFor.
@@ -242,13 +257,13 @@ export default function App() {
   const setProject = (update: (current: ProjectDocument) => ProjectDocument) =>
     setProjectState((state) => (state ? { ...state, project: update(state.project) } : state));
   const drafting = usePhaseDrafting(projectState?.project ?? null, setProject, "jsa");
-  const procedureDrafting = usePhaseDrafting(projectState?.project ?? null, setProject, "procedure");
   // The project's company logo: in IndexedDB under the project's id once it
   // has one, held here until then (a new project isn't saved yet)
   const projectLogo = useCompanyLogo(projectState?.id ?? null);
   // The project procedure's sub-step photos — same store as Single Mode's,
   // under the project's id (keys: ProjectProcedureStep's projectPhotoKey)
   const projectPhotos = usePhotos(projectState?.id ?? null, null);
+  const procedureDrafting = usePhaseDrafting(projectState?.project ?? null, setProject, "procedure", (phaseId) => projectPhotos.quarantine(`${phaseId}:`));
   const [pendingProjectLogo, setPendingProjectLogo] = useState<CompanyLogo | null>(
     () => loadCompanyProfile()?.logo ?? null,
   );
@@ -391,6 +406,7 @@ export default function App() {
         { ...values, analysis_date: todayIso() },
         { signal: controller.signal },
       );
+      if (controller.signal.aborted || generateController.current !== controller) return;
       setDoc(generated);
       docDraft.save(generated);
       // A new JSA means any procedure on screen describes a different job
@@ -412,8 +428,10 @@ export default function App() {
         );
       }
     } finally {
-      setBusy(false);
-      generateController.current = null;
+      if (generateController.current === controller) {
+        setBusy(false);
+        generateController.current = null;
+      }
     }
   };
 
@@ -469,6 +487,15 @@ export default function App() {
     openHistoryEntry(entry, 3);
 
   const startOver = () => {
+    generateController.current?.abort();
+    procedureController.current?.abort();
+    generateController.current = null;
+    procedureController.current = null;
+    setBusy(false);
+    setProcedureBusy(false);
+    if (historyId && doc?.header.work_activity.trim()) historyStore.upsertDoc(historyId, doc);
+    if (historyId && procedure) historyStore.upsertProcedure(historyId, procedure);
+    if (projectState?.id) projectStore.upsert(projectState.id, projectState.project);
     setDoc(null);
     discardProcedure();
     setError(null);
@@ -520,6 +547,9 @@ export default function App() {
     procedureController.current = controller;
     try {
       const generated = await generateProcedure(source, { signal: controller.signal });
+      if (controller.signal.aborted || procedureController.current !== controller) return;
+      if (procedure) await quarantine();
+      if (controller.signal.aborted || procedureController.current !== controller) return;
       setProcedure(generated);
       procedureDraft.save(generated);
       // Photos survive a regenerate — they're the user's own work, not the
@@ -553,8 +583,10 @@ export default function App() {
         );
       }
     } finally {
-      setProcedureBusy(false);
-      procedureController.current = null;
+      if (procedureController.current === controller) {
+        setProcedureBusy(false);
+        procedureController.current = null;
+      }
     }
   };
 
@@ -624,7 +656,7 @@ export default function App() {
   // it describing work that no longer matches — warn rather than silently
   // resync, which would throw away the user's own edits to the procedure
   const procedureStale =
-    !!doc && !!procedure && stepFingerprint(doc) !== stepFingerprint(procedure);
+    !!doc && !!procedure && procedureIsStale(doc, procedure);
 
   // null here means "stage doesn't match what's actually in state" — e.g. a
   // fresh mount on stage 1 before the very first effect below has run, or a
@@ -637,6 +669,11 @@ export default function App() {
   const inProject = (mode === "project" && stage === 0) || stage >= 10;
   // Single Mode's track (see the note on Stage)
   const withProcedure = mode === "procedure";
+
+  const hasSavedItems = view?.kind === "input" && (mode === "project" ? projectStore.list().length > 0 : historyStore.list().length > 0);
+  const showHistory = hasSavedItems && !busy;
+  const mainRef = useRef<HTMLElement>(null);
+  usePageHeading(mainRef, appName);
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface">
@@ -655,7 +692,7 @@ export default function App() {
           has room for the form's own 45rem plus a real side column for
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
-      <main className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
+      <main ref={mainRef} className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
         {/* One track per mode: JSA 3 steps, JSA + Procedure 4, โครงการ 4 —
             the procedure is a real step once the user has asked for it, not
             a side branch off the JSA's PDF page.
@@ -704,22 +741,17 @@ export default function App() {
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
             {view?.kind === "input" ? (
-              // Below xl: unchanged — single 45rem column, history stacked below
-              // the form. From xl up, with real desktop width to spare: history
-              // moves beside the form as its own column instead of competing for
-              // vertical space under it (see HistoryList.tsx's matching xl:
-              // classes that drop its now-unneeded top divider). Deliberately
-              // xl (1280px), not lg (1024px) — the form alone is 45rem (720px),
-              // so anything narrower than xl only leaves the side column ~300px
-              // wide: enough to break, not enough to look right (heading wraps,
-              // search placeholder truncates).
+              // Below xl: single column with history below the form. From xl,
+              // share the available width equally so history has room for job
+              // titles plus both document buttons. minmax(0, 1fr) allows long
+              // Thai titles to truncate without widening either column.
               //
               // Grid's default stretch (no xl:items-start override) — the history
               // column now matches the form's full height so its own scroll area
               // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
               // list), instead of sizing to its own short content and floating
               // next to a much taller form.
-              <div className="mx-auto grid max-w-[45rem] gap-y-10 xl:max-w-none xl:grid-cols-[45rem_1fr] xl:gap-x-12 xl:gap-y-0">
+              <div className={`mx-auto grid max-w-[45rem] gap-y-10 ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-x-8 xl:gap-y-0" : ""}`}>
                 {/* overflow-x-clip: the sideways slide must not widen the page
                     for its 250ms (a phone would get a horizontal scrollbar).
                     The clip would also cut off the focus ring of every
@@ -776,10 +808,10 @@ export default function App() {
                     generating so it doesn't compete with GeneratingPanel. */}
                 <AnimatePresence initial={false} mode="wait">
                   {busy ? null : mode === "project" ? (
-                    <ProjectList key="projects" onOpen={openSavedProject} />
+                    <ProjectList key={`projects-${libraryVersion}`} onOpen={openSavedProject} />
                   ) : (
                     <HistoryList
-                      key="history"
+                      key={`history-${libraryVersion}`}
                       onOpen={handleOpenHistory}
                       onOpenProcedure={handleOpenHistoryProcedure}
                       onCreateProcedure={handleCreateHistoryProcedure}
@@ -796,6 +828,12 @@ export default function App() {
             {view?.kind === "editing" ? (
               <EditorStep
                 doc={view.doc}
+                onDuplicate={async () => {
+                  if (!historyId) return;
+                  const { duplicateJob } = await import("./lib/backup");
+                  const copy = await duplicateJob({ id: historyId, savedAt: Date.now(), doc: view.doc, ...(procedure ? { procedure } : {}) });
+                  openHistoryEntry(copy, 1);
+                }}
                 onChange={setDoc}
                 companyLogo={companyLogo}
                 onCompanyLogoChange={setCompanyLogo}
@@ -866,6 +904,12 @@ export default function App() {
             {view?.kind === "projectHub" ? (
               <div className="mx-auto max-w-[45rem]">
                 <ProjectHub
+                  onDuplicate={async () => {
+                    if (!projectState?.id) return;
+                    const { duplicateProject } = await import("./lib/backup");
+                    const copy = await duplicateProject({ id: projectState.id, savedAt: Date.now(), project: projectState.project });
+                    openSavedProject(copy);
+                  }}
                   project={view.project}
                   drafting={drafting}
                   saveState={projectSave}
@@ -941,6 +985,7 @@ export default function App() {
             ) : null}
           </motion.div>
         </AnimatePresence>
+        {view?.kind === "input" && !busy ? <BackupControls /> : null}
       </main>
 
       {/* Every page ends with the standing caution — the "can make mistakes"

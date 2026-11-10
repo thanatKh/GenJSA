@@ -70,12 +70,12 @@ export function Label({
   );
 }
 
-export function FieldError({ children }: { children?: ReactNode }) {
+export function FieldError({ children, id }: { children?: ReactNode; id?: string }) {
   if (!children) return null;
   return (
     // role="alert": announced by screen readers the moment it appears —
     // aria-invalid alone only marks the field, it says nothing about why
-    <p role="alert" className="mt-1.5 text-sm text-danger-text flex items-start gap-1.5">
+    <p id={id} role="alert" className="mt-1.5 text-sm text-danger-text flex items-start gap-1.5">
       <TriangleAlert className="size-4 mt-1 shrink-0" aria-hidden="true" />
       <span>{children}</span>
     </p>
@@ -121,6 +121,28 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
     };
 
     useEffect(resize, [value, minRows, maxRows]);
+
+    // Wrapping also changes when the window/container changes width. Observe
+    // width only: writing height must not cause a ResizeObserver feedback loop.
+    useEffect(() => {
+      const el = inner.current;
+      if (!el) return;
+      let width = -1;
+      let frame = 0;
+      const measure = () => {
+        const next = el.getBoundingClientRect().width;
+        if (next === 0) { width = 0; return; }
+        if (next === width) return;
+        width = next;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(resize);
+      };
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+      // resize reads current DOM styles; row constraints restart this observer.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [minRows, maxRows]);
 
     // Google Sans/Google Sans Text load with font-display: swap (fonts.css)
     // — text first paints in the fallback font, which wraps Thai differently,

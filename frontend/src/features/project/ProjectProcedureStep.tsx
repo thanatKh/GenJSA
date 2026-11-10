@@ -35,6 +35,9 @@ import type { PhotoMap, StepPhoto } from "../../lib/pdf/layout";
 import { SubStepItem } from "../procedure/ProcedureEditorStep";
 import { PhotoHint, StepPhotoSlot } from "../procedure/SubStepPhoto";
 import type { ProcedureDocument, ProjectDocument, ProjectPhase, SubStep } from "../../lib/schema";
+import { UnassignedPhotos } from "../procedure/UnassignedPhotos";
+import { restorePhotoAt } from "../../lib/restorePhotoAt";
+import { StepNavigator } from "../../components/StepNavigator";
 import { Elapsed } from "./ProjectHub";
 import { projectPhotoKey, sectionStale } from "./projectModel";
 import type { PhaseDrafting } from "./usePhaseDrafting";
@@ -63,11 +66,14 @@ export function ProjectProcedureStep({
 }) {
   const [pendingDelete, setPendingDelete] = useState<{ label: string; restore: () => void } | null>(null);
   const [redrafting, setRedrafting] = useState<ProjectPhase | null>(null);
+  const [confirmExport, setConfirmExport] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }, []);
 
+  const latestProject = useRef(project);
+  latestProject.current = project;
   const intro = project.procedureIntro;
   // Raw text while typing — see ProcedureEditorStep's tools field for why a
   // join/split round trip on every keystroke would eat the Enter just typed.
@@ -91,6 +97,11 @@ export function ProjectProcedureStep({
 
   const busy = drafting.current !== null;
   const undrafted = project.phases.filter((phase) => phase.jsa && !phase.procedure).map((phase) => phase.id);
+  const reviewed = project.phases.filter((phase) => phase.reviewed && phase.jsa).length;
+  const staleCount = project.phases.filter(sectionStale).length;
+  const incompleteCount = project.phases.filter((phase) => !phase.procedure || phase.procedure.steps.some((s) => !s.sub_steps.length || s.sub_steps.some((sub) => !sub.action.trim()))).length;
+  const unassigned = Object.keys(photos).filter((key) => key.startsWith("unassigned:")).length;
+  const exportWarning = reviewed < project.phases.length || staleCount > 0 || incompleteCount > 0 || unassigned > 0;
 
   const patchIntro = (patch: Partial<NonNullable<ProjectDocument["procedureIntro"]>>) =>
     onChange((p) => ({
@@ -170,9 +181,18 @@ export function ProjectProcedureStep({
     setPendingDelete({
       label: `ลบขั้นตอนย่อย ${label} แล้ว`,
       restore: () => {
-        rowKeys.current[slot] = keysBefore;
-        setSubSteps(phaseId, stepIndex, subs);
-        replaceStepPhotos(phaseId, stepNo, photosBefore);
+        const current = latestProject.current.phases.find((p) => p.id === phaseId)?.procedure?.steps[stepIndex];
+        if (!current) return;
+        const latest = [...current.sub_steps];
+        const keys = [...keysFor(slot, latest.length)];
+        const nextKey = keysBefore[subIndex + 1];
+        const found = nextKey ? keys.indexOf(nextKey) : -1;
+        const at = found >= 0 ? found : Math.min(subIndex, latest.length);
+        latest.splice(at, 0, subs[subIndex]);
+        keys.splice(at, 0, keysBefore[subIndex]);
+        rowKeys.current[slot] = keys;
+        setSubSteps(phaseId, stepIndex, latest);
+        replaceStepPhotos(phaseId, stepNo, restorePhotoAt(photosRef.current, `${phaseId}:${stepNo}.`, at + 1, photosBefore[projectPhotoKey(phaseId, stepNo, subIndex + 1)]));
       },
     });
     undoTimer.current = setTimeout(() => setPendingDelete(null), UNDO_TIMEOUT_MS);
@@ -189,6 +209,16 @@ export function ProjectProcedureStep({
         ฉบับเดียวทั้งโครงการ ร่างทีละส่วนจาก JSA ของแต่ละขั้นตอน โดยระบบรู้ว่าขั้นตอนก่อนหน้าทำอะไรไว้แล้ว
       </p>
       <PhotoHint note="รูปภาพจะถูกลบหากลบโครงการนี้" />
+      <div className="mt-4 rounded-lg border border-line bg-raised p-3 text-sm" role="status">
+        JSA ตรวจแล้ว {reviewed}/{project.phases.length} · ขั้นตอนปฏิบัติงานครบ {project.phases.length - incompleteCount}/{project.phases.length}
+        {staleCount > 0 ? ` · ต้องตรวจให้ตรงกับ JSA ${staleCount} ส่วน` : ""}
+        {unassigned > 0 ? ` · รูปรอจับคู่ ${unassigned}` : ""}
+      </div>
+      <UnassignedPhotos photos={photos} onChange={onPhotoChange}
+        targets={project.phases.flatMap((phase, pi) => (phase.procedure?.steps ?? []).flatMap((step) => [
+          { key: projectPhotoKey(phase.id, step.no, 0), label: `${pi + 1}.${step.no} ${step.procedure}` },
+          ...step.sub_steps.map((sub) => ({ key: projectPhotoKey(phase.id, step.no, sub.no), label: `${pi + 1}.${step.no}.${sub.no} ${sub.action}` })),
+        ]))} />
 
       {undrafted.length > 0 && !busy ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-raised p-3 sm:p-4">
@@ -202,6 +232,9 @@ export function ProjectProcedureStep({
         </div>
       ) : null}
 
+      <StepNavigator steps={project.phases.flatMap((phase, phaseIndex) => phase.procedure?.steps.map((step, i) => ({
+        id: `project-procedure-${phase.id}-${i}`, label: `${phaseIndex + 1}.${i + 1} ${step.procedure}`,
+      })) ?? [])} />
       <AnimatePresence initial={false}>
         {intro ? (
           <motion.div key="intro" {...fadeSwap}>
@@ -361,7 +394,8 @@ export function ProjectProcedureStep({
             disabled={busy}
             onClick={() => {
               if (intro) flushTools();
-              onContinue();
+              if (exportWarning) setConfirmExport(true);
+              else onContinue();
             }}
           >
             เอกสาร PDF
@@ -370,6 +404,10 @@ export function ProjectProcedureStep({
         </div>
       </div>
 
+      <ConfirmDialog open={confirmExport} title="ส่งออกเอกสารที่ยังไม่ครบ?"
+        description={`JSA ตรวจแล้ว ${reviewed}/${project.phases.length} · ขั้นตอนปฏิบัติงานยังไม่ครบ ${incompleteCount} ส่วน · ต้องตรวจให้ตรงกับ JSA ${staleCount} ส่วน · รูปรอจับคู่ ${unassigned} รูป กรุณาตรวจเอกสารก่อนใช้งานจริง`}
+        confirmLabel="ยืนยันส่งออก" onCancel={() => setConfirmExport(false)}
+        onConfirm={() => { setConfirmExport(false); if (intro) flushTools(); onContinue(); }} />
       <UndoToast
         open={!!pendingDelete}
         message={pendingDelete?.label ?? ""}
@@ -427,7 +465,7 @@ function Section({
           const slot = `${phaseId}:${stepIndex}`;
           const keys = keysFor(slot, step.sub_steps.length);
           return (
-            <li key={stepIndex} className="border-t border-line pt-3">
+            <li key={stepIndex} id={`project-procedure-${phaseId}-${stepIndex}`} className="border-t border-line pt-3">
               <h3 className="font-display text-base font-semibold text-ink">
                 {stepNo} {step.procedure || "(ไม่มีชื่อขั้นตอน)"}
               </h3>

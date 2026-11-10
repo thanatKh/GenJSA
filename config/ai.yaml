@@ -17,6 +17,15 @@ model: "openthaigpt"
 # JSA generation (ai_service.py) never reads this setting now.
 detailed_model: "qwen3.6-35b-a3b"
 
+# Switch on timeout / unavailable only; auth and rate limits stop immediately.
+# All models share retry.max_attempts below (not a fresh budget per model).
+# OpenThaiGPT is already the JSA primary. Keeping it here also protects future
+# primary-model changes; duplicate model IDs are called only once per chain.
+fallback_models:
+  - "openthaigpt"
+detailed_fallback_models:
+  - "openthaigpt"
+
 api:
   base_url: "https://thaillm.or.th/api/v1"
   chat_completions_path: "/chat/completions"

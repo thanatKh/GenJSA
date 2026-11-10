@@ -23,6 +23,11 @@ function title(entry: ProjectEntry) {
 
 export function ProjectList({ onOpen }: { onOpen: (entry: ProjectEntry) => void }) {
   const [entries, setEntries] = useState<ProjectEntry[]>(() => projectStore.list());
+  useEffect(() => {
+    const refresh = () => setEntries(projectStore.list());
+    window.addEventListener("genjsa-library-changed", refresh);
+    return () => window.removeEventListener("genjsa-library-changed", refresh);
+  }, []);
   const [undoEntry, setUndoEntry] = useState<ProjectEntry | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

@@ -19,6 +19,9 @@ import {
   Reveal,
   UndoToast,
 } from "../../components/ui";
+import { DuplicateButton } from "../../components/DuplicateButton";
+import { StepNavigator } from "../../components/StepNavigator";
+import { jsaProblems, focusJsaField } from "../../lib/jsaValidation";
 import { ThaiDatePicker } from "../../components/ThaiDatePicker";
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import type { CompanyLogo } from "../../lib/companyLogo";
@@ -50,11 +53,6 @@ const EMPTY_STEP: Omit<JsaStep, "no"> = {
   hazards: [{ hazard: "", controls: [""] }],
 };
 
-/** "A", "A และ B", "A, B และ C" */
-function thaiList(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} และ${items[items.length - 1]}`;
-}
 
 export function EditorStep({
   doc,
@@ -67,7 +65,9 @@ export function EditorStep({
   onCompanyLogoChange,
   saveState,
   project,
+  onDuplicate,
 }: {
+  onDuplicate?: () => Promise<void>;
   doc: JsaDocument;
   onChange: (next: JsaDocument) => void;
   /** Browser-only, beside the document rather than in it — see useCompanyLogo.ts */
@@ -86,6 +86,7 @@ export function EditorStep({
    * bar goes back to the project's JSA list instead of starting over. */
   project?: { name: string; position: string; onBack: () => void };
 }) {
+  const [checked, setChecked] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [liveMessage, setLiveMessage] = useState("");
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -208,8 +209,12 @@ export function EditorStep({
   // /api/procedure/generate. Catch it here, at the source, rather than as a
   // failure on a later page the user has no reason to connect back to this field.
   const missingActivity = !doc.header.work_activity.trim();
-  const missingSteps = doc.steps.some((step) => !step.procedure.trim());
-  const incomplete = missingSupervisor || missingActivity || missingSteps;
+  const problems = jsaProblems(doc);
+  const continueReviewed = () => {
+    setChecked(true);
+    if (problems.length) { focusJsaField(problems[0].id); return; }
+    onContinue();
+  };
 
   return (
     <section>
@@ -217,7 +222,7 @@ export function EditorStep({
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
           {project ? `ตรวจทาน ${project.position}` : "ตรวจทานและแก้ไข"}
         </h1>
-        <SaveStatus state={saveState} />
+        <div className="flex flex-wrap items-center gap-2"><SaveStatus state={saveState} />{onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}</div>
       </div>
       {project ? (
         <p className="mt-1 text-sm font-medium text-ink">
@@ -239,6 +244,7 @@ export function EditorStep({
         </label>
         <AutoGrowTextarea
           id="work_activity"
+          required
           minRows={1}
           maxLength={WORK_ACTIVITY_MAX}
           aria-invalid={missingActivity}
@@ -267,6 +273,7 @@ export function EditorStep({
             </label>
             <Input
               id="supervisor"
+              required
               autoComplete="name"
               aria-invalid={missingSupervisor}
               value={doc.header.supervisor}
@@ -346,6 +353,11 @@ export function EditorStep({
         </div>
       </Card>
 
+      {checked && problems.length > 0 ? <div role="alert" className="mt-4 rounded-lg border border-danger p-3 text-sm text-danger-text">
+        <p className="font-medium">กรุณาแก้ไขก่อนดำเนินการต่อ</p>
+        <ul className="mt-1 list-disc pl-5">{problems.map((p) => <li key={p.id}><button type="button" className="text-left underline" onClick={() => focusJsaField(p.id)}>{p.message}</button></li>)}</ul>
+      </div> : null}
+      <StepNavigator steps={doc.steps.map((step, i) => ({ id: `jsa-step-${i}`, label: `${i + 1}. ${step.procedure || "ยังไม่มีชื่อ"}` }))} />
       {/* Column header matching the printed PDF table — desktop only, the
           step list itself repeats these labels per-step at narrower widths.
           Shaded and fully bordered (bg-raised, matching the hazard/controls
@@ -365,7 +377,7 @@ export function EditorStep({
         <span>
           มาตรการป้องกัน/ควบคุม
           <span className="block text-xs font-normal text-muted/80">
-            พิมพ์หนึ่งมาตรการต่อบรรทัด
+            แยกรายข้อ เลขตรงกับเอกสาร PDF
           </span>
         </span>
       </div>
@@ -452,18 +464,6 @@ export function EditorStep({
         </div>
       </Reveal>
 
-      <Reveal show={incomplete}>
-        <p className="pt-4 text-sm text-danger-text">
-          {`กรุณากรอก${thaiList(
-            [
-              missingActivity && "งาน/กิจกรรม",
-              missingSupervisor && "ชื่อหัวหน้างาน",
-              missingSteps && "ขั้นตอนการทำงาน",
-            ].filter((label): label is string => !!label),
-          )}ให้ครบก่อนสร้างเอกสาร (ช่องที่ยังไม่ได้กรอกมีเครื่องหมายสีแดง)`}
-        </p>
-      </Reveal>
-
       {/* Spacer so the fixed bar below doesn't cover the last bit of content */}
       <div className="h-20" aria-hidden="true" />
 
@@ -495,7 +495,7 @@ export function EditorStep({
               เริ่มใหม่
             </Button>
           )}
-          <Button size="lg" onClick={onContinue} disabled={incomplete} className="flex-1 sm:flex-none">
+          <Button size="lg" onClick={continueReviewed} className="flex-1 sm:flex-none">
             {project ? (
               <>
                 <Check className="size-5" aria-hidden="true" />

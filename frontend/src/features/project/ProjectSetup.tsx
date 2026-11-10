@@ -111,13 +111,15 @@ export function ProjectSetup({
           </Label>
           <Input
             id="project_name"
+            required
+            aria-describedby={problems?.name ? "project_name_error" : undefined}
             value={project.name}
             maxLength={300}
             placeholder="เช่น งานซ่อมแซมท่อทาง KBY 2569 — Liquid LPG 8&quot; ท่า 2"
             aria-invalid={!!problems?.name}
             onChange={(event) => update({ name: event.target.value })}
           />
-          <FieldError>{problems?.name}</FieldError>
+          <FieldError id="project_name_error">{problems?.name}</FieldError>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -127,12 +129,14 @@ export function ProjectSetup({
             </Label>
             <Input
               id="project_supervisor"
+              required
+              aria-describedby={problems?.supervisor ? "project_supervisor_error" : undefined}
               autoComplete="name"
               value={project.supervisor}
               aria-invalid={!!problems?.supervisor}
               onChange={(event) => update({ supervisor: event.target.value })}
             />
-            <FieldError>{problems?.supervisor}</FieldError>
+            <FieldError id="project_supervisor_error">{problems?.supervisor}</FieldError>
           </div>
           <div>
             <Label htmlFor="project_analyst">ผู้วิเคราะห์</Label>
@@ -265,9 +269,11 @@ export function ProjectSetup({
                           value={phase.work}
                           maxLength={500}
                           aria-invalid={!!issue?.work}
+                            required
+                            aria-describedby={issue?.work ? `phase-${phase.id}-work-error` : undefined}
                           onChange={(event) => updatePhase(phase.id, { work: event.target.value })}
                         />
-                        <FieldError>{issue?.work}</FieldError>
+                        <FieldError id={`phase-${phase.id}-work-error`}>{issue?.work}</FieldError>
                       </div>
                       {phase.jsa ? (
                         // The description only matters for drafting — once the
@@ -285,9 +291,11 @@ export function ProjectSetup({
                             maxLength={5000}
                             value={phase.description}
                             aria-invalid={!!issue?.description}
+                            required
+                            aria-describedby={issue?.description ? `phase-${phase.id}-description-error` : undefined}
                             onChange={(event) => updatePhase(phase.id, { description: event.target.value })}
                           />
-                          <FieldError>{issue?.description}</FieldError>
+                          <FieldError id={`phase-${phase.id}-description-error`}>{issue?.description}</FieldError>
                         </div>
                       )}
                       <div className="flex justify-end gap-1">

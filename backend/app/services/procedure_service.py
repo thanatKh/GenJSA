@@ -144,6 +144,7 @@ async def generate_procedure(
         payload_model=AiProcedurePayload,
         provider=provider,
         settings=settings,
+        fallback_models=settings.ai.detailed_fallback_models,
     )
 
     return _assemble(request.jsa, payload, settings)

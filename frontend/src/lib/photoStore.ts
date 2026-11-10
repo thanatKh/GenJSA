@@ -54,7 +54,7 @@ const DB_NAME = "genjsa-photos";
 const DB_VERSION = 1;
 const STORE = "photos";
 
-type StoredPhoto = {
+export type StoredPhoto = {
   historyId: string;
   /** Sub-step key ("1.2"), or a number on rows from before the move to
    * sub-steps — see the header comment. */
@@ -212,6 +212,47 @@ async function clearForHistoryId(historyId: string): Promise<void> {
  * pass, so this avoids opening one transaction per id. */
 export async function clearForHistoryIds(historyIds: string[]): Promise<void> {
   await Promise.all(historyIds.map((id) => clearForHistoryId(id)));
+}
+
+/** Backup/restore must detect failures, unlike best-effort editor writes. */
+export async function exportAssets(ids: readonly string[]): Promise<StoredPhoto[]> {
+  const db = await openDb();
+  if (!db) throw new Error("ไม่สามารถอ่านรูปภาพจากที่จัดเก็บในเบราว์เซอร์นี้ได้");
+  const wanted = new Set(ids);
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+    request.onsuccess = () => resolve((request.result as StoredPhoto[]).filter((row) => wanted.has(row.historyId)));
+    request.onerror = () => reject(new Error("อ่านรูปภาพไม่สำเร็จ"));
+  });
+}
+
+export async function importAssets(rows: readonly StoredPhoto[]): Promise<void> {
+  if (!rows.length) return;
+  const db = await openDb();
+  if (!db) throw new Error("ไม่สามารถบันทึกรูปภาพในเบราว์เซอร์นี้ได้");
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    for (const row of rows) tx.objectStore(STORE).put(row);
+    tx.oncomplete = () => resolve();
+    tx.onabort = tx.onerror = () => reject(new Error("บันทึกรูปภาพไม่สำเร็จ พื้นที่อาจไม่เพียงพอ"));
+  });
+}
+
+/** Relocate photos atomically: a failed write must keep every original. */
+export async function moveAssets(historyId: string, moves: { from: string; to: string; photo: { data: string; ratio: number } }[]): Promise<void> {
+  if (!moves.length) return;
+  const db = await openDb();
+  if (!db) throw new Error("ไม่สามารถจัดเก็บรูปเดิมก่อนสร้างเอกสารใหม่ได้");
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    for (const { from, to, photo } of moves) {
+      store.put({ historyId, stepNo: to, ...photo, savedAt: Date.now() });
+      store.delete([historyId, from]);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onabort = tx.onerror = () => reject(new Error("เก็บรูปเดิมไม่สำเร็จ กรุณาตรวจพื้นที่ในเบราว์เซอร์"));
+  });
 }
 
 /** This job's company logo, or null (none saved, or storage unavailable) */

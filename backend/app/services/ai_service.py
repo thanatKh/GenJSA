@@ -7,6 +7,7 @@ JSON only.
 
 import asyncio
 import logging
+from collections.abc import Sequence
 
 from jinja2 import Template
 from pydantic import BaseModel, ValidationError
@@ -83,6 +84,7 @@ async def generate_validated[T: BaseModel](
     payload_model: type[T],
     provider: LLMProvider,
     settings: Settings,
+    fallback_models: Sequence[str] = (),
 ) -> T:
     """Call the LLM until it returns something that validates as `payload_model`.
 
@@ -93,6 +95,9 @@ async def generate_validated[T: BaseModel](
     attempts = max(1, settings.ai.retry.max_attempts)
     json_mode = settings.ai.request_json_mode
     last_error: AppError = Errors.AI_BAD_RESPONSE
+    # One total attempt budget across models, so failover cannot multiply wait time.
+    models = list(dict.fromkeys([model, *(m.strip() for m in fallback_models if m.strip())]))
+    model_index = 0
 
     for attempt in range(1, attempts + 1):
         prompt = system_prompt if attempt == 1 else system_prompt + _RETRY_REMINDER
@@ -101,14 +106,20 @@ async def generate_validated[T: BaseModel](
             raw = await provider.complete(
                 prompt,
                 user_prompt,
-                model=model,
+                model=models[model_index],
                 json_mode=json_mode,
             )
         except AppError as exc:
-            # timeout / auth / rate limit — retrying won't help (timeout would just double the
-            # wait since timeout_seconds is already generous; auth/rate-limit won't resolve
-            # themselves in a couple seconds). AI_UNAVAILABLE (DNS/TLS/connection-refused) is
-            # the one transient case worth a retry — it's often a momentary blip.
+            # A different model can recover from an unavailable worker / timeout.
+            # Never switch for auth or quota errors: backups share the same key.
+            if exc.code in (Errors.AI_TIMEOUT.code, Errors.AI_UNAVAILABLE.code):
+                if model_index + 1 < len(models) and attempt < attempts:
+                    model_index += 1
+                    json_mode = settings.ai.request_json_mode
+                    logger.warning("AI model failover (%s) on attempt %d/%d", exc.code, attempt, attempts)
+                    continue
+                if exc.code == Errors.AI_TIMEOUT.code:
+                    raise
             if exc.code not in (Errors.AI_BAD_RESPONSE.code, Errors.AI_UNAVAILABLE.code):
                 raise
             last_error = exc
@@ -143,6 +154,7 @@ async def generate_jsa(
         payload_model=AiJsaPayload,
         provider=provider,
         settings=settings,
+        fallback_models=settings.ai.fallback_models,
     )
 
     project = request.project

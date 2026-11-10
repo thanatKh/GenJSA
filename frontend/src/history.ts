@@ -29,6 +29,7 @@ import {
   type ProcedureDocument,
 } from "./lib/schema";
 import { clearForHistoryIds } from "./lib/photoStore";
+import { deferPhotoCleanup, cancelPhotoCleanup } from "./lib/deferredPhotoCleanup";
 
 const KEY = "genjsa.history.v1";
 
@@ -190,24 +191,21 @@ export function upsertProcedure(id: string, procedure: ProcedureDocument): boole
   return upsertEntry(id, { procedure });
 }
 
-/** Removes the entry AND its photos. Note for HistoryList.tsx's undo flow:
- * restore() below only needs to put the JSA/procedure documents back to make
- * the entry usable again — it deliberately does not try to restore photos
- * within the undo window, so a delete-then-undo loses any photos that were
- * attached. Accepted trade-off: re-attaching them is exactly the manual
- * "drag the photo back in" work the user would otherwise do anyway, and it
- * keeps remove()/restore() from needing to shuttle photo blobs through the
- * undo toast's in-memory HistoryEntry just for this one edge case. */
+/** Remove the document immediately; defer photo deletion beyond Undo. */
 export function remove(id: string): void {
-  writeRaw(readRaw().entries.filter((entry) => entry.id !== id));
-  void clearForHistoryIds([id]);
+  if (writeRaw(readRaw().entries.filter((entry) => entry.id !== id))) {
+    deferPhotoCleanup(id);
+    window.dispatchEvent(new Event("genjsa-library-count"));
+  }
 }
 
 /** Put a removed entry back with its original savedAt, so undo doesn't reorder the list. */
 export function restore(entry: HistoryEntry): void {
+  cancelPhotoCleanup(entry.id);
   const others = readRaw().entries.filter((other) => other.id !== entry.id);
   const next = [entry, ...others].sort((a, b) => b.savedAt - a.savedAt);
   void writeCapped(next);
+  window.dispatchEvent(new Event("genjsa-library-count"));
 }
 
 export function clear(): void {
@@ -218,6 +216,7 @@ export function clear(): void {
     /* fail silently */
   }
   if (ids.length) void clearForHistoryIds(ids);
+  window.dispatchEvent(new Event("genjsa-library-count"));
 }
 
 export function newId(): string {

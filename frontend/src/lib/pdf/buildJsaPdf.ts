@@ -26,7 +26,7 @@ import {
   type PdfLayout,
 } from "./layout";
 
-type Row = { cells: [Line[], Line[], Line[]] };
+type Row = { cells: [Line[], Line[], Line[]]; dividers: number[] };
 
 type BuildOptions = {
   layout?: PdfLayout;
@@ -108,6 +108,8 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     const multiple = step.hazards.length > 1;
     const hazards: Line[] = [];
     const controls: Line[] = [];
+    const dividers: number[] = [];
+    const blank = (): Line => ({ text: "", weight: "normal", indent: 0 });
 
     step.hazards.forEach((hazard, hazardIndex) => {
       hazards.push(
@@ -136,11 +138,21 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
           ),
         );
       });
+      // Each hazard and its controls share one sub-row. Pad the shorter
+      // column before starting the next pair; the procedure stays merged.
+      const height = Math.max(hazards.length, controls.length);
+      while (hazards.length < height) hazards.push(blank());
+      while (controls.length < height) controls.push(blank());
+      if (hazardIndex < step.hazards.length - 1) {
+        dividers.push(height + 0.5);
+        hazards.push(blank());
+        controls.push(blank());
+      }
     });
 
     if (hazards.length === 0) hazards.push(...wrap("—", innerW[1], "normal", L.font.body_pt));
 
-    return { cells: [procedure, hazards, controls] };
+    return { cells: [procedure, hazards, controls], dividers };
   });
 
   // --------------------------------------------------------- header drawing --
@@ -263,6 +275,12 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     colW.forEach((w, i) => {
       doc.rect(colX[i], top, w, height);
       drawLines(row.cells[i].slice(from, from + count), colX[i] + pad, top + pad, w - pad * 2);
+    });
+    row.dividers.forEach((line) => {
+      if (line > from && line < from + count) {
+        const dividerY = top + pad + (line - from) * lineH;
+        doc.line(colX[1], dividerY, mL + contentW, dividerY);
+      }
     });
     return height;
   };

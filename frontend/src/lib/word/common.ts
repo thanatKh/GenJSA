@@ -126,6 +126,9 @@ export function createWordKit(L: PdfLayout) {
       keepNext,
       spacing: { before: spaceBefore },
       indent: marker ? markerIndent(marker, left) : left ? { left } : undefined,
+      // Match the marker's hanging indent instead of Word's default tab grid,
+      // which can push text to a new line in a narrow table cell.
+      tabStops: marker ? [{ type: TabStopType.LEFT, position: markerIndent(marker, left).left }] : undefined,
       children: [
         ...(marker ? [...run(marker, { bold, size: halfPt(size) }), new TextRun({ children: [new Tab()] })] : []),
         // A line per \n, so a multi-line field keeps its line breaks
@@ -217,11 +220,12 @@ export function createWordKit(L: PdfLayout) {
    * hence the tiny trailing one. */
   const cell = (
     children: (Paragraph | Table)[],
-    options: { span?: number; width: number; shaded?: boolean; top?: boolean },
+    options: { span?: number; rowSpan?: number; width: number; shaded?: boolean; top?: boolean },
   ) => {
     const last = children[children.length - 1];
     return new TableCell({
       columnSpan: options.span,
+      rowSpan: options.rowSpan,
       width: { size: options.width, type: WidthType.DXA },
       margins: cellMargins,
       // Body rows read from the top, like the PDF; header cells are centred

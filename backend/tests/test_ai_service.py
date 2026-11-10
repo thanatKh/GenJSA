@@ -126,6 +126,69 @@ async def test_auth_error_is_not_retried(settings):
     assert len(provider.calls) == 1
 
 
+async def _run_with_backups(provider, settings, backups):
+    return await generate_validated(
+        system_prompt="sys", user_prompt="user", model="primary",
+        payload_model=Payload, provider=provider, settings=settings,
+        fallback_models=backups,
+    )
+
+
+@pytest.mark.parametrize("error", [Errors.AI_TIMEOUT, Errors.AI_UNAVAILABLE])
+async def test_transient_failure_switches_model(settings, error):
+    provider = FakeProvider(error, '{"ok": true}')
+    result = await _run_with_backups(provider, settings, ["backup"])
+    assert result.ok is True
+    assert [c["model"] for c in provider.calls] == ["primary", "backup"]
+
+
+@pytest.mark.parametrize("error", [Errors.AI_AUTH, Errors.AI_RATE_LIMIT])
+async def test_shared_key_errors_never_try_backups(settings, error):
+    provider = FakeProvider(error)
+    with pytest.raises(AppError) as excinfo:
+        await _run_with_backups(provider, settings, ["backup"])
+    assert excinfo.value.code == error.code
+    assert len(provider.calls) == 1
+
+
+async def test_failover_keeps_one_total_attempt_budget(settings):
+    settings.ai.retry.max_attempts = 3
+    provider = FakeProvider(Errors.AI_UNAVAILABLE, Errors.AI_UNAVAILABLE, Errors.AI_UNAVAILABLE)
+    with pytest.raises(AppError) as excinfo:
+        await _run_with_backups(provider, settings, ["primary", " ", "backup", "backup", "last", "unused"])
+    assert excinfo.value.code == Errors.AI_UNAVAILABLE.code
+    assert [c["model"] for c in provider.calls] == ["primary", "backup", "last"]
+
+
+async def test_timeout_without_backup_stops_immediately(settings):
+    provider = FakeProvider(Errors.AI_TIMEOUT)
+    with pytest.raises(AppError) as excinfo:
+        await _run_with_backups(provider, settings, [])
+    assert excinfo.value.code == Errors.AI_TIMEOUT.code
+    assert len(provider.calls) == 1
+
+
+async def test_backup_still_requires_valid_schema_and_retries(settings):
+    provider = FakeProvider(Errors.AI_UNAVAILABLE, '{"wrong": true}', '{"ok": true}')
+    result = await _run_with_backups(provider, settings, ["backup"])
+    assert result.ok is True
+    assert [c["model"] for c in provider.calls] == ["primary", "backup", "backup"]
+
+
+async def test_failover_resets_json_mode_for_new_model(settings):
+    provider = FakeProvider(Errors.AI_BAD_RESPONSE, Errors.AI_UNAVAILABLE, '{"ok": true}')
+    await _run_with_backups(provider, settings, ["backup"])
+    assert [c["json_mode"] for c in provider.calls] == [True, False, True]
+
+
+async def test_no_backup_call_when_attempt_budget_is_used_up(settings):
+    settings.ai.retry.max_attempts = 1
+    provider = FakeProvider(Errors.AI_UNAVAILABLE)
+    with pytest.raises(AppError):
+        await _run_with_backups(provider, settings, ["backup"])
+    assert len(provider.calls) == 1
+
+
 async def test_raises_after_exhausting_attempts(settings):
     settings.ai.retry.max_attempts = 3
     provider = FakeProvider("bad", "also bad", "still bad")
@@ -193,6 +256,28 @@ async def test_generate_jsa_always_uses_the_plain_model(settings):
     await generate_jsa(request, provider, settings)
 
     assert provider.calls[0]["model"] == settings.ai.model
+
+
+async def test_jsa_falls_back_to_openthaigpt_when_primary_changes(settings):
+    settings.ai.model = "another-jsa-model"
+    settings.ai.fallback_models = ["openthaigpt"]
+    provider = FakeProvider(Errors.AI_UNAVAILABLE, _ONE_STEP)
+    request = GenerateRequest(
+        supervisor="ผู้ทดสอบ", analysis_date=date(2026, 11, 10),
+        work_description="ทดสอบการสลับโมเดลวิเคราะห์ความเสี่ยง",
+    )
+    doc = await generate_jsa(request, provider, settings)
+    assert [c["model"] for c in provider.calls] == ["another-jsa-model", "openthaigpt"]
+    assert doc.header.supervisor == request.supervisor
+    assert len(doc.steps) == 1
+
+
+async def test_same_model_backup_does_not_repeat_timed_out_primary(settings):
+    provider = FakeProvider(Errors.AI_TIMEOUT)
+    with pytest.raises(AppError) as excinfo:
+        await _run_with_backups(provider, settings, ["primary"])
+    assert excinfo.value.code == Errors.AI_TIMEOUT.code
+    assert len(provider.calls) == 1
 
 
 def _project_request(**project):

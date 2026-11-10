@@ -166,13 +166,26 @@ export function usePhotos(historyId: string | null, procedure: ProcedureDocument
   const pruneToLiveKeys = (liveKeys: readonly string[]) => {
     setPhotos((current) => {
       const live = new Set(liveKeys);
-      const orphaned = Object.keys(current).filter((key) => !live.has(key));
+      const orphaned = Object.keys(current).filter((key) => !live.has(key) && !key.startsWith("unassigned:"));
       if (historyId && orphaned.length) {
         void Promise.all(orphaned.map((key) => photoStore.remove(historyId, key)));
       }
-      return Object.fromEntries(Object.entries(current).filter(([key]) => live.has(key)));
+      return Object.fromEntries(Object.entries(current).filter(([key]) => live.has(key) || key.startsWith("unassigned:")));
     });
   };
 
-  return { photos, setPhoto, replaceStepPhotos, pruneToLiveKeys };
+  const quarantine = async (prefix = "") => {
+    const next = { ...photosRef.current };
+    const moves: { from: string; to: string; photo: StepPhoto }[] = [];
+    for (const [key, photo] of Object.entries(next)) {
+      if (key.startsWith("unassigned:") || !key.startsWith(prefix)) continue;
+      const target = `unassigned:${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      next[target] = photo; delete next[key];
+      moves.push({ from: key, to: target, photo });
+    }
+    if (historyId) await photoStore.moveAssets(historyId, moves);
+    photosRef.current = next;
+    setPhotos(next);
+  };
+  return { photos, setPhoto, replaceStepPhotos, pruneToLiveKeys, quarantine };
 }

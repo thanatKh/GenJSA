@@ -24,6 +24,7 @@ export function usePhaseDrafting(
   project: ProjectDocument | null,
   setProject: (update: (current: ProjectDocument) => ProjectDocument) => void,
   kind: "jsa" | "procedure",
+  onProcedureReplaced?: (phaseId: string) => Promise<void>,
 ) {
   const projectRef = useRef(project);
   useEffect(() => {
@@ -63,6 +64,7 @@ export function usePhaseDrafting(
         try {
           if (kind === "jsa") {
             const jsa = await generateJsa(generateInput(latest, index), { signal: run.signal });
+            if (run.signal.aborted) return;
             setProject((p) => withPhaseJsa(p, id, jsa, false));
           } else {
             const section = await generateProcedure(
@@ -70,6 +72,9 @@ export function usePhaseDrafting(
               { signal: run.signal },
               procedureInput(latest, index),
             );
+            if (run.signal.aborted) return;
+            if (phase.procedure) await onProcedureReplaced?.(id);
+            if (run.signal.aborted) return;
             setProject((p) => withPhaseProcedure(p, id, section));
           }
         } catch (caught) {

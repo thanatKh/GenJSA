@@ -74,6 +74,9 @@ class AiConfig(BaseModel):
     # when blank. Not used for JSA generation itself — see jsa-generate.md's
     # own history if this ever needs reviving for that path.
     detailed_model: str = ""
+    # Ordered backups for each document type. Empty lists disable failover.
+    fallback_models: list[str] = Field(default_factory=list)
+    detailed_fallback_models: list[str] = Field(default_factory=list)
     api: AiApi
     request_json_mode: bool = True
     retry: AiRetry = Field(default_factory=AiRetry)

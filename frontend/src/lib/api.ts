@@ -5,6 +5,7 @@
  */
 
 import {
+  jsaFingerprint,
   jsaDocumentSchema,
   procedureDocumentSchema,
   type JsaDocument,
@@ -137,7 +138,7 @@ export async function generateProcedure(
     options?.signal,
   );
   try {
-    return procedureDocumentSchema.parse(await response.json());
+    return { ...procedureDocumentSchema.parse(await response.json()), sourceFingerprint: jsaFingerprint(jsa) };
   } catch {
     throw new ApiError(SHAPE_ERROR);
   }

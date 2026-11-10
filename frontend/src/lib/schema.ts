@@ -57,6 +57,8 @@ export const procedureStepSchema = z.object({
 });
 
 export const procedureDocumentSchema = z.object({
+  // Browser-only provenance, not sent to the generation API.
+  sourceFingerprint: z.string().optional(),
   header: jsaHeaderSchema,
   purpose: z.string().default(""),
   scope: z.string().default(""),
@@ -151,8 +153,18 @@ export type ProjectProcedureIntro = z.infer<typeof projectProcedureIntroSchema>;
  *
  * A procedure mirrors its JSA's steps, so editing those steps afterwards
  * leaves it describing work that no longer matches. Comparing this against the
- * current JSA is enough to warn the user; it deliberately ignores hazards and
- * details, which the procedure never reflected in the first place. */
+ * current JSA handles legacy entries. New entries also retain the header and
+ * step details used by the generation request (jsaFingerprint below). */
 export function stepFingerprint(doc: JsaDocument | ProcedureDocument): string {
   return doc.steps.map((step) => step.procedure.trim()).join("|");
+}
+
+export function jsaFingerprint(doc: JsaDocument): string {
+  return JSON.stringify([doc.header, doc.steps.map((s) => [s.procedure.trim(), s.details.trim()])]);
+}
+
+export function procedureIsStale(jsa: JsaDocument, procedure: ProcedureDocument): boolean {
+  if (procedure.sourceFingerprint) return procedure.sourceFingerprint !== jsaFingerprint(jsa);
+  // Old entries have no source details snapshot. Do not imply we verified it.
+  return stepFingerprint(jsa) !== stepFingerprint(procedure) || jsa.steps.some((s) => s.details.trim());
 }

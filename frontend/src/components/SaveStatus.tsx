@@ -18,7 +18,7 @@ const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: React
   saved: {
     className: "text-muted",
     icon: <Check className="size-3.5 text-[var(--success)]" aria-hidden="true" />,
-    text: "บันทึกแล้ว",
+    text: "บันทึกในเบราว์เซอร์นี้แล้ว",
   },
   failed: {
     className: "text-danger-text",

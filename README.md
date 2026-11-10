@@ -75,6 +75,25 @@ Fires the same prompt at every model in `candidate_models` and compares how
 reliably each returns valid JSON, how many steps it produces, and how long
 it takes → put the result in `config/ai.yaml`.
 
+### Model failover
+
+`config/ai.yaml` defines ordered backups separately for JSA (`fallback_models`)
+and work procedures (`detailed_fallback_models`). Procedures currently try
+`qwen3.6-35b-a3b`, then `openthaigpt` if the model times out or the service is
+unavailable (including upstream 502/504 errors). JSA currently uses
+`openthaigpt` as both primary and configured backup: duplicates are removed,
+so it will not switch to the same model again. If a different JSA primary is
+configured later, OpenThaiGPT remains its backup.
+
+Failover shares the existing `retry.max_attempts` budget across all models;
+it does not start a fresh retry loop for every backup. Auth and rate-limit
+errors stop immediately because models share the same API key. Invalid JSON
+or schema responses use the existing validation retries, not model failover.
+Every backup response must pass the same schema and human review. Empty backup
+lists disable failover. Restart the backend after changing model configuration.
+This protects against individual model failures; it cannot recover from an
+outage affecting the entire ThaiLLM service.
+
 ## Tests
 
 ```bash

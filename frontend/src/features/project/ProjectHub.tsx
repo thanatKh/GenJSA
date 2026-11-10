@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, FileText, PenLine, Sparkles, X } from "lucide-react";
 
+import { DuplicateButton } from "../../components/DuplicateButton";
 import { Alert, Button } from "../../components/ui";
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { fadeSwap, listItem } from "../../lib/motion";
@@ -58,7 +59,9 @@ export function ProjectHub({
   onManual,
   onEditProject,
   onProcedure,
+  onDuplicate,
 }: {
+  onDuplicate?: () => Promise<void>;
   project: ProjectDocument;
   drafting: PhaseDrafting;
   saveState: SaveState;
@@ -77,7 +80,7 @@ export function ProjectHub({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">JSA แต่ละขั้นตอน</h1>
-        <SaveStatus state={saveState} />
+        <div className="flex flex-wrap items-center gap-2"><SaveStatus state={saveState} />{onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}</div>
       </div>
       <p className="mt-1.5 font-medium text-ink">{project.name}</p>
       <p className="mt-0.5 text-sm text-muted">
@@ -185,7 +188,7 @@ export function ProjectHub({
         </div>
       ) : null}
 
-      <div className="mt-6 flex items-center justify-between gap-2 border-t border-line pt-4">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" size="lg" onClick={onEditProject} disabled={busy}>
           <ArrowLeft className="size-4" aria-hidden="true" />
           ข้อมูลโครงการ

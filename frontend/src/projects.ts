@@ -13,6 +13,7 @@
 
 import { projectDocumentSchema, type ProjectDocument } from "./lib/schema";
 import { clearForHistoryIds } from "./lib/photoStore";
+import { deferPhotoCleanup, cancelPhotoCleanup } from "./lib/deferredPhotoCleanup";
 import { newId } from "./history";
 
 const KEY = "genjsa.projects.v1";
@@ -100,14 +101,18 @@ export function upsert(id: string, project: ProjectDocument): boolean {
 
 /** Removes the project AND its images */
 export function remove(id: string): void {
-  writeRaw(readRaw().entries.filter((entry) => entry.id !== id));
-  void clearForHistoryIds([id]);
+  if (writeRaw(readRaw().entries.filter((entry) => entry.id !== id))) {
+    deferPhotoCleanup(id);
+    window.dispatchEvent(new Event("genjsa-library-count"));
+  }
 }
 
 /** Put a removed project back with its original savedAt (undo) */
 export function restore(entry: ProjectEntry): void {
+  cancelPhotoCleanup(entry.id);
   const others = readRaw().entries.filter((other) => other.id !== entry.id);
   writeRaw([entry, ...others].sort((a, b) => b.savedAt - a.savedAt));
+  window.dispatchEvent(new Event("genjsa-library-count"));
 }
 
 export { newId };

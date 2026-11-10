@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Check, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, RotateCcw, Sparkles } from "lucide-react";
 
 import {
   Alert,
@@ -313,13 +313,14 @@ export function InputStep({
               // "เช่น" added here, once, so every example reads as one
               placeholder={`เช่น ${placeholder}`}
               aria-invalid={!!errors.work_description}
-              aria-describedby="work_description_hint"
+              required
+              aria-describedby={`work_description_hint${errors.work_description ? " work_description_error" : ""}`}
               {...register("work_description")}
             />
             <p id="work_description_hint" className="mt-1.5 text-sm text-muted">
               ระบุขั้นตอนการปฏิบัติงานที่ทราบให้ครบถ้วน เพื่อให้ JSA ตรงกับงานจริงมากที่สุด
             </p>
-            <FieldError>{errors.work_description?.message}</FieldError>
+            <FieldError id="work_description_error">{errors.work_description?.message}</FieldError>
           </div>
 
           <div>
@@ -328,22 +329,25 @@ export function InputStep({
             </Label>
             <Input
               id="supervisor"
+              required
+              aria-describedby={errors.supervisor ? "supervisor_error" : undefined}
               autoComplete="name"
               aria-invalid={!!errors.supervisor}
               {...register("supervisor")}
             />
-            <FieldError>{errors.supervisor?.message}</FieldError>
+            <FieldError id="supervisor_error">{errors.supervisor?.message}</FieldError>
           </div>
 
           <div>
             <Label htmlFor="analyst">ผู้วิเคราะห์</Label>
             <Input
               id="analyst"
+              aria-describedby={errors.analyst ? "analyst_error" : undefined}
               autoComplete="name"
               aria-invalid={!!errors.analyst}
               {...register("analyst")}
             />
-            <FieldError>{errors.analyst?.message}</FieldError>
+            <FieldError id="analyst_error">{errors.analyst?.message}</FieldError>
           </div>
 
           <CompanySection
@@ -352,11 +356,12 @@ export function InputStep({
               <>
                 <Input
                   id="company"
+                  aria-describedby={errors.company ? "company_error" : undefined}
                   autoComplete="organization"
                   aria-invalid={!!errors.company}
                   {...register("company")}
                 />
-                <FieldError>{errors.company?.message}</FieldError>
+                <FieldError id="company_error">{errors.company?.message}</FieldError>
               </>
             }
             logo={companyLogo}
@@ -364,17 +369,12 @@ export function InputStep({
             footer={
               // Only here: remembering happens when a document is created
               <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={rememberCompany}
-                  onClick={() => setRememberCompany((v) => !v)}
-                  className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                    rememberCompany ? "border-navy bg-navy text-white" : "border-line bg-surface"
-                  }`}
-                >
-                  {rememberCompany ? <Check className="size-3.5" aria-hidden="true" /> : null}
-                </button>
+                <input
+                  type="checkbox"
+                  checked={rememberCompany}
+                  onChange={(event) => setRememberCompany(event.target.checked)}
+                  className="size-5 shrink-0 accent-navy"
+                />
                 <span className="text-ink">จำไว้สำหรับครั้งต่อไป</span>
               </label>
             }
