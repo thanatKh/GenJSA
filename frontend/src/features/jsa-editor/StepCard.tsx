@@ -318,12 +318,32 @@ export function StepCard({
                 CELL_FOCUS_WITHIN,
               )}
             >
-              <label
-                htmlFor={`hazard-${index}-${hazardIndex}`}
-                className="mb-1 text-xs font-semibold text-navy"
-              >
-                อันตรายที่ {hazardIndex + 1}
-              </label>
+              {/* The hazard's delete sits on its own label line, in its own
+                  column. It used to float at the top-right of the controls
+                  column, right above the controls' own trash buttons, so
+                  there were two kinds of delete stacked in one corner and
+                  nobody could tell which one removed what. */}
+              <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
+                <label
+                  htmlFor={`hazard-${index}-${hazardIndex}`}
+                  className="text-xs font-semibold text-navy"
+                >
+                  อันตรายที่ {hazardIndex + 1}
+                </label>
+                {step.hazards.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeHazardAt(hazardIndex)}
+                    aria-label={`ลบอันตรายที่ ${hazardIndex + 1}`}
+                    title={`ลบอันตรายที่ ${hazardIndex + 1}`}
+                    className={cx("-my-1 text-muted hover:bg-danger-soft hover:text-danger-text", FADE_IN_CLASS)}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
+              </div>
               <AutoGrowTextarea
                 id={`hazard-${index}-${hazardIndex}`}
                 minRows={1}
@@ -358,7 +378,7 @@ export function StepCard({
                 CELL_FOCUS_WITHIN,
               )}
             >
-              <p className="mb-1 pr-8 text-xs font-semibold text-navy">
+              <p className="mb-1 flex min-h-6 items-center text-xs font-semibold text-navy">
                 อันตรายที่ {hazardIndex + 1}
               </p>
               <ControlsEditor
@@ -368,21 +388,6 @@ export function StepCard({
                 multiple={step.hazards.length > 1}
                 onChange={(controls) => patchHazard(hazardIndex, { controls })}
               />
-              {/* Top-right corner of the cell, not a row of its own under the
-                  text — that row made every hazard ~40px taller than its
-                  content. The textarea keeps pr-9 clear for it. */}
-              {step.hazards.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => removeHazardAt(hazardIndex)}
-                  aria-label="ลบอันตรายนี้"
-                  className={cx("absolute top-2 right-2 text-muted hover:bg-danger-soft hover:text-danger-text", FADE_IN_CLASS)}
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </Button>
-              ) : null}
             </div>
           </Fragment>
         ))}

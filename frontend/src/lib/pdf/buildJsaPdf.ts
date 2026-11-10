@@ -268,17 +268,37 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
 
   let y = drawHeader();
 
+  // A hazard's sub-row ends in one blank spacer line, with the divider through
+  // its middle. A full blank line made the gap either side of the divider
+  // about twice a normal cell's padding — the second hazard's text sat
+  // visibly lower than the first's. The spacer is only this fraction of a
+  // line tall, so the gap matches the cell padding.
+  const SPACER_H = 0.5;
+  /** Distance from the slice's first line to line `index`, spacers shortened */
+  const offsetTo = (row: Row, from: number, index: number) => {
+    let off = (index - from) * lineH;
+    for (const d of row.dividers) {
+      const spacer = Math.floor(d);
+      if (spacer >= from && spacer < index) off -= (1 - SPACER_H) * lineH;
+    }
+    return off;
+  };
+
   const drawRowSlice = (row: Row, from: number, count: number, top: number) => {
-    const height = count * lineH + pad * 2;
+    const height = offsetTo(row, from, from + count) + pad * 2;
     doc.setLineWidth(L.table.border_width_pt);
     doc.setDrawColor(...border);
     colW.forEach((w, i) => {
       doc.rect(colX[i], top, w, height);
-      drawLines(row.cells[i].slice(from, from + count), colX[i] + pad, top + pad, w - pad * 2);
+      row.cells[i].slice(from, from + count).forEach((line, n) => {
+        if (!line.text && !line.marker) return;
+        drawLines([line], colX[i] + pad, top + pad + offsetTo(row, from, from + n), w - pad * 2);
+      });
     });
-    row.dividers.forEach((line) => {
-      if (line > from && line < from + count) {
-        const dividerY = top + pad + (line - from) * lineH;
+    row.dividers.forEach((d) => {
+      const spacer = Math.floor(d);
+      if (spacer >= from && spacer < from + count) {
+        const dividerY = top + pad + offsetTo(row, from, spacer) + (SPACER_H * lineH) / 2;
         doc.line(colX[1], dividerY, mL + contentW, dividerY);
       }
     });
