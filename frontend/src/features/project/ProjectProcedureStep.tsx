@@ -208,7 +208,7 @@ export function ProjectProcedureStep({
       <p className="mt-0.5 text-sm text-muted">
         ฉบับเดียวทั้งโครงการ ร่างทีละส่วนจาก JSA ของแต่ละขั้นตอน โดยระบบรู้ว่าขั้นตอนก่อนหน้าทำอะไรไว้แล้ว
       </p>
-      <PhotoHint note="รูปภาพจะถูกลบหากลบโครงการนี้" />
+      <PhotoHint />
       <div className="mt-4 rounded-lg border border-line bg-raised p-3 text-sm" role="status">
         JSA ตรวจแล้ว {reviewed}/{project.phases.length} · ขั้นตอนปฏิบัติงานครบ {project.phases.length - incompleteCount}/{project.phases.length}
         {staleCount > 0 ? ` · ต้องตรวจให้ตรงกับ JSA ${staleCount} ส่วน` : ""}

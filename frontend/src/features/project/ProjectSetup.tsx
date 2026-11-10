@@ -179,7 +179,7 @@ export function ProjectSetup({
 
         <Section
           title="รายการวาล์ว / Blind / Tag"
-          hint="จุดแยกระบบ (isolation) ที่ใช้ในโครงการ กรอกครั้งเดียว ระบบใช้เลขตามนี้เท่านั้น ไม่คิดเลขขึ้นเอง"
+          hint="เลขวาล์ว / Blind / Tag ของจุดแยกระบบ (isolation) ที่ใช้ในโครงการ กรอกครั้งเดียวใช้กับทุกขั้นตอน"
         >
           <ul className="grid list-none gap-2 p-0">
             <AnimatePresence initial={false}>

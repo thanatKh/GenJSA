@@ -341,7 +341,7 @@ export function ProcedureEditorStep({
       </p>
       {/* Said once here rather than under every photo — with a photo on
           each sub-step, a per-photo note would repeat down the whole page */}
-      <PhotoHint note="รูปภาพจะถูกลบหากลบงานนี้ออกจากประวัติ" />
+      <PhotoHint />
 
       <ul className="mt-4 grid list-none gap-4 p-0">
         {procedure.steps.map((step, stepIndex) => (

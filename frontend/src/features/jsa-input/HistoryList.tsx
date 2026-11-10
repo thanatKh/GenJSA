@@ -140,7 +140,15 @@ export function HistoryList({
     // which looks identical to the bug this is fixing. The scrollable <ul>
     // below is the one piece that grows (flex-1 + min-h-0) — header, search
     // box and footer note all keep their natural height.
-    <motion.section {...fadeSwap} className="mt-6 flex min-w-0 flex-col border-t border-line pt-4 xl:mt-0 xl:h-full xl:border-t-0 xl:pt-0">
+    //
+    // xl:h-0 xl:min-h-full (not xl:h-full): h-full only stretched the section
+    // to the form's height when the list was SHORTER than the form. A long
+    // history (15 jobs) made the list's own height the grid row's height, so
+    // the row grew, the page scrolled, and the list never scrolled by itself.
+    // A zero base height keeps the list's content out of the row's sizing;
+    // min-h-full then stretches it to whatever height the form sets, and the
+    // list scrolls inside that.
+    <motion.section {...fadeSwap} className="mt-6 flex min-w-0 flex-col border-t border-line pt-4 xl:mt-0 xl:h-0 xl:min-h-full xl:border-t-0 xl:pt-0">
       {/* flex-wrap: on a 320px phone the title + count and ล้างประวัติทั้งหมด
           don't fit one line — the button drops below instead of the title
           breaking in two */}
@@ -314,7 +322,7 @@ export function HistoryList({
                       <motion.div key="create" {...fadeSwap} className="shrink-0">
                         <button type="button" onClick={() => onCreateProcedure(entry)}
                           aria-label={`สร้างขั้นตอนปฏิบัติงานของ ${entryTitle(entry)}`}
-                          title="สร้างขั้นตอนปฏิบัติงานด้วย AI"
+                          title="สร้างขั้นตอนปฏิบัติงาน"
                           className={docButton + "border border-line hover:bg-navy-soft"}>
                           <Plus className="size-3.5" aria-hidden="true" />
                           ขั้นตอน

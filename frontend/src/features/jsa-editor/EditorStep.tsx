@@ -374,12 +374,7 @@ export function EditorStep({
         <span aria-hidden="true" />
         <span>ขั้นตอนการทำงาน</span>
         <span>อันตรายที่อาจเกิดขึ้น</span>
-        <span>
-          มาตรการป้องกัน/ควบคุม
-          <span className="block text-xs font-normal text-muted/80">
-            แยกรายข้อ เลขตรงกับเอกสาร PDF
-          </span>
-        </span>
+        <span>มาตรการป้องกัน/ควบคุม</span>
       </div>
 
       {/* Below lg: unchanged gap-separated cards. On lg: one continuous
