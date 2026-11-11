@@ -17,6 +17,8 @@
 import {
   PHOTO_JPEG_QUALITY,
   PHOTO_MAX_EDGE_PX,
+  photoKey,
+  type PhotoMap,
   type StepPhoto,
 } from "./pdf/layout";
 
@@ -24,6 +26,8 @@ import {
  * JPEG is ~5MB — but it stops someone dropping a 200MB TIFF and freezing the
  * tab while the browser tries to decode it. */
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+const EXPORT_MAX_EDGE_PX = 1400;
+const EXPORT_JPEG_QUALITY = 0.8;
 
 export class PhotoError extends Error {}
 
@@ -41,11 +45,21 @@ export async function fileToStepPhoto(file: File): Promise<StepPhoto> {
     throw new PhotoError("ไฟล์รูปภาพใหญ่เกินไป กรุณาใช้รูปที่เล็กกว่านี้");
   }
 
-  const bitmap = await decode(file);
+  return resizePhoto(file, PHOTO_MAX_EDGE_PX, PHOTO_JPEG_QUALITY);
+}
+
+async function resizePhoto(
+  source: Blob,
+  maxEdge: number,
+  quality: number,
+  original?: StepPhoto,
+): Promise<StepPhoto> {
+  const bitmap = await decode(source);
   try {
+    const longestEdge = Math.max(bitmap.width, bitmap.height);
     const scale = Math.min(
       1,
-      PHOTO_MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height),
+      maxEdge / longestEdge,
     );
     // Never upscale: a small source stays its own size rather than being
     // blown up into a blurry, larger file.
@@ -64,10 +78,12 @@ export async function fileToStepPhoto(file: File): Promise<StepPhoto> {
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(bitmap, 0, 0, w, h);
 
-    return {
-      data: canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY),
-      ratio: w / h,
-    };
+    const data = canvas.toDataURL("image/jpeg", quality);
+    // Keep an already small JPEG if re-encoding would add bytes and blur.
+    if (scale === 1 && original?.data.startsWith("data:image/jpeg;") && original.data.length <= data.length) {
+      return original;
+    }
+    return { data, ratio: original?.ratio ?? w / h };
   } finally {
     // createImageBitmap allocates outside the JS heap; the <img> fallback
     // below has nothing to release, so this no-ops for it.
@@ -77,12 +93,39 @@ export async function fileToStepPhoto(file: File): Promise<StepPhoto> {
   }
 }
 
+type PhotoSteps = {
+  steps: readonly { no: number; sub_steps: readonly { no: number }[] }[];
+  photoPrefix: string;
+};
+
+/** Prepare only the photos used by this export, one at a time to bound decoded
+ * image memory on phones. The saved photos stay at their editing resolution. */
+export async function prepareExportPhotos(
+  photos: PhotoMap | undefined,
+  groups: readonly PhotoSteps[],
+): Promise<PhotoMap> {
+  const output: PhotoMap = {};
+  if (!photos) return output;
+  for (const { steps, photoPrefix } of groups) {
+    for (const step of steps) {
+      for (const no of [0, ...step.sub_steps.map((sub) => sub.no)]) {
+        const key = photoPrefix + photoKey(step.no, no);
+        const photo = photos[key];
+        if (!photo || output[key]) continue;
+        const source = await (await fetch(photo.data)).blob();
+        output[key] = await resizePhoto(source, EXPORT_MAX_EDGE_PX, EXPORT_JPEG_QUALITY, photo);
+      }
+    }
+  }
+  return output;
+}
+
 type Decoded = ImageBitmap | HTMLImageElement;
 
 /** createImageBitmap where available (faster, off the main thread, and it
  * applies EXIF orientation so phone photos aren't sideways); an <img> +
  * object URL otherwise. Also used by companyLogo.ts. */
-export async function decode(file: File): Promise<Decoded> {
+export async function decode(file: Blob): Promise<Decoded> {
   if (typeof createImageBitmap === "function") {
     try {
       return await createImageBitmap(file, { imageOrientation: "from-image" });

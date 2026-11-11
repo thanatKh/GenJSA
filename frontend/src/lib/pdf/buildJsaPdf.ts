@@ -285,14 +285,18 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
   };
 
   const drawRowSlice = (row: Row, from: number, count: number, top: number) => {
-    const height = offsetTo(row, from, from + count) + pad * 2;
+    const procedureLines = Math.min(count, Math.max(0, row.cells[0].length - from));
+    // Hazard dividers shorten only the two right columns. The merged
+    // procedure cell keeps its normal line spacing even across a divider.
+    const height = Math.max(procedureLines * lineH, offsetTo(row, from, from + count)) + pad * 2;
     doc.setLineWidth(L.table.border_width_pt);
     doc.setDrawColor(...border);
     colW.forEach((w, i) => {
       doc.rect(colX[i], top, w, height);
       row.cells[i].slice(from, from + count).forEach((line, n) => {
         if (!line.text && !line.marker) return;
-        drawLines([line], colX[i] + pad, top + pad + offsetTo(row, from, from + n), w - pad * 2);
+        const offset = i === 0 ? n * lineH : offsetTo(row, from, from + n);
+        drawLines([line], colX[i] + pad, top + pad + offset, w - pad * 2);
       });
     });
     row.dividers.forEach((d) => {

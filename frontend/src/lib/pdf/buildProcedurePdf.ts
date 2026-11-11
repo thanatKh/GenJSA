@@ -16,6 +16,7 @@
  */
 
 import type { CompanyLogo } from "../companyLogo";
+import { prepareExportPhotos } from "../photo";
 import type { ProcedureDocument, ProcedureStep } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
@@ -77,7 +78,10 @@ export async function buildProcedurePdf(
   const D = options.document ?? FALLBACK_DOCUMENT;
   const P = options.procedure ?? FALLBACK_PROCEDURE;
   const C = options.company;
-  const photos = options.photos ?? {};
+  const photos = await prepareExportPhotos(
+    options.photos,
+    options.project?.phases ?? [{ steps: procedure.steps, photoPrefix: "" }],
+  );
 
   const E = await createEngine(L, { companyLogo: options.companyLogo });
   const { doc, pageW, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines, logo, border } = E;

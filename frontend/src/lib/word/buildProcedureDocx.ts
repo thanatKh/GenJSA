@@ -26,6 +26,7 @@ import {
 
 import type { CompanyLogo } from "../companyLogo";
 import { loadOrLogo } from "../orLogo";
+import { prepareExportPhotos } from "../photo";
 import { procedureDocxFileName } from "../pdf/fileName";
 import {
   FALLBACK_DOCUMENT,
@@ -62,7 +63,10 @@ export async function buildProcedureDocx(
   const L = options.layout ?? FALLBACK_LAYOUT;
   const D = options.document ?? FALLBACK_DOCUMENT;
   const P = options.procedure ?? FALLBACK_PROCEDURE;
-  const photos = options.photos ?? {};
+  const photos = await prepareExportPhotos(
+    options.photos,
+    options.project?.phases ?? [{ steps: procedure.steps, photoPrefix: "" }],
+  );
   const companyLogo = options.companyLogo ?? null;
   const K = createWordKit(L);
   const orLogo = await loadOrLogo();

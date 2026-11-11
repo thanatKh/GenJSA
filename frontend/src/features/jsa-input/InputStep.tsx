@@ -394,7 +394,6 @@ export function InputStep({
             </div>
           </Reveal>
 
-          {/* Keep the two drafting paths together when the actions wrap. */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
               type="button"
@@ -407,32 +406,33 @@ export function InputStep({
               <RotateCcw className="size-4" aria-hidden="true" />
               ล้างฟอร์ม
             </Button>
-            <div className="ms-auto flex flex-wrap justify-end gap-2">
-              <Button ref={personalAiButton} type="button" variant="outline" size="lg" className="max-[359px]:px-3"
-                onClick={async () => {
-                  if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) setPersonalAiOpen(true);
-                }}>
-                ใช้ AI ของฉัน
-              </Button>
-              <Button type="submit" size="lg" className="max-[359px]:px-3">
-                <Sparkles className="size-5" aria-hidden="true" />
-                สร้างเอกสาร
-              </Button>
-            </div>
+            <Button type="submit" size="lg" className="max-[359px]:px-3">
+              <Sparkles className="size-5" aria-hidden="true" />
+              สร้างเอกสาร
+            </Button>
           </div>
 
-          {/* Explicit opt-in for users who'd rather type every field
-              themselves than review an AI draft — not a stepper shortcut,
-              since that would imply step 2/3 are always freely reachable.
-              Only supervisor/date are required here; work_description isn't
-              validated because it's only ever used to prompt the AI. */}
-          <button
-            type="button"
-            onClick={skipToManual}
-            className="justify-self-center text-sm text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
-          >
-            ข้ามขั้นตอนนี้ กรอกแบบฟอร์ม JSA เองทั้งหมด
-          </button>
+          <div className="flex min-w-0 items-center justify-center gap-2.5 text-sm">
+            <button
+              type="button"
+              onClick={skipToManual}
+              className="min-w-0 text-start text-muted underline decoration-dotted underline-offset-4 hover:text-navy pointer-coarse:min-h-12"
+            >
+              ข้ามขั้นตอนนี้ กรอกแบบฟอร์ม JSA เองทั้งหมด
+            </button>
+            <span aria-hidden="true" className="text-muted">·</span>
+            <button
+              ref={personalAiButton}
+              type="button"
+              aria-haspopup="dialog"
+              className="shrink-0 px-1 text-navy underline decoration-dotted underline-offset-4 pointer-coarse:min-h-12"
+              onClick={async () => {
+                if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) setPersonalAiOpen(true);
+              }}
+            >
+              ขั้นสูง
+            </button>
+          </div>
         </form>
         </motion.div>
       )}
