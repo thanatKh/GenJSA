@@ -664,7 +664,7 @@ export default function App() {
   // the same "briefly blank, never wrong" behavior the old JSX had by
   // falling through every condition.
   const view = computeView(stage, doc, procedure, procedureBusy, projectState);
-  const inProject = (mode === "project" && stage === 0) || stage >= 10;
+  const inProject = stage >= 10;
   // Single Mode's track (see the note on Stage)
   const withProcedure = mode === "procedure";
 
@@ -691,47 +691,29 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main ref={mainRef} className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
-        {/* One track per mode: JSA 3 steps, JSA + Procedure 4, โครงการ 4 —
-            the procedure is a real step once the user has asked for it, not
-            a side branch off the JSA's PDF page.
-
-            Width: every stage but 1 wraps its own content at max-w-[45rem]
-            (stage 0 escapes that at xl: via its own grid — see below), so the
-            Stepper needs the same cap there or it visibly overflows past the
-            narrower content beneath it. Only stage 1 (EditorStep) spans the
-            full <main> width by design, so the Stepper matches that here too
-            instead of shrinking to 45rem above a wider table. */}
-        <div
-          className={
-            stage === 1 || stage === 11
-              ? undefined
-              : stage === 0
-                ? "mx-auto max-w-[45rem] xl:max-w-none"
-                : "mx-auto max-w-[45rem]"
-          }
-        >
-          {/* Switching modes swaps the track (3 steps <-> 4): fade across
-              rather than snapping between the two */}
-          <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
-          {inProject ? (
-            <Stepper
-              steps={PROJECT_STEPS}
-              current={stage === 0 ? 0 : stage === 12 ? 2 : stage === 13 ? 3 : 1}
-              onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
-            />
-          ) : withProcedure ? (
-            <Stepper
-              steps={PROCEDURE_STEPS}
-              current={stage === 0 ? 0 : stage === 1 ? 1 : stage === 3 ? 2 : 3}
-              onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
-            />
-          ) : (
-            <Stepper current={Math.min(stage, 2)} onNavigate={(index) => goto(index as Stage)} />
-          )}
-          </motion.div>
-          </AnimatePresence>
-        </div>
+        {stage !== 0 && view ? (
+          <div className={stage === 1 || stage === 11 ? undefined : "mx-auto max-w-[45rem]"}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
+                {inProject ? (
+                  <Stepper
+                    steps={PROJECT_STEPS}
+                    current={stage === 12 ? 2 : stage === 13 ? 3 : 1}
+                    onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
+                  />
+                ) : withProcedure ? (
+                  <Stepper
+                    steps={PROCEDURE_STEPS}
+                    current={stage === 1 ? 1 : stage === 3 ? 2 : 3}
+                    onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
+                  />
+                ) : (
+                  <Stepper current={Math.min(stage, 2)} onNavigate={(index) => goto(index as Stage)} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        ) : null}
 
         {/* One fade between screens (#1). Keyed on the screen, not the
             document, so edits inside a screen never re-trigger it. mode="wait"

@@ -231,7 +231,7 @@ class ProcedureLabels(BaseModel):
     # The JSA's "วันที่วิเคราะห์" / "ผู้วิเคราะห์" are wrong for a procedure —
     # it isn't an analysis — so the same header values get different wording
     date: str = "วันที่จัดทำ"
-    author: str = "ผู้จัดทำ"
+    author: str = "ชื่อผู้จัดทำ"
 
 
 class ProcedureSections(BaseModel):

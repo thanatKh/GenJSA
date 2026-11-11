@@ -155,7 +155,7 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
   // No official form code — unlike the JSA, this document has no F-number
   formCode: "",
   footerText: "",
-  labels: { date: "วันที่จัดทำ", author: "ผู้จัดทำ" },
+  labels: { date: "วันที่จัดทำ", author: "ชื่อผู้จัดทำ" },
   sections: {
     purpose: "วัตถุประสงค์",
     scope: "ขอบเขต",

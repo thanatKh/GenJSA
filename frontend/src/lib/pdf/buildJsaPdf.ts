@@ -100,8 +100,11 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
   const rows: Row[] = jsa.steps.map((step, stepIndex) => {
     const innerW = colW.map((w) => w - pad * 2);
 
+    // Reserve a small right inset for the bold heading, including when
+    // the whole step is a heading with no separate description.
+    const headingW = innerW[0] - mmToPt(1);
     const procedure: Line[] = [
-      ...wrap(step.procedure, innerW[0], "bold", L.font.body_pt, `${stepIndex + 1}.`),
+      ...wrap(step.procedure, headingW, "bold", L.font.body_pt, `${stepIndex + 1}.`),
       ...wrap(step.details, innerW[0], "normal", L.font.body_pt),
     ];
 

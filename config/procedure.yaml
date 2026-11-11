@@ -19,7 +19,7 @@ document:
     # The header values are inherited from the source JSA, but its wording
     # isn't: this document isn't an analysis, so "วันที่วิเคราะห์" would be wrong
     date: "วันที่จัดทำ"
-    author: "ผู้จัดทำ"
+    author: "ชื่อผู้จัดทำ"
 
   # Section headings, in printed order. An empty section is skipped entirely
   # rather than printing a heading over blank space.

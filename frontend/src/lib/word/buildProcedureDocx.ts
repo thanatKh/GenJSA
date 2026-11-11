@@ -83,8 +83,7 @@ export async function buildProcedureDocx(
   const photoMaxHmm = 80;
 
   // ------------------------------------------------------------------ cover --
-  const authorName = h.analyst?.trim() || h.supervisor?.trim();
-  const authorShown = !!authorName && authorName !== h.supervisor?.trim();
+  const authorName = h.analyst?.trim() || h.supervisor.trim();
   const infoPt = L.font.header_label_pt + 2;
   const infoLine = (label: string, value: string) =>
     value.trim()
@@ -141,9 +140,8 @@ export async function buildProcedureDocx(
       children: [...K.run(h.work_activity, { bold: true, size: halfPt(L.font.title_en_pt + 6) })],
     }),
     ...infoLine(D.labels.company ?? "บริษัท", h.company?.trim() ?? ""),
-    ...infoLine(D.labels.supervisor, h.supervisor),
+    ...infoLine(P.labels.author, authorName),
     ...infoLine(P.labels.date, formatThaiDate(h.analysis_date)),
-    ...(authorShown ? infoLine(P.labels.author, authorName!) : []),
   ];
 
   // ----------------------------------------------------- full header block --
@@ -162,7 +160,7 @@ export async function buildProcedureDocx(
     }),
     new TableRow({
       children: [
-        K.cell([K.fieldParagraph(D.labels.supervisor, h.supervisor)], { width: splitW }),
+        K.cell([K.fieldParagraph(P.labels.author, authorName)], { width: splitW }),
         K.cell([K.fieldParagraph(P.labels.date, formatThaiDate(h.analysis_date))], { width: K.contentW - splitW }),
       ],
     }),

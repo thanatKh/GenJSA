@@ -94,7 +94,11 @@ export function PersonalAiDialog({ description, onClose, onImport, restoreFocus 
           <div className="grid gap-2 rounded-lg bg-navy-soft p-3">
             <p role="status" className="font-medium break-words">{draft.work_activity} · {draft.steps.length} ขั้นตอน</p>
             <ol className="max-h-32 list-decimal overflow-y-auto ps-5">
-              {draft.steps.map((step) => <li key={step.no} className="break-words">{step.procedure}</li>)}
+              {draft.steps.map((step) => (
+                <li key={step.no} className="break-words">
+                  {step.procedure} <span className="text-muted">· อันตราย {step.hazards.length} ข้อ</span>
+                </li>
+              ))}
             </ol>
             <Button type="button" className="justify-self-start" onClick={() => {
               imported.current = true;

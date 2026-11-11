@@ -78,6 +78,7 @@ export async function buildProcedurePdf(
   const D = options.document ?? FALLBACK_DOCUMENT;
   const P = options.procedure ?? FALLBACK_PROCEDURE;
   const C = options.company;
+  const authorName = procedure.header.analyst?.trim() || procedure.header.supervisor.trim();
   const photos = await prepareExportPhotos(
     options.photos,
     options.project?.phases ?? [{ steps: procedure.steps, photoPrefix: "" }],
@@ -112,12 +113,12 @@ export async function buildProcedurePdf(
 
   let y = mT;
 
-  /** Title bar + the work-activity/supervisor/date fields, framed the same
+  /** Title bar + the work-activity/author/date fields, framed the same
    * way on every page. Returns the y below it. Pushes one pageFrames entry
    * per call, so drawFrames() (one call per page, by index) always has an
    * entry waiting for the page it's about to stroke.
    *
-   * The full header (title bar + work activity + supervisor/date) prints on
+   * The full header (title bar + work activity + author/date) prints on
    * the first content page only. Continuation pages get `compact`: one
    * bordered row naming the document and the job — still enough that a
    * loose printed sheet reads as part of this document, without the 20/18pt
@@ -150,11 +151,11 @@ export async function buildProcedurePdf(
     E.drawField(D.labels.work_activity, activityLines, mL, contentW, cursor, activityH);
     cursor += activityH;
 
-    // Supervisor and date share a row, split at the same 2/3 point the JSA uses
+    // Author and date share a row, split at the same 2/3 point the JSA uses
     const splitW = contentW * 0.665;
-    const supervisorLines = E.measureFieldLines(
-      D.labels.supervisor,
-      procedure.header.supervisor,
+    const authorLines = E.measureFieldLines(
+      P.labels.author,
+      authorName,
       splitW,
     );
     const dateLines = E.measureFieldLines(
@@ -162,10 +163,10 @@ export async function buildProcedurePdf(
       formatThaiDate(procedure.header.analysis_date),
       contentW - splitW,
     );
-    const infoH = Math.max(E.fieldRowHeight(supervisorLines), E.fieldRowHeight(dateLines));
+    const infoH = Math.max(E.fieldRowHeight(authorLines), E.fieldRowHeight(dateLines));
     doc.rect(mL, cursor, splitW, infoH);
     doc.rect(mL + splitW, cursor, contentW - splitW, infoH);
-    E.drawField(D.labels.supervisor, supervisorLines, mL, splitW, cursor, infoH);
+    E.drawField(P.labels.author, authorLines, mL, splitW, cursor, infoH);
     E.drawField(P.labels.date, dateLines, mL + splitW, contentW - splitW, cursor, infoH);
     cursor += infoH;
 
@@ -287,7 +288,7 @@ export async function buildProcedurePdf(
     const activityPt = L.font.title_en_pt + 6;
     const activityLineH = activityPt * L.font.line_height;
     // +2 over the header label size, with a little more line spacing: at
-    // header_label_pt the supervisor/date lines read as fine print under a
+    // header_label_pt the author/date lines read as fine print under a
     // much larger job name
     const infoPt = L.font.header_label_pt + 2;
     const infoLineH = infoPt * (L.font.line_height + 0.2);
@@ -297,12 +298,9 @@ export async function buildProcedurePdf(
 
     const activityLines = wrap(procedure.header.work_activity, contentW * 0.8, "bold", activityPt);
 
-    const supervisorShown = !!procedure.header.supervisor?.trim();
     const dateShown = !!procedure.header.analysis_date?.trim();
-    const authorName = procedure.header.analyst?.trim() || procedure.header.supervisor?.trim();
-    const authorShown = !!authorName && authorName !== procedure.header.supervisor?.trim();
     const companyName = procedure.header.company?.trim() ?? "";
-    const infoLinesCount = [supervisorShown, dateShown, authorShown, !!companyName].filter(Boolean).length;
+    const infoLinesCount = [!!authorName, dateShown, !!companyName].filter(Boolean).length;
 
     const blockH =
       logoH +
@@ -414,19 +412,8 @@ export async function buildProcedurePdf(
       cursor += infoLineH;
     };
     if (companyName) infoLine(D.labels.company ?? "บริษัท", companyName);
-    infoLine(D.labels.supervisor, procedure.header.supervisor);
+    infoLine(P.labels.author, authorName);
     infoLine(P.labels.date, formatThaiDate(procedure.header.analysis_date));
-
-    // ผู้จัดทำ — moved here from the sign-off that used to close the document
-    // after the last step, so the "who made this" credit sits with the rest
-    // of the cover's summary instead of trailing off after the content.
-    // Same analyst-falls-back-to-supervisor rule the old sign-off used, but
-    // only printed when it's a genuinely different name from the supervisor
-    // line just above — an identical repeat would read as a copy-paste
-    // mistake, not a second name worth stating.
-    if (authorShown) {
-      infoLine(P.labels.author, authorName!);
-    }
 
     doc.addPage();
   };
