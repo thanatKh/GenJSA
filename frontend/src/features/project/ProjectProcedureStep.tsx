@@ -202,7 +202,6 @@ export function ProjectProcedureStep({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ขั้นตอนปฏิบัติงานโครงการ</h1>
-        <SaveStatus state={saveState} />
       </div>
       <p className="mt-1.5 font-medium text-ink">{project.name}</p>
       <p className="mt-0.5 text-sm text-muted">
@@ -377,6 +376,7 @@ export function ProjectProcedureStep({
             type="button"
             variant="ghost"
             size="lg"
+            className="max-sm:px-2"
             onClick={() => {
               if (intro) flushTools();
               onBack();
@@ -385,10 +385,11 @@ export function ProjectProcedureStep({
             <ArrowLeft className="size-4" aria-hidden="true" />
             กลับ
           </Button>
+          <SaveStatus state={saveState} compact />
           <Button
             type="button"
             size="lg"
-            className="flex-1 sm:flex-none"
+            className="max-sm:px-3"
             // Not while a section is drafting: its result would land after
             // the files were already built from the project without it
             disabled={busy}

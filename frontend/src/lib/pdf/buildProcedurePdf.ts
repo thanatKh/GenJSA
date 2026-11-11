@@ -237,22 +237,19 @@ export async function buildProcedurePdf(
   const photoBlockH = (photo: StepPhoto, maxW: number) =>
     photoGap + photoSize(photo, maxW).h + captionLineH;
 
-  /** One atomic block — never split across pages, unlike drawFlowing's text.
-   * Left-aligned with its sub-step's own text (x = where the text starts,
-   * after "1.1") and captioned "ภาพประกอบขั้นตอน 1.1". It used to be centered
-   * on the page with no caption, so a photo between 1.1 and 1.2 could belong
-   * to either — on paper there was nothing to say which. */
-  const drawPhoto = (photo: StepPhoto, x: number, maxW: number, label: string) => {
+  /** Keep the centered photo and its numbered caption on the same page. */
+  const drawPhoto = (photo: StepPhoto, maxW: number, label: string) => {
     const { w, h } = photoSize(photo, maxW);
+    const centerX = mL + contentW / 2;
 
     y += photoGap;
     need(h + captionLineH);
-    doc.addImage(photo.data, "JPEG", x, y, w, h);
+    doc.addImage(photo.data, "JPEG", centerX - w / 2, y, w, h);
     y += h;
 
     E.setFont("normal", captionPt);
     doc.setTextColor(110, 110, 110);
-    doc.text(label, x, y + captionPt * 1.05);
+    doc.text(label, centerX, y + captionPt * 1.05, { align: "center" });
     doc.setTextColor(0, 0, 0);
     y += captionLineH;
   };
@@ -543,13 +540,11 @@ export async function buildProcedurePdf(
     // keep-together below would carry them to the next page and strand the
     // title on this one anyway.
     // Photos align with their sub-step's text, after the "1.1" marker
-    const photoX = (lines: Line[]) => mL + subX + (lines[0]?.indent ?? 0);
     const photoMaxW = (lines: Line[]) => contentW - subX - (lines[0]?.indent ?? 0);
 
     // The step's own photo ("1.0"): under the title, before its sub-steps,
     // aligned with the title text
     const stepPhoto = photos[photoPrefix + photoKey(step.no, 0)];
-    const stepPhotoX = mL + stepX + (titleLines[0]?.indent ?? 0);
     const stepPhotoMaxW = contentW - stepX - (titleLines[0]?.indent ?? 0);
 
     let keepTogether = Math.min(titleLines.length, 1) * stepLineH;
@@ -572,7 +567,7 @@ export async function buildProcedurePdf(
 
     drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
     if (stepPhoto) {
-      drawPhoto(stepPhoto, stepPhotoX, stepPhotoMaxW, `ภาพประกอบขั้นตอน ${prefix}${step.no}`);
+      drawPhoto(stepPhoto, stepPhotoMaxW, `ภาพประกอบขั้นตอน ${prefix}${step.no}`);
     }
 
     step.sub_steps.forEach((_, subIndex) => {
@@ -596,7 +591,6 @@ export async function buildProcedurePdf(
       if (photo) {
         drawPhoto(
           photo,
-          photoX(actionLines),
           photoMaxW(actionLines),
           `ภาพประกอบขั้นตอน ${prefix}${step.no}.${step.sub_steps[subIndex].no}`,
         );

@@ -6,7 +6,7 @@
  * No fields for company / location / equipment — if important, the user can write them into the description.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,10 +30,12 @@ import {
 } from "../../lib/companyLogo";
 import { CompanySection } from "../company/CompanySection";
 import { loadNames, saveNames } from "../../lib/rememberedNames";
-import { inputFormSchema, type InputForm } from "../../lib/schema";
+import { inputFormSchema, type InputForm, type JsaDocument } from "../../lib/schema";
+import { todayIso } from "../../lib/thaidate";
 import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
 import { inputDraft } from "../../store";
 import { GeneratingPanel } from "./GeneratingPanel";
+import { PersonalAiDialog } from "./PersonalAiDialog";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -141,6 +143,7 @@ const PLACEHOLDERS = [
 export function InputStep({
   withProcedure,
   onGenerate,
+  onImportDraft,
   onSkipToManual,
   onCancel,
   onCancelGenerate,
@@ -152,6 +155,7 @@ export function InputStep({
    * procedure is drafted later, from the JSA once it has been reviewed. */
   withProcedure: boolean;
   onGenerate: (values: InputForm, companyLogo: CompanyLogo | null) => void;
+  onImportDraft: (doc: JsaDocument, companyLogo: CompanyLogo | null) => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analyst" | "company">,
     companyLogo: CompanyLogo | null,
@@ -168,6 +172,8 @@ export function InputStep({
   error: string | null;
 }) {
   const [confirmReset, setConfirmReset] = useState(false);
+  const [personalAiOpen, setPersonalAiOpen] = useState(false);
+  const personalAiButton = useRef<HTMLButtonElement>(null);
   // Picked once per mount (not per render/keystroke) — re-rolling while the
   // user types would make the placeholder text jump around underneath them
   const [placeholder] = useState(
@@ -388,21 +394,8 @@ export function InputStep({
             </div>
           </Reveal>
 
-          {/* Secondary on the left, primary on the right, both auto-width —
-              matches EditorStep's footer (เริ่มใหม่ / สร้าง PDF) so the two
-              most consequential actions in the app share one convention
-              instead of each page inventing its own button arrangement.
-              "สร้างเอกสาร" rather than "สร้าง JSA" — the label the rest of
-              the app already uses for this generic case (PdfDeliveryCard's
-              in-flight/error states). The same with JSA + Procedure: this
-              button drafts the JSA either way (the procedure comes after
-              it's reviewed), and the line under the heading says so. */}
-          {/* px-3 on the ghost button below 360px: at size="lg"'s px-6 the
-              two buttons can't shrink (whitespace-nowrap) and came to 309px,
-              wider than a 320px phone's 288px column — the page scrolled
-              sideways and "สร้างเอกสาร" was cut off. The ghost button has no
-              visible edge, so its padding is the cheapest to give up. */}
-          <div className="flex items-center justify-between gap-2">
+          {/* Keep the two drafting paths together when the actions wrap. */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -414,10 +407,18 @@ export function InputStep({
               <RotateCcw className="size-4" aria-hidden="true" />
               ล้างฟอร์ม
             </Button>
-            <Button type="submit" size="lg" className="max-[359px]:px-4">
-              <Sparkles className="size-5" aria-hidden="true" />
-              สร้างเอกสาร
-            </Button>
+            <div className="ms-auto flex flex-wrap justify-end gap-2">
+              <Button ref={personalAiButton} type="button" variant="outline" size="lg" className="max-[359px]:px-3"
+                onClick={async () => {
+                  if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) setPersonalAiOpen(true);
+                }}>
+                ใช้ AI ของฉัน
+              </Button>
+              <Button type="submit" size="lg" className="max-[359px]:px-3">
+                <Sparkles className="size-5" aria-hidden="true" />
+                สร้างเอกสาร
+              </Button>
+            </div>
           </div>
 
           {/* Explicit opt-in for users who'd rather type every field
@@ -436,6 +437,25 @@ export function InputStep({
         </motion.div>
       )}
       </AnimatePresence>
+
+      {personalAiOpen ? (
+        <PersonalAiDialog description={getValues("work_description")} onClose={() => setPersonalAiOpen(false)}
+          restoreFocus={() => personalAiButton.current?.focus()}
+          onImport={({ work_activity, steps, assumptions }) => {
+            const { supervisor, analyst, company } = getValues();
+            const header = {
+              work_activity,
+              supervisor: supervisor.trim(),
+              analyst: analyst.trim(),
+              company: company.trim(),
+              project: "",
+              analysis_date: todayIso(),
+            };
+            rememberForNextTime(header);
+            setPersonalAiOpen(false);
+            onImportDraft({ header, steps, assumptions }, companyLogo);
+          }} />
+      ) : null}
 
       <ConfirmDialog
         open={confirmReset}

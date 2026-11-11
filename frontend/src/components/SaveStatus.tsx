@@ -1,4 +1,4 @@
-/* "กำลังบันทึก…" / "บันทึกแล้ว" next to an editor's title — the editors save
+/* "กำลังบันทึก…" / "บันทึกแล้ว" — the editors save
  * to this device's history as you type (debounced in App.tsx), and without
  * this nothing said so. Only claims "saved" once history.ts reports the
  * write actually stored; a full storage quota says so instead. */
@@ -27,10 +27,12 @@ const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: React
   },
 };
 
-export function SaveStatus({ state }: { state: SaveState }) {
+const SHORT_LABELS = { saving: "กำลังบันทึก", saved: "บันทึกแล้ว", failed: "บันทึกไม่ได้" };
+
+export function SaveStatus({ state, compact = false }: { state: SaveState; compact?: boolean }) {
   const line = state === "idle" ? null : LINES[state];
   return (
-    <p role="status" aria-live="polite" className="flex min-h-5 items-center gap-1.5 text-sm">
+    <p role="status" aria-live="polite" className={`flex min-h-5 min-w-0 items-center gap-1.5 ${compact ? "flex-1 justify-center text-center text-xs" : "text-sm"}`}>
       {/* A quick cross-fade between states rather than the text snapping —
           it changes every time typing pauses, so it stays short and still */}
       <AnimatePresence mode="wait" initial={false}>
@@ -42,9 +44,15 @@ export function SaveStatus({ state }: { state: SaveState }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
             className={`flex items-center gap-1.5 ${line.className}`}
+            title={compact ? line.text : undefined}
           >
             {line.icon}
-            {line.text}
+            {compact && state !== "idle" ? (
+              <>
+                <span className="sr-only sm:not-sr-only">{line.text}</span>
+                <span aria-hidden="true" className="sm:hidden">{SHORT_LABELS[state]}</span>
+              </>
+            ) : line.text}
           </motion.span>
         ) : null}
       </AnimatePresence>

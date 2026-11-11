@@ -303,7 +303,7 @@ export async function buildProcedureDocx(
         name: "ภาพประกอบ",
         basedOn: "Normal",
         next: STYLE.caption,
-        paragraph: { keepNext: true, indent: { left: subTextLeft }, spacing: { before: mm(2) } },
+        paragraph: { keepNext: true, alignment: AlignmentType.CENTER, spacing: { before: mm(2) } },
       },
       {
         id: STYLE.caption,
@@ -312,7 +312,7 @@ export async function buildProcedureDocx(
         next: STYLE.subStep,
         quickFormat: true,
         run: { size: halfPt(captionPt), color: "6E6E6E" },
-        paragraph: { indent: { left: subTextLeft } },
+        paragraph: { alignment: AlignmentType.CENTER },
       },
     ],
   };
@@ -376,7 +376,7 @@ export async function buildProcedureDocx(
       // keepNext: a photo never lands on the next page without its sub-step
       body.push(new Paragraph({ style: STYLE.subStep, keepNext: !!photo, children: text(sub.action) }));
       if (!photo) return;
-      // Under its own sub-step, aligned with its text, and captioned — same
+      // Centered under its own sub-step and captioned — same
       // as the PDF, so it can't be read as belonging to the next sub-step.
       // The caption is plain text: it won't follow a renumbering in Word.
       const maxWmm = ((K.contentW - subTextLeft) / 1440) * 25.4;

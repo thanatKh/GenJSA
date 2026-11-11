@@ -393,6 +393,16 @@ export default function App() {
     procedureDraft.clear();
   };
 
+  const openNewDraft = (draft: JsaDocument, logo: CompanyLogo | null) => {
+    setDoc(draft);
+    docDraft.save(draft);
+    discardProcedure();
+    setError(null);
+    setCompanyLogoFor(startHistoryEntry(), logo);
+    setStage(1);
+    window.scrollTo({ top: 0 });
+  };
+
   const handleGenerate = async (values: InputForm, logo: CompanyLogo | null) => {
     setBusy(true);
     setError(null);
@@ -407,13 +417,7 @@ export default function App() {
         { signal: controller.signal },
       );
       if (controller.signal.aborted || generateController.current !== controller) return;
-      setDoc(generated);
-      docDraft.save(generated);
-      // A new JSA means any procedure on screen describes a different job
-      discardProcedure();
-      setCompanyLogoFor(startHistoryEntry(), logo);
-      setStage(1);
-      window.scrollTo({ top: 0 });
+      openNewDraft(generated, logo);
     } catch (caught) {
       // Cancelled by the user (see cancelGenerate) — not a failure, so no
       // error banner; just fall through to the form as if nothing happened.
@@ -444,13 +448,7 @@ export default function App() {
     values: Pick<InputForm, "supervisor" | "analyst" | "company">,
     logo: CompanyLogo | null,
   ) => {
-    const blank = buildBlankDocument(values);
-    setDoc(blank);
-    docDraft.save(blank);
-    discardProcedure();
-    setCompanyLogoFor(startHistoryEntry(), logo);
-    setStage(1);
-    window.scrollTo({ top: 0 });
+    openNewDraft(buildBlankDocument(values), logo);
   };
 
   /** Restore both documents from a history entry. `to` is where to land —
@@ -790,6 +788,7 @@ export default function App() {
                         <InputStep
                           withProcedure={mode === "procedure"}
                           onGenerate={handleGenerate}
+                          onImportDraft={openNewDraft}
                           onSkipToManual={handleSkipToManual}
                           // Only set when reached via the stepper's back-navigation
                           // (doc already exists then — see the effect above that jumps
@@ -985,33 +984,22 @@ export default function App() {
             ) : null}
           </motion.div>
         </AnimatePresence>
-        {view?.kind === "input" && !busy ? <BackupControls /> : null}
       </main>
 
-      {/* Every page ends with the standing caution — the "can make mistakes"
-          line AI products carry, worded with "GenJSA" since the UI never says
-          "AI". "ตกหล่น" on purpose: for a JSA the dangerous mistake is the
-          hazard a draft never mentions, not a wrong sentence. Then the credit
-          line from config/app.yaml (same source as the เกี่ยวกับ dialog).
-          On the two editors the page ends under a bar fixed to the bottom of
-          the screen, hence the extra bottom padding there. */}
       <footer
-        className={`space-y-1 px-4 pt-2 text-center text-xs text-muted ${
+        className={`mx-auto w-full max-w-[var(--page-max-w)] px-4 text-xs text-muted ${
           view?.kind === "editing" ||
           view?.kind === "procedureEditing" ||
           view?.kind === "projectEditing" ||
           view?.kind === "projectProcedure"
             ? "pb-24"
-            : "pb-6"
+            : "pb-3"
         }`}
       >
-        {/* Two inline-blocks so a narrow screen breaks between the phrases,
-            never leaving "งานจริง" alone on a line */}
-        <p>
-          <span className="inline-block">GenJSA อาจร่างเนื้อหาผิดพลาดหรือตกหล่น</span>{" "}
-          <span className="inline-block">โปรดตรวจสอบก่อนนำไปใช้งานจริง</span>
-        </p>
-        {config?.about?.developer ? <p>พัฒนาโดย {config.about.developer}</p> : null}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-line pt-2 sm:justify-between">
+          <p className="min-w-0 text-center sm:text-start">ร่างอาจผิดพลาดหรือตกหล่น โปรดตรวจสอบก่อนใช้งานจริง</p>
+          {view?.kind === "input" && !busy ? <BackupControls /> : null}
+        </div>
       </footer>
       <Toaster />
     </div>

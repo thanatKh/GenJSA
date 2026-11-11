@@ -233,7 +233,6 @@ export function ProcedureEditorStep({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานขั้นตอนปฏิบัติงาน</h1>
-        <SaveStatus state={saveState} />
       </div>
       <p className="mt-1.5 text-muted">
         ระบบร่างขั้นตอนย่อยจาก JSA กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
@@ -427,6 +426,7 @@ export function ProcedureEditorStep({
             type="button"
             variant="ghost"
             size="lg"
+            className="max-sm:px-2"
             onClick={() => {
               flushTools();
               onBack();
@@ -439,10 +439,11 @@ export function ProcedureEditorStep({
             <span className="sm:hidden">กลับ</span>
             <span className="hidden sm:inline">กลับไปตรวจทาน JSA</span>
           </Button>
+          <SaveStatus state={saveState} compact />
           <Button
             type="button"
             size="lg"
-            className="flex-1 sm:flex-none"
+            className="max-sm:px-3"
             onClick={() => {
               if (exportIssues.length) setConfirmExport(true);
               else { flushTools(); onContinue(); }

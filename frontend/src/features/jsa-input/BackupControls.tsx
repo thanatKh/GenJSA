@@ -16,9 +16,9 @@ export function BackupControls() {
     try { await action(); } catch (e) { setError(e instanceof Error ? e.message : "ดำเนินการไม่สำเร็จ กรุณาลองอีกครั้ง"); }
     finally { setBusy(false); }
   };
-  return <div className="mx-auto mt-6 max-w-[45rem] border-t border-line pt-4">
-    <div className="flex flex-wrap items-center justify-center gap-2">
-      <Button type="button" variant="ghost" disabled={busy} onClick={() => void run(async () => {
+  return <div className="min-w-0">
+    <div className="flex flex-wrap items-center justify-center gap-1 sm:justify-end">
+      <Button type="button" size="sm" className="pointer-coarse:min-h-12" variant="ghost" disabled={busy} onClick={() => void run(async () => {
         const { createBackup } = await import("../../lib/backup");
         const blob = new Blob([JSON.stringify(await createBackup())], { type: "application/json" });
         if (blob.size > MAX_BACKUP_BYTES) throw new Error("ไฟล์สำรองเกิน 100 MB กรุณาลดจำนวนรายการก่อนสำรอง");
@@ -27,9 +27,8 @@ export function BackupControls() {
         link.click(); setTimeout(() => URL.revokeObjectURL(url), 30_000);
         setMessage("ส่งไฟล์สำรองให้เบราว์เซอร์แล้ว กรุณาเก็บไฟล์ .json ไว้ในที่ปลอดภัย");
       })}><Download className="size-4" aria-hidden="true" />สำรองข้อมูล</Button>
-      <Button type="button" variant="ghost" disabled={busy} onClick={() => input.current?.click()}><Upload className="size-4" aria-hidden="true" />นำเข้าข้อมูล</Button>
+      <Button type="button" size="sm" className="pointer-coarse:min-h-12" variant="ghost" disabled={busy} onClick={() => input.current?.click()}><Upload className="size-4" aria-hidden="true" />นำเข้าข้อมูล</Button>
     </div>
-    <p className="mt-1 text-center text-xs text-muted">ไฟล์สำรองรวม JSA โครงการ ขั้นตอนปฏิบัติงาน และรูปภาพ · ไม่อัปโหลดไปเซิร์ฟเวอร์</p>
     <input ref={input} type="file" accept=".json,application/json" className="hidden" aria-label="เลือกไฟล์สำรอง GenJSA"
       onChange={(event) => {
         const file = event.target.files?.[0]; event.target.value = "";

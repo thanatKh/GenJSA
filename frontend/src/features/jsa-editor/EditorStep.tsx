@@ -222,7 +222,7 @@ export function EditorStep({
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
           {project ? `ตรวจทาน ${project.position}` : "ตรวจทานและแก้ไข"}
         </h1>
-        <div className="flex flex-wrap items-center gap-2"><SaveStatus state={saveState} />{onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}</div>
+        <div className="flex flex-wrap items-center gap-2">{onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}</div>
       </div>
       {project ? (
         <p className="mt-1 text-sm font-medium text-ink">
@@ -472,25 +472,20 @@ export function EditorStep({
             above them; this bar is `fixed`, so it sits outside <main>'s own
             width entirely and needs the token again rather than inheriting it. */}
         <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
-          {/* One row on every width — secondary left, primary right, the same
-              as the first screen's ล้างฟอร์ม / สร้างเอกสาร. On phones it used to
-              stack into two rows (~137px of screen covered the whole time you
-              edit); one row is ~65px. size="lg" on both so they sit at one
-              height; the primary fills the rest of the row on phones, keeping
-              it the big thumb target. */}
           {project ? (
             // Nothing to lose by leaving: every edit is already saved with the project
-            <Button variant="ghost" size="lg" onClick={project.onBack}>
+            <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={project.onBack}>
               <ArrowLeft className="size-4" aria-hidden="true" />
               กลับ
             </Button>
           ) : (
-            <Button variant="ghost" size="lg" onClick={() => setConfirmRestart(true)}>
+            <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={() => setConfirmRestart(true)}>
               <RotateCcw className="size-4" aria-hidden="true" />
               เริ่มใหม่
             </Button>
           )}
-          <Button size="lg" onClick={continueReviewed} className="flex-1 sm:flex-none">
+          <SaveStatus state={saveState} compact />
+          <Button size="lg" onClick={continueReviewed} className="max-sm:px-3">
             {project ? (
               <>
                 <Check className="size-5" aria-hidden="true" />

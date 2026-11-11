@@ -380,12 +380,14 @@ export function InfoDialog({
   title,
   icon,
   onClose,
+  onCloseAutoFocus,
   children,
 }: {
   open: boolean;
   title: string;
   icon?: ReactNode;
   onClose: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }) {
   return (
@@ -402,6 +404,8 @@ export function InfoDialog({
           the cascade at any viewport >= 640px */}
       <DialogContent
         className="flex max-h-[85dvh] w-[min(92vw,36rem)] max-w-none sm:max-w-none flex-col gap-0 overflow-hidden p-0"
+        aria-describedby={undefined}
+        onCloseAutoFocus={onCloseAutoFocus}
         showCloseButton={false}
       >
         <DialogHeader className="flex-row items-center gap-2.5 border-b border-line px-5 py-4">
