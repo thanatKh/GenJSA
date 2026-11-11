@@ -12,6 +12,7 @@ import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
 import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
 import { HistoryList } from "./features/jsa-input/HistoryList";
 import { InputStep } from "./features/jsa-input/InputStep";
+import { AdvancedDraftScreen } from "./features/jsa-input/AdvancedDraftScreen";
 import { ModeChoice } from "./features/jsa-input/ModeChoice";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
@@ -23,7 +24,7 @@ import { ProjectList } from "./features/project/ProjectList";
 import { ProjectProcedureStep } from "./features/project/ProjectProcedureStep";
 import { ProjectFilesStep } from "./features/project/ProjectFilesStep";
 import { ProjectSetup } from "./features/project/ProjectSetup";
-import { blankPhaseJsa, blankProject, withPhaseJsa } from "./features/project/projectModel";
+import { blankPhaseJsa, blankProject, withPhaseJsa, withPhaseProcedure } from "./features/project/projectModel";
 import { usePhaseDrafting } from "./features/project/usePhaseDrafting";
 import * as projectStore from "./projects";
 import type { ProjectEntry } from "./projects";
@@ -39,6 +40,7 @@ import {
 } from "./lib/api";
 import { loadCompanyProfile, type CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
+import { parsePersonalDraft, parsePersonalProcedure, procedureSourceText } from "./lib/personalAi";
 import {
   projectDocumentSchema,
   procedureIsStale,
@@ -105,7 +107,7 @@ function buildBlankDocument(
 // 10+ are Project Mode: 10 the project's JSA list, 11 one phase's JSA in the
 // editor, 12 the project's work procedure, 13 its two files. Its first step,
 // ข้อมูลโครงการ, is stage 0 on the โครงการ tab.
-type Stage = 0 | 1 | 2 | 3 | 4 | 10 | 11 | 12 | 13;
+type Stage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 10 | 11 | 12 | 13;
 
 /** What <main> actually renders, computed once from (stage, doc, procedure,
  * busy, procedureBusy) instead of re-derived at each of 7 separate JSX
@@ -128,6 +130,9 @@ type Stage = 0 | 1 | 2 | 3 | 4 | 10 | 11 | 12 | 13;
  */
 type View =
   | { kind: "input" }
+  | { kind: "advancedInput" }
+  | { kind: "advancedProcedure"; doc: JsaDocument }
+  | { kind: "advancedPhase"; project: ProjectDocument; phase: ProjectPhase; document: "jsa" | "wp" }
   | { kind: "editing"; doc: JsaDocument }
   | { kind: "procedureGenerating"; doc: JsaDocument; heading: string }
   | { kind: "pdf"; doc: JsaDocument }
@@ -147,6 +152,17 @@ function computeView(
 ): View | null {
   // Both tabs: the tabs themselves stay put while the form under them swaps
   if (stage === 0) return { kind: "input" };
+  if (stage === 5) return { kind: "advancedInput" };
+  if (stage === 6) return doc && !procedure ? { kind: "advancedProcedure", doc } : null;
+  if (stage === 7 || stage === 8) {
+    const phase = project?.project.phases[project.openPhase];
+    if (!project?.id || !phase) return null;
+    if (stage === 7 && !phase.jsa) return { kind: "advancedPhase", project: project.project, phase, document: "jsa" };
+    if (stage === 8 && phase.jsa && phase.reviewed && !phase.procedure) {
+      return { kind: "advancedPhase", project: project.project, phase, document: "wp" };
+    }
+    return null;
+  }
   if (stage === 10) return project?.id ? { kind: "projectHub", project: project.project } : null;
   if (stage === 12) return project?.id ? { kind: "projectProcedure", project: project.project } : null;
   if (stage === 13) return project?.id ? { kind: "projectFiles", project: project.project } : null;
@@ -400,7 +416,6 @@ export default function App() {
     setError(null);
     setCompanyLogoFor(startHistoryEntry(), logo);
     setStage(1);
-    window.scrollTo({ top: 0 });
   };
 
   const handleGenerate = async (values: InputForm, logo: CompanyLogo | null) => {
@@ -473,7 +488,6 @@ export default function App() {
     // switch was on (see the track note on Stage)
     setMode(entry.procedure ? "procedure" : "jsa");
     setStage(to);
-    window.scrollTo({ top: 0 });
   };
 
   const handleOpenHistory = (entry: HistoryEntry) => openHistoryEntry(entry, 1);
@@ -505,7 +519,7 @@ export default function App() {
     // Drafts only — past work in historyStore.ts deliberately survives "เริ่มใหม่"
     clearAllDrafts();
     setStage(0);
-    window.scrollTo({ top: 0 });
+    if (stage === 0) window.scrollTo({ top: 0 });
   };
 
   /** On to the procedure from the current JSA: the JSA editor's ถัดไป on
@@ -601,7 +615,6 @@ export default function App() {
 
   const goto = (next: Stage) => {
     setStage(next);
-    window.scrollTo({ top: 0 });
   };
 
   /** ข้อมูลโครงการ -> the JSA list. Saving the project for the first time
@@ -641,6 +654,14 @@ export default function App() {
     goto(11);
   };
 
+  const openAdvancedPhase = (phaseId: string, next: 7 | 8) => {
+    if (!projectState?.id) return;
+    const index = projectState.project.phases.findIndex((phase) => phase.id === phaseId);
+    if (index < 0) return;
+    setProjectState({ ...projectState, openPhase: index });
+    goto(next);
+  };
+
   /** "กรอกเอง" — a blank JSA for this phase, straight into the editor */
   const fillPhaseByHand = (phaseId: string) => {
     setProject((project) => {
@@ -664,6 +685,12 @@ export default function App() {
   // the same "briefly blank, never wrong" behavior the old JSX had by
   // falling through every condition.
   const view = computeView(stage, doc, procedure, procedureBusy, projectState);
+  const hasView = view !== null;
+  useEffect(() => {
+    if (stage === 5 && mode === "project") setStage(0);
+    if (stage === 6 && !hasView) setStage(doc ? 1 : 0);
+    if ((stage === 7 || stage === 8) && !hasView) setStage(projectState?.id ? (stage === 7 ? 10 : 12) : 0);
+  }, [stage, mode, hasView, doc, projectState?.id]);
   const inProject = stage >= 10;
   // Single Mode's track (see the note on Stage)
   const withProcedure = mode === "procedure";
@@ -681,7 +708,7 @@ export default function App() {
         department={config?.company.department}
         developer={config?.about?.developer}
         contactEmail={config?.about?.contactEmail}
-        onHome={startOver}
+        onHome={stage >= 5 && stage <= 8 ? () => goto(0) : startOver}
       />
 
       {/* max-w-[var(--page-max-w)] — shared with AppBar.tsx's title-bar row
@@ -691,36 +718,35 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main ref={mainRef} className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
-        {stage !== 0 && view ? (
-          <div className={stage === 1 || stage === 11 ? undefined : "mx-auto max-w-[45rem]"}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
-                {inProject ? (
-                  <Stepper
-                    steps={PROJECT_STEPS}
-                    current={stage === 12 ? 2 : stage === 13 ? 3 : 1}
-                    onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
-                  />
-                ) : withProcedure ? (
-                  <Stepper
-                    steps={PROCEDURE_STEPS}
-                    current={stage === 1 ? 1 : stage === 3 ? 2 : 3}
-                    onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
-                  />
-                ) : (
-                  <Stepper current={Math.min(stage, 2)} onNavigate={(index) => goto(index as Stage)} />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        ) : null}
-
-        {/* One fade between screens (#1). Keyed on the screen, not the
-            document, so edits inside a screen never re-trigger it. mode="wait"
-            lets the old screen fade out before the new one fades in. */}
+        {/* Keep the Stepper with the screen it describes. Mounting it above
+            an exiting screen would move the old content mid-fade. */}
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
-            {view?.kind === "input" ? (
+          <motion.div key={view?.kind === "advancedInput" ? "input" : view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
+            {stage !== 0 && (stage < 5 || stage >= 10) && view ? (
+              <div className={stage === 1 || stage === 11 ? undefined : "mx-auto max-w-[45rem]"}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
+                    {inProject ? (
+                      <Stepper
+                        steps={PROJECT_STEPS}
+                        current={stage === 12 ? 2 : stage === 13 ? 3 : 1}
+                        onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
+                      />
+                    ) : withProcedure ? (
+                      <Stepper
+                        steps={PROCEDURE_STEPS}
+                        current={stage === 1 ? 1 : stage === 3 ? 2 : 3}
+                        onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
+                      />
+                    ) : (
+                      <Stepper current={Math.min(stage, 2)} onNavigate={(index) => goto(index as Stage)} />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            ) : null}
+
+            {view?.kind === "input" || view?.kind === "advancedInput" ? (
               // Below xl: single column with history below the form. From xl,
               // share the available width equally so history has room for job
               // titles plus both document buttons. minmax(0, 1fr) allows long
@@ -741,7 +767,7 @@ export default function App() {
                     which iOS Safari doesn't support. */}
                 <div className="-mx-2 min-w-0 overflow-x-clip px-2">
                   {/* Gone while a JSA is generating: the mode can't change mid-draft */}
-                  {busy ? null : <ModeChoice mode={mode} onChange={setMode} />}
+                  {busy || view.kind === "advancedInput" ? null : <ModeChoice mode={mode} onChange={setMode} />}
                   {/* The switch stays put; only the form under it swaps, sliding
                       in from the side of the option that was picked. JSA and
                       JSA + Procedure share one form, so they don't swap. */}
@@ -771,6 +797,9 @@ export default function App() {
                           withProcedure={mode === "procedure"}
                           onGenerate={handleGenerate}
                           onImportDraft={openNewDraft}
+                          advanced={view.kind === "advancedInput"}
+                          onOpenAdvanced={() => goto(5)}
+                          onCloseAdvanced={() => goto(0)}
                           onSkipToManual={handleSkipToManual}
                           // Only set when reached via the stepper's back-navigation
                           // (doc already exists then — see the effect above that jumps
@@ -788,7 +817,7 @@ export default function App() {
                 {/* Each tab lists its own kind of saved work. Hidden while
                     generating so it doesn't compete with GeneratingPanel. */}
                 <AnimatePresence initial={false} mode="wait">
-                  {busy ? null : mode === "project" ? (
+                  {busy || view.kind === "advancedInput" ? null : mode === "project" ? (
                     <ProjectList key={`projects-${libraryVersion}`} onOpen={openSavedProject} />
                   ) : (
                     <HistoryList
@@ -802,6 +831,46 @@ export default function App() {
               </div>
             ) : null}
 
+            {view?.kind === "advancedProcedure" ? (
+              <div className="mx-auto max-w-[45rem]">
+                <AdvancedDraftScreen kind="wp" scope={historyId ?? undefined} description={procedureSourceText(view.doc)}
+                  backLabel="กลับไปตรวจทาน JSA"
+                  onBack={() => goto(1)}
+                  parse={(answer) => parsePersonalProcedure(answer, view.doc, config?.procedure?.jsaReferenceLabel)}
+                  onImport={(next) => {
+                    updateProcedure(next);
+                    setProcedureError(null);
+                    setMode("procedure");
+                    goto(3);
+                  }} />
+              </div>
+            ) : null}
+
+            {view?.kind === "advancedPhase" ? (
+              <div className="mx-auto max-w-[45rem]">
+                {view.document === "jsa" ? (
+                  <AdvancedDraftScreen kind="jsa" scope={`${projectState?.id}.${view.phase.id}`}
+                    description={`${view.phase.work}\n${view.phase.description}`}
+                    backLabel="กลับไป JSA แต่ละขั้นตอน"
+                    onBack={() => goto(10)} parse={parsePersonalDraft}
+                    onImport={({ steps, assumptions }) => {
+                      const draft = blankPhaseJsa(view.project, view.phase);
+                      setProject((project) => withPhaseJsa(project, view.phase.id, { ...draft, steps, assumptions }, false));
+                      openPhase(view.phase.id);
+                    }} />
+                ) : view.phase.jsa ? (
+                  <AdvancedDraftScreen kind="wp" scope={`${projectState?.id}.${view.phase.id}`} description={procedureSourceText(view.phase.jsa)}
+                    backLabel="กลับไปขั้นตอนปฏิบัติงานโครงการ"
+                    onBack={() => goto(12)}
+                    parse={(answer) => parsePersonalProcedure(answer, view.phase.jsa!, config?.procedure?.jsaReferenceLabel)}
+                    onImport={(next) => {
+                      setProject((project) => withPhaseProcedure(project, view.phase.id, next));
+                      goto(12);
+                    }} />
+                ) : null}
+              </div>
+            ) : null}
+
             {/* No inner max-w wrapper — the table benefits from the room, and it
                 keeps this stage's body flush with AppBar's edges (both share
                 <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
@@ -809,6 +878,7 @@ export default function App() {
             {view?.kind === "editing" ? (
               <EditorStep
                 doc={view.doc}
+                onAdvanced={procedure ? undefined : () => goto(6)}
                 onDuplicate={async () => {
                   if (!historyId) return;
                   const { duplicateJob } = await import("./lib/backup");
@@ -896,6 +966,7 @@ export default function App() {
                   saveState={projectSave}
                   onOpen={openPhase}
                   onManual={fillPhaseByHand}
+                  onAdvanced={(phaseId) => openAdvancedPhase(phaseId, 7)}
                   onEditProject={() => goto(0)}
                   onProcedure={() => goto(12)}
                 />
@@ -913,6 +984,7 @@ export default function App() {
                   onContinue={() => goto(13)}
                   photos={projectPhotos.photos}
                   onPhotoChange={projectPhotos.setPhoto}
+                  onAdvanced={(phaseId) => openAdvancedPhase(phaseId, 8)}
                 />
               </div>
             ) : null}

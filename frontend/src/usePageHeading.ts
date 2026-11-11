@@ -16,7 +16,8 @@ export function usePageHeading(main: RefObject<HTMLElement | null>, appName: str
       document.title = `${text} · ${appName}`;
       if (focus && (heading !== previous || text !== previousText)) {
         heading.tabIndex = -1;
-        heading.focus();
+        heading.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: "instant" });
       }
       previous = heading;
       previousText = text;

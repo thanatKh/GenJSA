@@ -75,6 +75,7 @@ export type ProcedureMeta = {
   titleEn: string;
   formCode: string;
   footerText: string;
+  jsaReferenceLabel?: string;
   labels: { date: string; author: string };
   sections: {
     purpose: string;
@@ -155,6 +156,7 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
   // No official form code — unlike the JSA, this document has no F-number
   formCode: "",
   footerText: "",
+  jsaReferenceLabel: "การวิเคราะห์งานเพื่อความปลอดภัย (JSA)",
   labels: { date: "วันที่จัดทำ", author: "ชื่อผู้จัดทำ" },
   sections: {
     purpose: "วัตถุประสงค์",

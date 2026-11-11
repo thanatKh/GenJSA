@@ -53,10 +53,12 @@ export function ProjectProcedureStep({
   onContinue,
   photos,
   onPhotoChange,
+  onAdvanced,
 }: {
   project: ProjectDocument;
   photos: PhotoMap;
   onPhotoChange: (key: string, photo: StepPhoto | null) => void;
+  onAdvanced: (phaseId: string) => void;
   onChange: (update: (current: ProjectDocument) => ProjectDocument) => void;
   drafting: PhaseDrafting;
   saveState: SaveState;
@@ -338,11 +340,16 @@ export function ProjectProcedureStep({
                       ยังไม่มี JSA ของขั้นตอนนี้
                     </motion.p>
                   ) : !phase.procedure ? (
-                    <motion.div key="draft" {...fadeSwap} className="mt-3">
+                    <motion.div key="draft" {...fadeSwap} className="mt-3 flex flex-wrap items-center gap-2">
                       <Button type="button" variant="outline" disabled={busy} onClick={() => drafting.draft([phase.id])}>
                         <Sparkles className="size-4" aria-hidden="true" />
                         ร่างส่วนนี้
                       </Button>
+                      {phase.reviewed ? (
+                        <Button type="button" variant="ghost" disabled={busy}
+                          aria-label={`ขั้นสูงสำหรับ WP ของ ${phase.work}`}
+                          onClick={() => onAdvanced(phase.id)}>ขั้นสูง</Button>
+                      ) : null}
                     </motion.div>
                   ) : (
                     <motion.div key="body" {...fadeSwap}>

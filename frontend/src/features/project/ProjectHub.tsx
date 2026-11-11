@@ -57,6 +57,7 @@ export function ProjectHub({
   saveState,
   onOpen,
   onManual,
+  onAdvanced,
   onEditProject,
   onProcedure,
   onDuplicate,
@@ -67,6 +68,7 @@ export function ProjectHub({
   saveState: SaveState;
   onOpen: (phaseId: string) => void;
   onManual: (phaseId: string) => void;
+  onAdvanced: (phaseId: string) => void;
   onEditProject: () => void;
   /** On to the project's work procedure — offered once every JSA is reviewed */
   onProcedure: () => void;
@@ -157,6 +159,9 @@ export function ProjectHub({
                     </motion.div>
                   ) : isWaiting ? null : (
                     <motion.div key="draft" {...fadeSwap} className="flex flex-wrap justify-end gap-2">
+                      <Button type="button" variant="ghost" disabled={busy}
+                        aria-label={`ขั้นสูงสำหรับ JSA ของ ${phase.work}`}
+                        onClick={() => onAdvanced(phase.id)}>ขั้นสูง</Button>
                       <Button
                         type="button"
                         variant="ghost"

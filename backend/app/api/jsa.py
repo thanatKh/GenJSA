@@ -63,6 +63,7 @@ async def public_config() -> dict:
             "titleEn": proc.title_en,
             "formCode": proc.form_code,
             "footerText": proc.footer_text,
+            "jsaReferenceLabel": proc.jsa_reference_label,
             "labels": proc.labels.model_dump(),
             "sections": proc.sections.model_dump(),
         },

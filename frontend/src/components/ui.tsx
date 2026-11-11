@@ -11,6 +11,7 @@ import {
   useEffect,
   useId,
   useRef,
+  type ReactElement,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
@@ -29,9 +30,11 @@ import { Skeleton } from "./ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogClose,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "./ui/dialog";
 import {
   AlertDialog,
@@ -376,27 +379,19 @@ export function ConfirmDialog({
 /* ------------------------------------------------------------- InfoDialog */
 
 export function InfoDialog({
-  open,
+  trigger,
   title,
   icon,
-  onClose,
-  onCloseAutoFocus,
   children,
 }: {
-  open: boolean;
+  trigger: ReactElement;
   title: string;
   icon?: ReactNode;
-  onClose: () => void;
-  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }) {
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
+    <Dialog>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       {/* sm:max-w-none needed alongside max-w-none — the generated file's
           sm:max-w-sm lives in a different modifier scope than a plain
           max-w-none override, so tailwind-merge doesn't treat them as
@@ -405,7 +400,6 @@ export function InfoDialog({
       <DialogContent
         className="flex max-h-[85dvh] w-[min(92vw,36rem)] max-w-none sm:max-w-none flex-col gap-0 overflow-hidden p-0"
         aria-describedby={undefined}
-        onCloseAutoFocus={onCloseAutoFocus}
         showCloseButton={false}
       >
         <DialogHeader className="flex-row items-center gap-2.5 border-b border-line px-5 py-4">
@@ -420,9 +414,7 @@ export function InfoDialog({
           {children}
         </div>
         <DialogFooter className="mx-0 mb-0 rounded-none border-t border-line bg-transparent px-5 py-4">
-          <Button variant="outline" onClick={onClose}>
-            ปิด
-          </Button>
+          <DialogClose asChild><Button variant="outline">ปิด</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -14,6 +14,7 @@
  */
 
 import type { InputForm, JsaDocument, ProcedureDocument, ProjectDocument } from "./lib/schema";
+import type { DetailLevel } from "./lib/personalAi";
 
 const INPUT_KEY = "genjsa.draft.input";
 const DOC_KEY = "genjsa.draft.doc";
@@ -52,6 +53,16 @@ export const inputDraft = {
   load: () => read<InputForm>(INPUT_KEY),
   save: (value: InputForm) => write(INPUT_KEY, value),
   clear: () => remove(INPUT_KEY),
+};
+
+export type AdvancedKind = "jsa" | "wp";
+type AdvancedDraft = { source: string; work: string; instructions: string; answer: string; level: DetailLevel };
+const ADVANCED_PREFIX = "genjsa.draft.advanced.";
+const advancedKey = (kind: AdvancedKind, scope = "single") => `${ADVANCED_PREFIX}${kind}.${scope}`;
+export const advancedDraft = {
+  load: (kind: AdvancedKind, scope?: string) => read<AdvancedDraft>(advancedKey(kind, scope)),
+  save: (kind: AdvancedKind, value: AdvancedDraft, scope?: string) => write(advancedKey(kind, scope), value),
+  clear: (kind: AdvancedKind) => remove(advancedKey(kind)),
 };
 
 export const docDraft = {
@@ -110,6 +121,12 @@ export const modeDraft = {
  * design, and so are saved projects (projects.ts). */
 export function clearAllDrafts(): void {
   inputDraft.clear();
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(ADVANCED_PREFIX)) sessionStorage.removeItem(key);
+    }
+  } catch { /* Storage may be unavailable. */ }
   docDraft.clear();
   procedureDraft.clear();
   currentHistoryId.clear();

@@ -66,8 +66,10 @@ export function EditorStep({
   saveState,
   project,
   onDuplicate,
+  onAdvanced,
 }: {
   onDuplicate?: () => Promise<void>;
+  onAdvanced?: () => void;
   doc: JsaDocument;
   onChange: (next: JsaDocument) => void;
   /** Browser-only, beside the document rather than in it — see useCompanyLogo.ts */
@@ -210,10 +212,10 @@ export function EditorStep({
   // failure on a later page the user has no reason to connect back to this field.
   const missingActivity = !doc.header.work_activity.trim();
   const problems = jsaProblems(doc);
-  const continueReviewed = () => {
+  const continueReviewed = (next: () => void) => {
     setChecked(true);
     if (problems.length) { focusJsaField(problems[0].id); return; }
-    onContinue();
+    next();
   };
 
   return (
@@ -222,7 +224,13 @@ export function EditorStep({
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
           {project ? `ตรวจทาน ${project.position}` : "ตรวจทานและแก้ไข"}
         </h1>
-        <div className="flex flex-wrap items-center gap-2">{onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}
+          {onAdvanced ? (
+            <Button type="button" variant="ghost" size="sm" title="ร่าง WP จาก JSA นี้"
+              onClick={() => continueReviewed(onAdvanced)}>ขั้นสูง</Button>
+          ) : null}
+        </div>
       </div>
       {project ? (
         <p className="mt-1 text-sm font-medium text-ink">
@@ -485,7 +493,7 @@ export function EditorStep({
             </Button>
           )}
           <SaveStatus state={saveState} compact />
-          <Button size="lg" onClick={continueReviewed} className="max-sm:px-3">
+          <Button size="lg" onClick={() => continueReviewed(onContinue)} className="max-sm:px-3">
             {project ? (
               <>
                 <Check className="size-5" aria-hidden="true" />
@@ -504,7 +512,9 @@ export function EditorStep({
       <ConfirmDialog
         open={confirmRestart}
         title="เริ่มใหม่?"
-        description="JSA ที่แก้ไว้จะหายไป แล้วกลับไปหน้ากรอกรายละเอียดงาน"
+        description={saveState === "saved"
+          ? "กลับไปกรอกรายละเอียดงานใหม่ งานนี้ยังเปิดได้จากประวัติในเบราว์เซอร์นี้"
+          : "กลับไปกรอกรายละเอียดงานใหม่ หากยังบันทึกไม่สำเร็จ ให้ตรวจสถานะบันทึกก่อนออกจากหน้านี้"}
         confirmLabel="เริ่มใหม่"
         onConfirm={() => {
           setConfirmRestart(false);

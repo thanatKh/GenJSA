@@ -6,7 +6,7 @@
  * No fields for company / location / equipment — if important, the user can write them into the description.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,9 +33,10 @@ import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm, type JsaDocument } from "../../lib/schema";
 import { todayIso } from "../../lib/thaidate";
 import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
-import { inputDraft } from "../../store";
+import { advancedDraft, inputDraft } from "../../store";
 import { GeneratingPanel } from "./GeneratingPanel";
-import { PersonalAiDialog } from "./PersonalAiDialog";
+import { AdvancedDraftScreen } from "./AdvancedDraftScreen";
+import { parsePersonalDraft } from "../../lib/personalAi";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -43,6 +44,7 @@ const EMPTY_FORM = (): InputForm => ({
   company: "",
   work_description: "",
 });
+const headerSchema = inputFormSchema.pick({ supervisor: true, analyst: true, company: true });
 
 // One random example per mount rather than one fixed placeholder — a single
 // example nudges every user toward describing "a pump job," which skews the
@@ -144,6 +146,9 @@ export function InputStep({
   withProcedure,
   onGenerate,
   onImportDraft,
+  advanced,
+  onOpenAdvanced,
+  onCloseAdvanced,
   onSkipToManual,
   onCancel,
   onCancelGenerate,
@@ -156,6 +161,9 @@ export function InputStep({
   withProcedure: boolean;
   onGenerate: (values: InputForm, companyLogo: CompanyLogo | null) => void;
   onImportDraft: (doc: JsaDocument, companyLogo: CompanyLogo | null) => void;
+  advanced: boolean;
+  onOpenAdvanced: () => void;
+  onCloseAdvanced: () => void;
   onSkipToManual: (
     values: Pick<InputForm, "supervisor" | "analyst" | "company">,
     companyLogo: CompanyLogo | null,
@@ -172,8 +180,6 @@ export function InputStep({
   error: string | null;
 }) {
   const [confirmReset, setConfirmReset] = useState(false);
-  const [personalAiOpen, setPersonalAiOpen] = useState(false);
-  const personalAiButton = useRef<HTMLButtonElement>(null);
   // Picked once per mount (not per render/keystroke) — re-rolling while the
   // user types would make the placeholder text jump around underneath them
   const [placeholder] = useState(
@@ -232,12 +238,18 @@ export function InputStep({
   const isEmpty =
     (values.supervisor ?? "").trim() === names.supervisor &&
     (values.analyst ?? "").trim() === names.analyst &&
+    (values.company ?? "").trim() === (profile?.name ?? "").trim() &&
+    companyLogo?.data === profile?.logo?.data &&
     !values.work_description?.trim();
 
   const applyReset = () => {
     // Remembered names and company survive ล้างฟอร์ม — they're settings, not a draft
-    reset({ ...EMPTY_FORM(), ...loadNames(), company: loadCompanyProfile()?.name ?? "" });
+    const savedCompany = loadCompanyProfile();
+    reset({ ...EMPTY_FORM(), ...loadNames(), company: savedCompany?.name ?? "" });
+    setCompanyLogo(savedCompany?.logo ?? null);
+    setRememberCompany(true);
     inputDraft.clear();
+    advancedDraft.clear("jsa");
     setConfirmReset(false);
     document.getElementById("supervisor")?.focus();
   };
@@ -252,6 +264,36 @@ export function InputStep({
     rememberForNextTime({ supervisor, analyst, company });
     onSkipToManual({ supervisor, analyst, company: company.trim() }, companyLogo);
   };
+
+  if (advanced) {
+    return (
+      <AdvancedDraftScreen
+        kind="jsa"
+        description={getValues("work_description")}
+        backLabel="กลับไปกรอกข้อมูล"
+        onBack={onCloseAdvanced}
+        parse={(answer) => {
+          if (!headerSchema.safeParse(getValues()).success) {
+            throw new Error("กรุณากลับไปตรวจข้อมูลหัวเอกสารก่อนนำเข้าร่าง");
+          }
+          return parsePersonalDraft(answer);
+        }}
+        onImport={({ work_activity, steps, assumptions }) => {
+          const { supervisor, analyst, company } = getValues();
+          const header = {
+            work_activity,
+            supervisor: supervisor.trim(),
+            analyst: analyst.trim(),
+            company: company.trim(),
+            project: "",
+            analysis_date: todayIso(),
+          };
+          rememberForNextTime(header);
+          onImportDraft({ header, steps, assumptions }, companyLogo);
+        }}
+      />
+    );
+  }
 
   return (
     <section>
@@ -422,12 +464,10 @@ export function InputStep({
             </button>
             <span aria-hidden="true" className="text-muted">·</span>
             <button
-              ref={personalAiButton}
               type="button"
-              aria-haspopup="dialog"
               className="shrink-0 px-1 text-navy underline decoration-dotted underline-offset-4 pointer-coarse:min-h-12"
               onClick={async () => {
-                if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) setPersonalAiOpen(true);
+                if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) onOpenAdvanced();
               }}
             >
               ขั้นสูง
@@ -438,29 +478,10 @@ export function InputStep({
       )}
       </AnimatePresence>
 
-      {personalAiOpen ? (
-        <PersonalAiDialog description={getValues("work_description")} onClose={() => setPersonalAiOpen(false)}
-          restoreFocus={() => personalAiButton.current?.focus()}
-          onImport={({ work_activity, steps, assumptions }) => {
-            const { supervisor, analyst, company } = getValues();
-            const header = {
-              work_activity,
-              supervisor: supervisor.trim(),
-              analyst: analyst.trim(),
-              company: company.trim(),
-              project: "",
-              analysis_date: todayIso(),
-            };
-            rememberForNextTime(header);
-            setPersonalAiOpen(false);
-            onImportDraft({ header, steps, assumptions }, companyLogo);
-          }} />
-      ) : null}
-
       <ConfirmDialog
         open={confirmReset}
         title="ล้างฟอร์ม?"
-        description="รายละเอียดงานที่กรอกไว้จะถูกลบและกู้คืนไม่ได้"
+        description="ข้อมูลที่กรอกและร่างในขั้นสูงจะถูกล้าง ชื่อและบริษัทที่จำไว้จะถูกเติมกลับมา"
         confirmLabel="ล้างฟอร์ม"
         onConfirm={applyReset}
         onCancel={() => setConfirmReset(false)}

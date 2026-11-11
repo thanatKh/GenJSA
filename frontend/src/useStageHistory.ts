@@ -54,13 +54,18 @@ export function useStageHistory<S extends number>(stage: S, setStage: (stage: S)
 
   // history -> stage
   useEffect(() => {
+    const scrollRestoration = window.history.scrollRestoration;
+    // The heading hook resets scroll when the incoming screen mounts.
+    window.history.scrollRestoration = "manual";
     const onPop = (event: PopStateEvent) => {
       const trail = trailOf(event.state);
       if (!trail) return;
       setStage(trail[trail.length - 1] as S);
-      window.scrollTo({ top: 0 });
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.history.scrollRestoration = scrollRestoration;
+    };
   }, [setStage]);
 }

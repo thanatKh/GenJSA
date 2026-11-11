@@ -325,7 +325,10 @@ export function ProjectSetup({
                           size="icon"
                           aria-label={`ลบขั้นตอนที่ ${index + 1}`}
                           className="text-muted hover:bg-danger-soft hover:text-danger-text"
-                          onClick={() => (phase.jsa ? setRemoving(phase) : removePhase(phase.id))}
+                          onClick={() => {
+                            if (phase.jsa || phase.procedure || phase.work.trim() || phase.description.trim()) setRemoving(phase);
+                            else removePhase(phase.id);
+                          }}
                         >
                           <Trash2 className="size-4" aria-hidden="true" />
                         </Button>
@@ -391,7 +394,7 @@ export function ProjectSetup({
       <ConfirmDialog
         open={removing !== null}
         title="ลบขั้นตอนนี้?"
-        description={`"${removing?.work || "ขั้นตอนนี้"}" มี JSA แล้ว JSA ของขั้นตอนนี้จะถูกลบด้วยและกู้คืนไม่ได้`}
+        description={`ข้อมูลของ “${removing?.work || "ขั้นตอนนี้"}”${removing?.jsa ? " รวมถึง JSA และขั้นตอนปฏิบัติงานที่ร่างไว้" : ""} จะถูกลบและกู้คืนไม่ได้`}
         confirmLabel="ลบขั้นตอน"
         onConfirm={() => {
           if (removing) removePhase(removing.id);

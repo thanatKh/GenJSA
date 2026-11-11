@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   FileText,
   Info,
@@ -56,7 +56,6 @@ export function AppBar({
    * so AppBar doesn't require a working reset in contexts that don't have one. */
   onHome?: () => void;
 }) {
-  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Logo + name, sized as a pair: on phones the title matches the height of
   // the "OR" letters; from sm up the text is two lines, so the logo grows to
@@ -113,114 +112,107 @@ export function AppBar({
           <div className={brandRow}>{brand}</div>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          className="ml-auto shrink-0 px-2.5 text-sm"
-          onClick={() => setAboutOpen(true)}
-          aria-label="เกี่ยวกับ"
+        <InfoDialog
+          title={`เกี่ยวกับ ${appName}`}
+          icon={<Info className="size-4" aria-hidden="true" />}
+          trigger={
+            <Button type="button" variant="ghost" className="ml-auto shrink-0 px-2.5 text-sm" aria-label="เกี่ยวกับ">
+              <Info className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline" aria-hidden="true">เกี่ยวกับ</span>
+            </Button>
+          }
         >
-          <Info className="size-4" aria-hidden="true" />
-          <span className="hidden sm:inline" aria-hidden="true">เกี่ยวกับ</span>
-        </Button>
-      </div>
-
-      <InfoDialog
-        open={aboutOpen}
-        title={`เกี่ยวกับ ${appName}`}
-        icon={<Info className="size-4" aria-hidden="true" />}
-        onClose={() => setAboutOpen(false)}
-      >
-        <AboutSection icon={Sparkles} title="สิ่งที่ระบบนี้ทำ">
-          <p>
-            {appName} ช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน (Job
-            Safety Analysis) — อธิบายงานที่จะทำเป็นภาษาไทย ระบบจะร่าง
-            JSA ให้ตรวจทานและแก้ไข แล้วเปิดเป็นเอกสาร PDF หรือไฟล์ Word
-            นอกจากนี้ยังให้ระบบร่าง &ldquo;ขั้นตอนปฏิบัติงาน&rdquo; จาก JSA
-            นั้นได้ เพื่อใช้เป็นวิธีปฏิบัติงานอย่างละเอียดที่หน้างาน
-          </p>
-        </AboutSection>
-
-        <AboutSection icon={ListChecks} title="ขั้นตอนการใช้งาน">
-          <ol className="list-decimal space-y-1 pl-5">
-            <li>กรอกรายละเอียดงานและชื่อหัวหน้างาน</li>
-            <li>ระบบร่าง JSA ให้อัตโนมัติ</li>
-            <li>ตรวจทานและแก้ไขทุกช่องให้ตรงกับงานจริง</li>
-            <li>เปิดเอกสาร PDF เพื่อบันทึกหรือพิมพ์ หรือดาวน์โหลดไฟล์ Word เพื่อแก้ไขต่อ</li>
-            <li>
-              (ไม่บังคับ) เลือก &ldquo;JSA + ขั้นตอนปฏิบัติงาน&rdquo; ในหน้าแรก
-              หรือกด &ldquo;สร้างขั้นตอนปฏิบัติงาน&rdquo; ในหน้าเอกสาร JSA
-              ระบบจะขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด แนบรูปภาพประกอบได้
-              แล้วตรวจทานและเปิดเป็นเอกสารอีกฉบับ
-            </li>
-          </ol>
-        </AboutSection>
-
-        <AboutSection icon={Lightbulb} title="ข้อแนะนำ">
-          <ul className="list-disc space-y-1 pl-5">
-            <li>
-              อธิบายงานให้ละเอียดที่สุด รวมถึงขั้นตอนที่วางแผนไว้
-              รายละเอียดที่ครบถ้วนช่วยให้ JSA ตรงกับงานจริงมากขึ้น
-            </li>
-            <li>
-              ระบบเป็นผู้ร่างเท่านั้น ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้ตรวจสอบ
-              และรับผิดชอบเนื้อหา จึงต้องตรวจทานทุกช่องก่อนนำไปใช้
-            </li>
-            <li>ข้อสันนิษฐานที่ระบบใช้จะแสดงในหน้าตรวจทาน ควรตรวจสอบว่าตรงกับหน้างานจริง</li>
-            <li>
-              งานที่วิเคราะห์แล้วจะแสดงในรายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
-              ในหน้าแรก เปิดขึ้นมาแก้ไขและสร้างเอกสารใหม่ได้
-              หากต้องการเก็บถาวร ควรบันทึกเป็นไฟล์ PDF ไว้
-            </li>
-          </ul>
-        </AboutSection>
-
-        <AboutSection icon={ShieldCheck} title="ความเป็นส่วนตัว">
-          <div className="space-y-1">
+          <AboutSection icon={Sparkles} title="สิ่งที่ระบบนี้ทำ">
             <p>
-              ระบบไม่เก็บข้อมูล JSA หรือขั้นตอนปฏิบัติงานไว้บนเซิร์ฟเวอร์
-              รายการ &ldquo;งานที่เคยวิเคราะห์&rdquo; รวมถึงรูปภาพและโลโก้
-              เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น (สูงสุด {MAX_ENTRIES} งานล่าสุด)
-              และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
+              {appName} ช่วยวิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน (Job
+              Safety Analysis) — อธิบายงานที่จะทำเป็นภาษาไทย ระบบจะร่าง
+              JSA ให้ตรวจทานและแก้ไข แล้วเปิดเป็นเอกสาร PDF หรือไฟล์ Word
+              นอกจากนี้ยังให้ระบบร่าง &ldquo;ขั้นตอนปฏิบัติงาน&rdquo; จาก JSA
+              นั้นได้ เพื่อใช้เป็นวิธีปฏิบัติงานอย่างละเอียดที่หน้างาน
             </p>
-          </div>
-        </AboutSection>
+          </AboutSection>
 
-        <AboutSection icon={FileText} title="เกี่ยวกับระบบนี้">
-          <div className="space-y-1">
-            {documentMeta ? (
+          <AboutSection icon={ListChecks} title="ขั้นตอนการใช้งาน">
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>กรอกรายละเอียดงานและชื่อหัวหน้างาน</li>
+              <li>ระบบร่าง JSA ให้อัตโนมัติ</li>
+              <li>ตรวจทานและแก้ไขทุกช่องให้ตรงกับงานจริง</li>
+              <li>เปิดเอกสาร PDF เพื่อบันทึกหรือพิมพ์ หรือดาวน์โหลดไฟล์ Word เพื่อแก้ไขต่อ</li>
+              <li>
+                (ไม่บังคับ) เลือก &ldquo;JSA + ขั้นตอนปฏิบัติงาน&rdquo; ในหน้าแรก
+                หรือกด &ldquo;สร้างขั้นตอนปฏิบัติงาน&rdquo; ในหน้าเอกสาร JSA
+                ระบบจะขยายแต่ละขั้นตอนเป็นวิธีทำอย่างละเอียด แนบรูปภาพประกอบได้
+                แล้วตรวจทานและเปิดเป็นเอกสารอีกฉบับ
+              </li>
+            </ol>
+          </AboutSection>
+
+          <AboutSection icon={Lightbulb} title="ข้อแนะนำ">
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                อธิบายงานให้ละเอียดที่สุด รวมถึงขั้นตอนที่วางแผนไว้
+                รายละเอียดที่ครบถ้วนช่วยให้ JSA ตรงกับงานจริงมากขึ้น
+              </li>
+              <li>
+                ระบบเป็นผู้ร่างเท่านั้น ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้ตรวจสอบ
+                และรับผิดชอบเนื้อหา จึงต้องตรวจทานทุกช่องก่อนนำไปใช้
+              </li>
+              <li>ข้อสันนิษฐานที่ระบบใช้จะแสดงในหน้าตรวจทาน ควรตรวจสอบว่าตรงกับหน้างานจริง</li>
+              <li>
+                งานที่วิเคราะห์แล้วจะแสดงในรายการ &ldquo;งานที่เคยวิเคราะห์&rdquo;
+                ในหน้าแรก เปิดขึ้นมาแก้ไขและสร้างเอกสารใหม่ได้
+                หากต้องการเก็บถาวร ควรบันทึกเป็นไฟล์ PDF ไว้
+              </li>
+            </ul>
+          </AboutSection>
+
+          <AboutSection icon={ShieldCheck} title="ความเป็นส่วนตัว">
+            <div className="space-y-1">
               <p>
-                อ้างอิงแบบฟอร์ม {documentMeta.formCode} {documentMeta.footerText}
+                ระบบไม่เก็บข้อมูล JSA หรือขั้นตอนปฏิบัติงานไว้บนเซิร์ฟเวอร์
+                รายการ &ldquo;งานที่เคยวิเคราะห์&rdquo; รวมถึงรูปภาพและโลโก้
+                เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น (สูงสุด {MAX_ENTRIES} งานล่าสุด)
+                และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
               </p>
-            ) : null}
-            {developer || department ? (
-              <p>
-                พัฒนาโดย {[developer, department].filter(Boolean).join(" · ")}
-              </p>
-            ) : null}
-            {contactEmail ? (
-              <p className="flex items-center gap-1.5">
-                <Mail className="size-3.5 shrink-0" aria-hidden="true" />
-                <a href={`mailto:${contactEmail}`} className="text-navy hover:underline">
-                  {contactEmail}
-                </a>
-              </p>
-            ) : null}
-            {/* documentMeta arrives with the server's settings, so it doubles
-                as "the server answered" — this used to say พร้อมใช้งาน
-                unconditionally, even with the server unreachable */}
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className={`size-2 rounded-full ${documentMeta ? "bg-[var(--success)]" : "bg-danger"}`}
-                aria-hidden="true"
-              />
-              <span className="text-ink">
-                {documentMeta ? "พร้อมใช้งาน" : "เชื่อมต่อระบบไม่ได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"}
-              </span>
             </div>
-          </div>
-        </AboutSection>
-      </InfoDialog>
+          </AboutSection>
+
+          <AboutSection icon={FileText} title="เกี่ยวกับระบบนี้">
+            <div className="space-y-1">
+              {documentMeta ? (
+                <p>
+                  อ้างอิงแบบฟอร์ม {documentMeta.formCode} {documentMeta.footerText}
+                </p>
+              ) : null}
+              {developer || department ? (
+                <p>
+                  พัฒนาโดย {[developer, department].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
+              {contactEmail ? (
+                <p className="flex items-center gap-1.5">
+                  <Mail className="size-3.5 shrink-0" aria-hidden="true" />
+                  <a href={`mailto:${contactEmail}`} className="text-navy hover:underline">
+                    {contactEmail}
+                  </a>
+                </p>
+              ) : null}
+              {/* documentMeta arrives with the server's settings, so it doubles
+                  as "the server answered" — this used to say พร้อมใช้งาน
+                  unconditionally, even with the server unreachable */}
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className={`size-2 rounded-full ${documentMeta ? "bg-[var(--success)]" : "bg-danger"}`}
+                  aria-hidden="true"
+                />
+                <span className="text-ink">
+                  {documentMeta ? "พร้อมใช้งาน" : "เชื่อมต่อระบบไม่ได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"}
+                </span>
+              </div>
+            </div>
+          </AboutSection>
+        </InfoDialog>
+      </div>
     </header>
   );
 }

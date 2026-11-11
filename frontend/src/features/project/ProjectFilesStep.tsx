@@ -16,7 +16,7 @@ import { ArrowLeft, TriangleAlert } from "lucide-react";
 import type { PublicConfig } from "../../lib/api";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import { procedureDocxFileName, procedurePdfFileName, projectJsaDocxFileName, projectJsaPdfFileName } from "../../lib/pdf/fileName";
-import { FALLBACK_DOCUMENT, type PhotoMap } from "../../lib/pdf/layout";
+import { FALLBACK_DOCUMENT, FALLBACK_PROCEDURE, type PhotoMap } from "../../lib/pdf/layout";
 import type { JsaDocument, ProcedureDocument, ProjectDocument } from "../../lib/schema";
 import { formatThaiDate, todayIso } from "../../lib/thaidate";
 import { PdfDeliveryCard } from "../pdf-view/PdfDeliveryCard";
@@ -38,6 +38,7 @@ export function ProjectFilesStep({
   onBack: () => void;
 }) {
   const labels = config?.document.labels ?? FALLBACK_DOCUMENT.labels;
+  const procedureLabels = config?.procedure?.labels ?? FALLBACK_PROCEDURE.labels;
 
   // Built once per project change, so the four deliveries' deps are stable
   const files = useMemo(() => {
@@ -155,8 +156,8 @@ export function ProjectFilesStep({
         kicker="ไฟล์ 1 · ขั้นตอนปฏิบัติงานโครงการ"
         title={files.cover.name}
         summary={[
-          { label: labels.supervisor, value: project.supervisor },
-          { label: labels.analysis_date, value: formatThaiDate(files.cover.date) },
+          { label: procedureLabels.author, value: files.procedure.header.analyst?.trim() || files.procedure.header.supervisor.trim() },
+          { label: procedureLabels.date, value: formatThaiDate(files.procedure.header.analysis_date) },
           { label: "เนื้อหา", value: `${project.phases.length} ส่วน · ${subSteps} ขั้นตอนย่อย` },
         ]}
         delivery={procedurePdf}

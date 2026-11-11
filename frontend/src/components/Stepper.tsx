@@ -106,8 +106,7 @@ function Connectors({
   /** One half of a connector. "done" draws the navy line over the gray one
    * and grows it left to right, so moving to the next step fills the line
    * toward it; `delay` lets the second half (the one beside the step being
-   * reached) follow the first. Mounted once for the whole session (it sits
-   * outside the per-screen fade in App.tsx), so it plays on step changes. */
+   * reached) follow the first. */
   const half = (kind: "done" | "todo", position: string, delay: number) => (
     <span className={`absolute top-[14px] ${position}`} aria-hidden="true">
       <span className="absolute inset-x-0 top-0 border-t border-line" />

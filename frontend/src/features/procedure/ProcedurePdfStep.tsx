@@ -151,7 +151,7 @@ export function ProcedurePdfStep({
         kicker="ไฟล์ 1 · ขั้นตอนปฏิบัติงาน (Work Procedure)"
         title={procedure.header.work_activity}
         summary={[
-          { label: labels.supervisor, value: procedure.header.supervisor },
+          { label: procedureLabels.author, value: procedure.header.analyst?.trim() || procedure.header.supervisor.trim() },
           { label: procedureLabels.date, value: formatThaiDate(procedure.header.analysis_date) },
           {
             label: "เนื้อหา",

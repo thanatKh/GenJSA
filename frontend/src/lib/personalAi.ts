@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { FALLBACK_PROCEDURE } from "./pdf/layout";
+import { jsaFingerprint, type JsaDocument, type ProcedureDocument } from "./schema";
+import { formatThaiDate } from "./thaidate";
 
 export const detailLevels = ["กระชับ", "มาตรฐาน", "ละเอียด"] as const;
 export type DetailLevel = (typeof detailLevels)[number];
@@ -31,7 +34,7 @@ const draftSchema = z.object({
   assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
 });
 
-export function parsePersonalDraft(answer: string) {
+function parseDraft<T>(answer: string, schema: z.ZodType<T>): T {
   if (answer.length > 250_000) throw new Error("คำตอบยาวเกินไป กรุณาขอให้ AI ตอบกระชับขึ้น");
   const trimmed = answer.trim();
   const fenced = [...trimmed.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)```/gi)];
@@ -41,15 +44,74 @@ export function parsePersonalDraft(answer: string) {
   } catch {
     throw new Error("อ่านคำตอบไม่ได้ กรุณาคัดลอก JSON จาก AI ให้ครบทั้งชุดแล้วลองอีกครั้ง");
   }
-  const parsed = draftSchema.safeParse(data);
+  const parsed = schema.safeParse(data);
   if (!parsed.success) {
     const field = parsed.error.issues[0]?.path.join(".");
     throw new Error(`ข้อมูลไม่ครบหรือผิดรูปแบบ${field ? ` ที่ ${field}` : ""} กรุณาให้ AI ตอบตามโครงสร้างในคำสั่ง`);
   }
-  return {
-    ...parsed.data,
-    steps: parsed.data.steps.map((step, index) => ({ ...step, no: index + 1 })),
-  };
+  return parsed.data;
+}
+
+export function parsePersonalDraft(answer: string) {
+  const draft = parseDraft(answer, draftSchema);
+  return { ...draft, steps: draft.steps.map((step, index) => ({ ...step, no: index + 1 })) };
 }
 
 export type PersonalDraft = ReturnType<typeof parsePersonalDraft>;
+
+export function procedureSourceText(jsa: JsaDocument) {
+  return [
+    jsa.header.work_activity,
+    ...jsa.steps.map((step, index) =>
+      [`${index + 1}. ${step.procedure}`, step.details].filter(Boolean).join("\n"),
+    ),
+  ].join("\n\n");
+}
+
+export function buildPersonalProcedurePrompt(work: string, level: DetailLevel, instructions: string) {
+  return [
+    "ร่างขั้นตอนปฏิบัติงาน (WP) ภาษาไทยจาก JSA ที่ตรวจทานแล้ว",
+    `ระดับรายละเอียด: ${level}`,
+    "ขยายแต่ละขั้นตอนหลักเป็นขั้นตอนย่อยที่ปฏิบัติได้ ส่ง steps หนึ่งรายการต่อเลขขั้นตอนหลัก no ให้ครบทุกข้อ ห้ามเพิ่ม ลบ หรือรวมเลขขั้นตอนหลัก",
+    "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือเอกสารอ้างอิง สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
+    "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการด้านล่าง",
+    '{"purpose":"วัตถุประสงค์","scope":"ขอบเขต","tools":["เครื่องมือ"],"steps":[{"no":1,"sub_steps":[{"action":"งานย่อย"}]}],"assumptions":[]}',
+    `ขั้นตอนหลักจาก JSA:\n${work.trim()}`,
+    instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
+  ].filter(Boolean).join("\n\n");
+}
+
+const procedureSchema = z.object({
+  purpose: z.string().trim().max(1000).default(""),
+  scope: z.string().trim().max(1000).default(""),
+  tools: z.array(z.string().trim().min(1).max(1000)).max(40).default([]),
+  assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
+  steps: z.array(z.object({
+    no: z.number().int().positive(),
+    sub_steps: z.array(z.object({ action: z.string().trim().min(1).max(1000) })).min(1).max(20),
+  })).min(1).max(200),
+});
+
+export function parsePersonalProcedure(
+  answer: string,
+  jsa: JsaDocument,
+  referenceLabel = FALLBACK_PROCEDURE.jsaReferenceLabel,
+): ProcedureDocument {
+  const draft = parseDraft(answer, procedureSchema);
+  const byNumber = new Map(draft.steps.map((step) => [step.no, step.sub_steps]));
+  if (draft.steps.length !== jsa.steps.length || byNumber.size !== jsa.steps.length ||
+      jsa.steps.some((_, index) => !byNumber.has(index + 1))) {
+    throw new Error("เลขขั้นตอนหลักไม่ตรงกับ JSA กรุณาให้ AI ส่งทุกเลขให้ครบและไม่ซ้ำกัน");
+  }
+  return {
+    ...draft,
+    header: jsa.header,
+    sourceFingerprint: jsaFingerprint(jsa),
+    references: [`${referenceLabel}: ${jsa.header.work_activity.trim()} — ${formatThaiDate(jsa.header.analysis_date)}`],
+    steps: jsa.steps.map((step, index) => ({
+      no: index + 1,
+      procedure: step.procedure,
+      sub_steps: byNumber.get(index + 1)!.map((sub, i) => ({ no: i + 1, action: sub.action })),
+    })),
+  };
+}
