@@ -36,7 +36,17 @@ function hazardScan(rules?: JsaPromptRules) {
   return `ก่อนเขียนอันตรายของแต่ละขั้นตอน ให้ไล่ตรวจแหล่งอันตรายต่อไปนี้ทีละข้อ แล้วใส่ทุกข้อที่เกิดได้จริงในขั้นตอนนั้น${list}`;
 }
 
-export function buildPersonalPrompt(description: string, level: DetailLevel, instructions: string, rules?: JsaPromptRules) {
+/* Mirrors backend/app/models/jsa.py's MAX_SUB_STEPS */
+const MAX_SUB_STEPS = 20;
+
+export function buildPersonalPrompt(
+  description: string,
+  level: DetailLevel,
+  instructions: string,
+  rules?: JsaPromptRules,
+  /** The advanced screen's "แตกเป็นขั้นตอนย่อย" box: split every main step */
+  splitSubSteps = false,
+) {
   return [
     "ร่างการวิเคราะห์งานเพื่อความปลอดภัย (JSA) ภาษาไทยสำหรับให้ผู้รับผิดชอบตรวจทาน",
     `ระดับรายละเอียด: ${level} โดยยังคงอันตรายและมาตรการสำคัญครบถ้วน`,
@@ -44,6 +54,10 @@ export function buildPersonalPrompt(description: string, level: DetailLevel, ins
     // Same rule as prompts/jsa-generate.md's rule 3 — the advanced screen's
     // hint tells users to list their steps, so the prompt has to honour them
     "ถ้ารายละเอียดงานมีรายการขั้นตอนมาแล้ว ให้ยึดตามลำดับและถ้อยคำนั้นเป็นหลัก ห้ามรวม แตก หรือตัดขั้นตอนที่ให้มา เพิ่มได้เฉพาะขั้นตอนที่จำเป็นด้านความปลอดภัยและควรมีอย่างชัดเจน",
+    splitSubSteps
+      ? `แตกแต่ละขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …) ใน sub_steps ตามลำดับการทำงานจริง ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS} ข้อ จำนวนขั้นตอนย่อยให้เป็นไปตามงานจริง ห้ามแตกเพียงเพื่อให้ได้จำนวน ถ้าขั้นตอนหลักใดไม่มีอะไรต้องแตกจริง ให้ sub_steps เป็น [] และใส่ hazards ที่ขั้นตอนหลักนั้นแทน`
+      : `ถ้ารายละเอียดงานมีขั้นตอนย่อยมาแล้ว (เช่น 1.1, 1.2) ให้ใส่ใน sub_steps ของขั้นตอนหลักนั้นตามลำดับเดิม ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS} ข้อ ถ้าไม่มีให้ sub_steps เป็น []`,
+    "ขั้นตอนหลักที่มี sub_steps เป็นหัวข้อ ให้ hazards ของขั้นตอนหลักนั้นเป็น [] อันตรายและมาตรการทั้งหมดอยู่ที่ขั้นตอนย่อย แต่ละขั้นตอนย่อยมี procedure details hazards แบบเดียวกับขั้นตอนหลัก",
     hazardScan(rules),
     "ใน hazards ให้แยกหนึ่งอันตรายต่อหนึ่ง object พร้อม controls ของอันตรายนั้นเอง หากพบหลายข้อให้ใส่หลาย object ในขั้นตอนเดิม อย่ารวมหลายอันตรายไว้ในข้อความเดียวหรือแยกขั้นตอนเพียงเพื่อให้เหลือข้อเดียว",
     "จำนวนอันตรายให้เป็นไปตามงานจริง ตัวอย่างด้านล่างแสดงสองข้อเพื่อสาธิตโครงสร้างเท่านั้น ใส่อันตรายเพียงข้อเดียวได้ก็ต่อเมื่อไล่ตรวจครบแล้วพบจริงเพียงข้อเดียว และห้ามเติมข้อที่ไม่เกี่ยวข้องเพื่อให้ได้จำนวน",
@@ -54,21 +68,34 @@ export function buildPersonalPrompt(description: string, level: DetailLevel, ins
     terminology(rules),
     "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่เลขข้อหรือข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
     answerAsFile(answerFileNames.jsa),
-    '{"work_activity":"ชื่องาน","steps":[{"procedure":"ชื่อขั้นตอน","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายข้อแรก","controls":["มาตรการของข้อแรก"]},{"hazard":"อันตรายอีกข้อ","controls":["มาตรการของอีกข้อ"]}]}],"assumptions":["ข้อมูลที่ต้องยืนยัน"]}',
+    '{"work_activity":"ชื่องาน","steps":[{"procedure":"ขั้นตอนที่ไม่แบ่งย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายข้อแรก","controls":["มาตรการของข้อแรก"]},{"hazard":"อันตรายอีกข้อ","controls":["มาตรการของอีกข้อ"]}],"sub_steps":[]},{"procedure":"ขั้นตอนหลักที่แบ่งย่อย","details":"","hazards":[],"sub_steps":[{"procedure":"ขั้นตอนย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายของขั้นตอนย่อย","controls":["มาตรการ"]}]}]}],"assumptions":["ข้อมูลที่ต้องยืนยัน"]}',
     `รายละเอียดงาน:\n${description.trim()}`,
     instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
   ].filter(Boolean).join("\n\n");
 }
+
+const hazardsSchema = z.array(z.object({
+  hazard: z.string().trim().min(1).max(1000),
+  controls: z.array(z.string().trim().min(1).max(4000)).min(1).max(20),
+})).max(30);
+
+const draftSubStepSchema = z.object({
+  procedure: z.string().trim().min(1).max(2000),
+  details: z.string().trim().max(4000).default(""),
+  hazards: hazardsSchema.min(1),
+});
 
 const draftSchema = z.object({
   work_activity: z.string().trim().min(1).max(500),
   steps: z.array(z.object({
     procedure: z.string().trim().min(1).max(2000),
     details: z.string().trim().max(4000).default(""),
-    hazards: z.array(z.object({
-      hazard: z.string().trim().min(1).max(1000),
-      controls: z.array(z.string().trim().min(1).max(4000)).min(1).max(20),
-    })).min(1).max(30),
+    // A heading step (one with sub-steps) carries none, so only required below
+    hazards: hazardsSchema.default([]),
+    sub_steps: z.array(draftSubStepSchema).max(MAX_SUB_STEPS).default([]),
+  }).refine((step) => step.sub_steps.length > 0 || step.hazards.length > 0, {
+    message: "ขั้นตอนที่ไม่มีขั้นตอนย่อยต้องมีอันตรายอย่างน้อยหนึ่งข้อ",
+    path: ["hazards"],
   })).min(1).max(200),
   assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
 });
@@ -93,7 +120,16 @@ function parseDraft<T>(answer: string, schema: z.ZodType<T>): T {
 
 export function parsePersonalDraft(answer: string) {
   const draft = parseDraft(answer, draftSchema);
-  return { ...draft, steps: draft.steps.map((step, index) => ({ ...step, no: index + 1 })) };
+  return {
+    ...draft,
+    steps: draft.steps.map((step, index) => ({
+      ...step,
+      no: index + 1,
+      // A heading's own hazards never print, so drop them here (as the backend does)
+      hazards: step.sub_steps.length ? [] : step.hazards,
+      sub_steps: step.sub_steps.map((sub, subIndex) => ({ ...sub, no: subIndex + 1 })),
+    })),
+  };
 }
 
 export type PersonalDraft = ReturnType<typeof parsePersonalDraft>;
@@ -102,7 +138,12 @@ export function procedureSourceText(jsa: JsaDocument) {
   return [
     jsa.header.work_activity,
     ...jsa.steps.map((step, index) =>
-      [`${index + 1}. ${step.procedure}`, step.details].filter(Boolean).join("\n"),
+      [
+        `${index + 1}. ${step.procedure}`,
+        step.details,
+        ...step.sub_steps.map((sub, subIndex) =>
+          [`   ${index + 1}.${subIndex + 1} ${sub.procedure}`, sub.details && `      ${sub.details}`].filter(Boolean).join("\n")),
+      ].filter(Boolean).join("\n"),
     ),
   ].join("\n\n");
 }
@@ -112,6 +153,8 @@ export function buildPersonalProcedurePrompt(work: string, level: DetailLevel, i
     "ร่างขั้นตอนปฏิบัติงาน (WP) ภาษาไทยจาก JSA ที่ตรวจทานแล้ว",
     `ระดับรายละเอียด: ${level}`,
     "ขยายแต่ละขั้นตอนหลักเป็นขั้นตอนย่อยที่ปฏิบัติได้ ส่ง steps หนึ่งรายการต่อเลขขั้นตอนหลัก no ให้ครบทุกข้อ ห้ามเพิ่ม ลบ หรือรวมเลขขั้นตอนหลัก",
+    // Same rule as prompts/procedure-generate.md: a JSA's 1.1 is the WP's 1.1
+    "ขั้นตอนหลักที่ JSA แบ่งขั้นตอนย่อยไว้แล้ว (มีรายการ 1.1, 1.2 … อยู่ใต้ขั้นตอนนั้น) ให้ส่ง sub_steps จำนวนเท่ากับใน JSA พอดี เรียงตามลำดับเดิม ข้อละหนึ่งรายการ แต่ละ action เขียนวิธีปฏิบัติของขั้นตอนย่อยข้อนั้นโดยขึ้นต้นด้วยชื่อขั้นตอนย่อยนั้น",
     "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือเอกสารอ้างอิง สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
     terminology(rules),
     "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการด้านล่าง",
@@ -149,10 +192,19 @@ export function parsePersonalProcedure(
     header: jsa.header,
     sourceFingerprint: jsaFingerprint(jsa),
     references: [`${referenceLabel}: ${jsa.header.work_activity.trim()} — ${formatThaiDate(jsa.header.analysis_date)}`],
-    steps: jsa.steps.map((step, index) => ({
-      no: index + 1,
-      procedure: step.procedure,
-      sub_steps: byNumber.get(index + 1)!.map((sub, i) => ({ no: i + 1, action: sub.action })),
-    })),
+    steps: jsa.steps.map((step, index) => {
+      const answered = byNumber.get(index + 1)!;
+      // Like procedure_service._sub_steps: a JSA step with sub-steps fixes the
+      // WP's to one line each, in order — a short answer falls back to the
+      // JSA sub-step's title, extras are dropped
+      const actions = step.sub_steps.length
+        ? step.sub_steps.map((sub, i) => answered[i]?.action ?? sub.procedure)
+        : answered.map((sub) => sub.action);
+      return {
+        no: index + 1,
+        procedure: step.procedure,
+        sub_steps: actions.map((action, i) => ({ no: i + 1, action })),
+      };
+    }),
   };
 }

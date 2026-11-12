@@ -57,8 +57,14 @@ const THAI = /[฀-๿]/;
 const THAI_OR_OTHER = /[฀-๿]+(?:\s+[฀-๿]+)*|[^฀-๿]+/g;
 
 /** Indent for a "1." / "1.1" / "•" marker hanging in front of its text */
-export function markerIndent(marker: string, left = 0) {
-  const hanging = mm(marker.length <= 1 ? 4 : marker.length <= 2 ? 5.5 : 7.5);
+export function markerIndent(marker: string, left = 0, bold = false) {
+  const base = marker.length <= 1 ? 4 : marker.length <= 2 ? 5.5 : 7.5;
+  // A bold multi-part number (a JSA sub-step's "2.1", or "12.3") is wider.
+  // Without the extra room it can run just past the tab stop — in a
+  // substitute font when TH Sarabun New isn't installed — and the text jumps
+  // to the next default tab. Regular-weight markers keep their old indents.
+  const extra = bold && marker.length >= 3 ? (marker.length >= 4 ? 4 : 2) : 0;
+  const hanging = mm(base + extra);
   return { left: left + hanging, hanging };
 }
 
@@ -125,10 +131,10 @@ export function createWordKit(L: PdfLayout) {
     new Paragraph({
       keepNext,
       spacing: { before: spaceBefore },
-      indent: marker ? markerIndent(marker, left) : left ? { left } : undefined,
+      indent: marker ? markerIndent(marker, left, bold) : left ? { left } : undefined,
       // Match the marker's hanging indent instead of Word's default tab grid,
       // which can push text to a new line in a narrow table cell.
-      tabStops: marker ? [{ type: TabStopType.LEFT, position: markerIndent(marker, left).left }] : undefined,
+      tabStops: marker ? [{ type: TabStopType.LEFT, position: markerIndent(marker, left, bold).left }] : undefined,
       children: [
         ...(marker ? [...run(marker, { bold, size: halfPt(size) }), new TextRun({ children: [new Tab()] })] : []),
         // A line per \n, so a multi-line field keeps its line breaks

@@ -13,7 +13,7 @@
  */
 
 import type { CompanyLogo } from "../companyLogo";
-import type { JsaDocument } from "../schema";
+import { jsaRows, type JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createEngine, type Line } from "./engine";
 import { pdfFileName, projectJsaPdfFileName } from "./fileName";
@@ -26,7 +26,13 @@ import {
   type PdfLayout,
 } from "./layout";
 
-type Row = { cells: [Line[], Line[], Line[]]; dividers: number[] };
+type Row = {
+  cells: [Line[], Line[], Line[]];
+  dividers: number[];
+  /** A step split into sub-steps: a shaded heading row with no hazards,
+   * never left alone at the foot of a page without its first sub-step */
+  heading?: boolean;
+};
 
 type BuildOptions = {
   layout?: PdfLayout;
@@ -97,16 +103,26 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
   const colX = [mL, mL + colW[0], mL + colW[0] + colW[1]];
 
   // ------------------------------------------------------------ build rows --
-  const rows: Row[] = jsa.steps.map((step, stepIndex) => {
+  // One row per plain step; a step with sub-steps is a heading row followed
+  // by one row per sub-step (1.1, 1.2 …) — see jsaRows
+  // Controls are numbered 1.1 / 1.2 to pair with their hazard — except in a
+  // JSA with sub-steps, where "1.1" already means step 1.1; they're bulleted
+  // there, and the divider between hazards still pairs each with its controls
+  const numberControls = !jsa.steps.some((s) => s.sub_steps.length);
+  const rows: Row[] = jsaRows(jsa).map((step) => {
     const innerW = colW.map((w) => w - pad * 2);
 
     // Reserve a small right inset for the bold heading, including when
     // the whole step is a heading with no separate description.
     const headingW = innerW[0] - mmToPt(1);
     const procedure: Line[] = [
-      ...wrap(step.procedure, headingW, "bold", L.font.body_pt, `${stepIndex + 1}.`),
+      ...wrap(step.procedure, headingW, "bold", L.font.body_pt, step.kind === "sub" ? step.no : `${step.no}.`),
       ...wrap(step.details, innerW[0], "normal", L.font.body_pt),
     ];
+
+    // A heading's hazards live on its sub-steps: leave its two right cells
+    // blank rather than printing "—", which would read as "no hazards"
+    if (step.kind === "heading") return { cells: [procedure, [], []], dividers: [], heading: true };
 
     const multiple = step.hazards.length > 1;
     const hazards: Line[] = [];
@@ -137,7 +153,7 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
             "normal",
             L.font.body_pt,
             // Multiple hazards: sub-numbers 1.1 / 1.2 pair up with the numbers in the hazard column
-            multiple ? `${hazardIndex + 1}.${controlIndex + 1}` : "-",
+            multiple && numberControls ? `${hazardIndex + 1}.${controlIndex + 1}` : "-",
           ),
         );
       });
@@ -295,7 +311,12 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     doc.setLineWidth(L.table.border_width_pt);
     doc.setDrawColor(...border);
     colW.forEach((w, i) => {
-      doc.rect(colX[i], top, w, height);
+      if (row.heading) {
+        doc.setFillColor(...fill);
+        doc.rect(colX[i], top, w, height, "FD");
+      } else {
+        doc.rect(colX[i], top, w, height);
+      }
       row.cells[i].slice(from, from + count).forEach((line, n) => {
         if (!line.text && !line.marker) return;
         const offset = i === 0 ? n * lineH : offsetTo(row, from, from + n);
@@ -346,6 +367,17 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
       const fitsHere = y + rowH + signatureH <= bodyBottom;
       const fitsFresh = rowH + signatureH <= bodyBottom - (mT + mmToPt(60));
       if (!fitsHere && y + rowH <= bodyBottom && fitsFresh) {
+        y = startNewPage();
+        freshPage = true;
+      }
+    }
+
+    // Keep a heading with the start of its first sub-step: if the heading
+    // plus a couple of that row's lines won't fit here, start a new page
+    const next = rows[rowIndex + 1];
+    if (row.heading && next && !freshPage) {
+      const nextLines = Math.min(MIN_SPLIT_LINES, Math.max(...next.cells.map((c) => c.length), 1));
+      if (y + (totalLines + nextLines) * lineH + pad * 4 > bodyBottom) {
         y = startNewPage();
         freshPage = true;
       }

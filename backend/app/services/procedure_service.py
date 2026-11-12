@@ -12,13 +12,14 @@ _assemble below for why that's enforced in code rather than trusted to the promp
 import logging
 
 from ..core.config import Settings
-from ..models.jsa import JsaDocument
+from ..models.jsa import JsaDocument, JsaStep
 from ..models.procedure import (
     AiProcedurePayload,
     GenerateProcedureRequest,
     ProcedureDocument,
     ProjectProcedureContext,
     ProcedureStep,
+    SubStep,
 )
 from ..core.thaidate import format_thai_date
 from ..providers.llm.base import LLMProvider
@@ -77,8 +78,37 @@ def _build_user_prompt(jsa: JsaDocument, project: ProjectProcedureContext | None
         lines.append(f"{step.no}. {step.procedure.strip()}")
         if step.details.strip():
             lines.append(f"   รายละเอียด: {step.details.strip()}")
+        # A JSA that already has sub-steps fixes the WP's sub-steps too: one
+        # each, in the same order, so the WP's 1.1 is the JSA's 1.1
+        for sub in step.sub_steps:
+            lines.append(f"   {step.no}.{sub.no} {sub.procedure.strip()}")
+            if sub.details.strip():
+                lines.append(f"      รายละเอียด: {sub.details.strip()}")
     body = "\n".join(lines)
     return body if project is None else f"{_project_context(project)}\n\n{body}"
+
+
+def _sub_steps(step: JsaStep, ai_subs: list[SubStep]) -> list[SubStep]:
+    """The WP sub-steps under one JSA step.
+
+    A JSA step without sub-steps takes whatever the model wrote. One with
+    sub-steps fixes the shape the same way step titles do: one WP line per
+    JSA sub-step, zipped by index. A missing line falls back to the JSA
+    sub-step's own title rather than leaving a gap that would shift every
+    number after it; extras are dropped.
+    """
+    if not step.sub_steps:
+        return ai_subs
+    if len(ai_subs) != len(step.sub_steps):
+        logger.warning(
+            "procedure sub-step count mismatch: model returned %d for %d JSA sub-steps",
+            len(ai_subs),
+            len(step.sub_steps),
+        )
+    return [
+        SubStep(no=i + 1, action=ai_subs[i].action if i < len(ai_subs) else sub.procedure)
+        for i, sub in enumerate(step.sub_steps)
+    ]
 
 
 def _assemble(
@@ -105,7 +135,7 @@ def _assemble(
         ProcedureStep(
             no=step.no,
             procedure=step.procedure,
-            sub_steps=by_index[index].sub_steps if index in by_index else [],
+            sub_steps=_sub_steps(step, by_index[index].sub_steps if index in by_index else []),
         )
         for index, step in enumerate(jsa.steps)
     ]

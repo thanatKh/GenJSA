@@ -131,7 +131,7 @@ export function blankPhaseJsa(project: ProjectDocument, phase: ProjectPhase): Js
       project: project.name.trim(),
       analysis_date: todayIso(),
     },
-    steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] }],
+    steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }], sub_steps: [] }],
     assumptions: [],
   };
 }

@@ -9,11 +9,23 @@ export const hazardSchema = z.object({
   controls: z.array(z.string()),
 });
 
-export const stepSchema = z.object({
+/** A JSA sub-step (1.1, 1.2 …): a row of its own with its own hazards. */
+export const jsaSubStepSchema = z.object({
   no: z.number(),
   procedure: z.string(),
   details: z.string().default(""),
   hazards: z.array(hazardSchema),
+});
+
+export const stepSchema = z.object({
+  no: z.number(),
+  procedure: z.string(),
+  details: z.string().default(""),
+  /** Always empty when sub_steps isn't — the step is then a heading row and
+   * its hazards live on the sub-steps (the backend enforces this too). */
+  hazards: z.array(hazardSchema),
+  // Defaulted so documents saved before sub-steps existed still parse
+  sub_steps: z.array(jsaSubStepSchema).default([]),
 });
 
 export const jsaHeaderSchema = z.object({
@@ -139,6 +151,7 @@ export const projectDocumentSchema = z.object({
 
 export type Hazard = z.infer<typeof hazardSchema>;
 export type JsaStep = z.infer<typeof stepSchema>;
+export type JsaSubStep = z.infer<typeof jsaSubStepSchema>;
 export type JsaDocument = z.infer<typeof jsaDocumentSchema>;
 export type InputForm = z.infer<typeof inputFormSchema>;
 export type SubStep = z.infer<typeof subStepSchema>;
@@ -160,7 +173,44 @@ export function stepFingerprint(doc: JsaDocument | ProcedureDocument): string {
 }
 
 export function jsaFingerprint(doc: JsaDocument): string {
-  return JSON.stringify([doc.header, doc.steps.map((s) => [s.procedure.trim(), s.details.trim()])]);
+  // Sub-steps join the fingerprint only when a step has them, so a procedure
+  // drafted before sub-steps existed doesn't suddenly read as out of date
+  return JSON.stringify([doc.header, doc.steps.map((s) => {
+    const own = [s.procedure.trim(), s.details.trim()];
+    return s.sub_steps.length ? [...own, s.sub_steps.map((sub) => [sub.procedure.trim(), sub.details.trim()])] : own;
+  })]);
+}
+
+/** Every row a step prints as, with its number: the step itself when it has
+ * no sub-steps, or its heading followed by each sub-step (1.1, 1.2 …). The
+ * one place that numbering rule lives, for the PDF, Word and the counts. */
+export type JsaRow = {
+  /** "step": a plain step · "heading": a step with sub-steps (no hazards) · "sub": one of its sub-steps */
+  kind: "step" | "heading" | "sub";
+  /** As printed: "2" or "2.1" */
+  no: string;
+  procedure: string;
+  details: string;
+  hazards: Hazard[];
+};
+
+export function jsaRows(doc: JsaDocument): JsaRow[] {
+  return doc.steps.flatMap((step, i): JsaRow[] => {
+    const no = `${i + 1}`;
+    const { procedure, details } = step;
+    if (!step.sub_steps.length) return [{ kind: "step", no, procedure, details, hazards: step.hazards }];
+    return [
+      { kind: "heading", no, procedure, details, hazards: [] },
+      ...step.sub_steps.map((sub, j): JsaRow => ({
+        kind: "sub", no: `${no}.${j + 1}`, procedure: sub.procedure, details: sub.details, hazards: sub.hazards,
+      })),
+    ];
+  });
+}
+
+/** Total hazards in a JSA, counting sub-steps' */
+export function hazardCount(doc: JsaDocument): number {
+  return jsaRows(doc).reduce((total, row) => total + row.hazards.length, 0);
 }
 
 export function procedureIsStale(jsa: JsaDocument, procedure: ProcedureDocument): boolean {

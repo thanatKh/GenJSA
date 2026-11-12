@@ -18,7 +18,7 @@ import {
   type DocumentMeta,
   type PdfLayout,
 } from "../pdf/layout";
-import type { JsaDocument } from "../schema";
+import { jsaRows, type JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
 import { createWordKit, halfPt, mm, toBlob } from "./common";
 
@@ -121,14 +121,33 @@ function jsaBody(
 
   // ------------------------------------------------------------------ steps --
   const dash = () => K.markedParagraph("—");
-  const rows = jsa.steps.flatMap((step, stepIndex) => {
-    const procedure = [K.markedParagraph(step.procedure, { marker: `${stepIndex + 1}.`, bold: true })];
-    if (step.details.trim()) procedure.push(K.markedParagraph(step.details));
+  // Same rows as the PDF: a step split into sub-steps is a shaded heading
+  // row (kept with the next row) followed by its 1.1, 1.2 … rows
+  // Same rule as the PDF: in a JSA with sub-steps, "1.1" is a step number,
+  // so controls are bulleted instead of numbered to their hazard
+  const numberControls = !jsa.steps.some((s) => s.sub_steps.length);
+  const rows = jsaRows(jsa).flatMap((step) => {
+    const heading = step.kind === "heading";
+    const marker = step.kind === "sub" ? step.no : `${step.no}.`;
+    const procedure = [K.markedParagraph(step.procedure, { marker, bold: true, keepNext: heading })];
+    if (step.details.trim()) procedure.push(K.markedParagraph(step.details, { keepNext: heading }));
+    if (heading) {
+      return [
+        new TableRow({
+          cantSplit: true,
+          children: [
+            K.cell(procedure, { width: colW[0], top: true, shaded: true }),
+            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[1], shaded: true }),
+            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[2], shaded: true }),
+          ],
+        }),
+      ];
+    }
     const multiple = step.hazards.length > 1;
     const hazards = step.hazards.length ? step.hazards : [{ hazard: "—", controls: [] }];
     return hazards.map((hazard, hazardIndex) => {
       const controls = hazard.controls.filter((c) => c && c.trim()).map((control, controlIndex) =>
-        K.markedParagraph(control, { marker: multiple ? `${hazardIndex + 1}.${controlIndex + 1}` : "-" }),
+        K.markedParagraph(control, { marker: multiple && numberControls ? `${hazardIndex + 1}.${controlIndex + 1}` : "-" }),
       );
       return new TableRow({
         children: [

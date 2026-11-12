@@ -7,8 +7,18 @@ import type { JsaPromptRules } from "../../lib/api";
 
 const textAreaClass = "w-full min-w-0 resize-y rounded-lg border border-line bg-surface p-3 text-base focus-visible:outline-2 focus-visible:outline-navy";
 
-type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: unknown[] };
+type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: { hazards?: unknown[]; action?: string }[] };
 type PreviewDraft = { steps: PreviewStep[]; work_activity?: string; header?: { work_activity: string } };
+
+/** One preview line's note: a JSA step's hazards (or its sub-steps and
+ * theirs), a WP step's sub-steps */
+function previewDetail(kind: AdvancedKind, step: PreviewStep) {
+  const subs = step.sub_steps?.length ?? 0;
+  if (kind === "wp") return `· ขั้นตอนย่อย ${subs} ข้อ`;
+  if (!subs) return `· อันตราย ${step.hazards?.length ?? 0} ข้อ`;
+  const hazards = step.sub_steps!.reduce((n, sub) => n + (sub.hazards?.length ?? 0), 0);
+  return `· ขั้นตอนย่อย ${subs} ข้อ · อันตราย ${hazards} ข้อ`;
+}
 
 export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description, scope, backLabel, onBack, parse, onImport, jsaRules }: {
   kind: AdvancedKind;
@@ -24,18 +34,19 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [saved] = useState(() => {
     const value = advancedDraft.load(kind, scope);
     if (!value) return null;
-    const hasEdits = value.work !== value.source || value.answer.trim() || value.instructions.trim() || value.level !== "มาตรฐาน";
+    const hasEdits = value.work !== value.source || value.answer.trim() || value.instructions.trim() || value.level !== "มาตรฐาน" || value.split;
     return value.source === description || hasEdits ? value : null;
   });
   const [source, setSource] = useState(saved?.source ?? description);
   const [level, setLevel] = useState<DetailLevel>(saved?.level ?? "มาตรฐาน");
   const [work, setWork] = useState(saved?.work ?? description);
   const [instructions, setInstructions] = useState(saved?.instructions ?? "");
+  const [split, setSplit] = useState(saved?.split ?? false);
   const [answer, setAnswer] = useState(saved?.answer ?? "");
   const [draft, setDraft] = useState<T | null>(null);
   useEffect(() => {
-    advancedDraft.save(kind, { source, work, level, instructions, answer }, scope);
-  }, [kind, source, work, level, instructions, answer, scope]);
+    advancedDraft.save(kind, { source, work, level, instructions, answer, split }, scope);
+  }, [kind, source, work, level, instructions, answer, split, scope]);
   const [error, setError] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const promptField = useRef<HTMLTextAreaElement>(null);
@@ -45,8 +56,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [dragging, setDragging] = useState(false);
   const prompt = kind === "wp"
     ? buildPersonalProcedurePrompt(work, level, instructions, jsaRules)
-    : buildPersonalPrompt(work, level, instructions, jsaRules);
+    : buildPersonalPrompt(work, level, instructions, jsaRules, split);
   const sourceChanged = source !== description;
+  const subCount = draft?.steps.reduce((n, step) => n + (step.sub_steps?.length ?? 0), 0) ?? 0;
   const fileName = answerFileNames[kind];
 
   const check = (text: string) => {
@@ -147,6 +159,18 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             ))}
           </div>
         </fieldset>
+        {kind === "jsa" ? (
+          <label className="flex min-h-12 items-start gap-2 py-2">
+            <input type="checkbox" checked={split} className="mt-1 size-4 shrink-0 accent-navy" aria-describedby="personal-split-hint"
+              onChange={(e) => { setSplit(e.target.checked); setCopyStatus(""); }} />
+            <span>
+              <span className="font-medium text-ink">แตกขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …)</span>
+              <span id="personal-split-hint" className="block text-sm text-muted">
+                สำหรับงานละเอียด แต่ละขั้นตอนย่อยมีอันตรายและมาตรการของตัวเอง ขั้นตอนหลักเป็นหัวข้อ และ WP จะใช้เลขเดียวกัน
+              </span>
+            </span>
+          </label>
+        ) : null}
         <div>
           <Label htmlFor="personal-instructions">คำขอเพิ่มเติม (ไม่บังคับ)</Label>
           <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); setCopyStatus(""); }} />
@@ -205,11 +229,12 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-lg bg-navy-soft p-3 [overflow-wrap:anywhere]">
             <p role="status" className="font-medium">
               {draft.work_activity ?? draft.header?.work_activity ?? "ตรวจรูปแบบแล้ว"} · {draft.steps.length} ขั้นตอน
+              {kind === "jsa" && subCount ? ` · ${subCount} ขั้นตอนย่อย` : ""}
             </p>
             <ol className="max-h-32 list-decimal overflow-y-auto ps-5">
               {draft.steps.map((step) => (
                 <li key={step.no}>
-                  {step.procedure} <span className="text-muted">{step.hazards ? `· อันตราย ${step.hazards.length} ข้อ` : `· ขั้นตอนย่อย ${step.sub_steps?.length ?? 0} ข้อ`}</span>
+                  {step.procedure} <span className="text-muted">{previewDetail(kind, step)}</span>
                 </li>
               ))}
             </ol>

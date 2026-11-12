@@ -21,6 +21,7 @@ import { FALLBACK_DOCUMENT } from "../../lib/pdf/layout";
 import { formatThaiDate } from "../../lib/thaidate";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import type { JsaDocument } from "../../lib/schema";
+import { hazardCount as countHazards } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { PdfDeliveryCard } from "./PdfDeliveryCard";
 import { usePdfDelivery } from "./usePdfDelivery";
@@ -90,10 +91,7 @@ export function PdfStep({
     buildErrorMessage: "สร้างไฟล์ Word ไม่สำเร็จ กรุณาลองอีกครั้ง หรือใช้ไฟล์ PDF แทน",
   });
 
-  const hazardCount = doc.steps.reduce(
-    (total, step) => total + step.hazards.length,
-    0,
-  );
+  const hazardCount = countHazards(doc);
 
   return (
     <section>

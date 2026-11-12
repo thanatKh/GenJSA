@@ -147,6 +147,18 @@ it, so retry behaviour can only ever be fixed (or broken) in one place:
 the backend is the single source of truth for step numbers printed on the
 document. `ProcedureDocument` does the same for its steps and sub-steps.
 
+**JSA sub-steps (1.1, 1.2 …).** For detailed work a JSA step can be split
+into `sub_steps` (each with its own `procedure`/`details`/`hazards`, max
+`MAX_SUB_STEPS` = 20, matching the WP's sub-step cap). A step with sub-steps is
+a **heading**: it prints as a shaded row with no hazards, and
+`JsaStep.heading_has_no_hazards` clears any it's given, so hazards can't print
+twice. Old documents have no `sub_steps` and default to `[]` everywhere (zod
+`.default([])`, and `store.ts` runs session drafts through the schema).
+`lib/schema.ts`'s `jsaRows()` is the one place the printed numbering lives —
+the PDF, the Word file and the hazard counts all walk it. In a JSA with any
+sub-steps, controls are bulleted instead of numbered `1.1` to their hazard,
+because "1.1" already means a step there.
+
 ### Procedure generation (`backend/app/services/procedure_service.py`)
 
 Two rules are enforced **structurally, not by the prompt**, because a model
@@ -156,6 +168,11 @@ will drift from either one. Keep it that way when editing:
   for step titles — they're copied from the source JSA — and sub-steps are
   zipped onto the JSA's list *by index, not by the model's own numbering*. A
   short or renumbered response loses detail instead of corrupting the shape.
+  The same goes one level down: under a JSA step that has sub-steps, the WP
+  gets exactly one sub-step per JSA sub-step, in order (`_sub_steps`; a
+  missing one falls back to the JSA sub-step's title, extras are dropped), so
+  WP 1.1 is always JSA 1.1. The advanced mode's `parsePersonalProcedure`
+  applies the same rule in the browser.
 - **The AI cannot invent references.** `เอกสารอ้างอิง` is built in code from
   the JSA header. Asked for references, a model produces plausible standard
   numbers it has no basis for, so it is never offered the field.

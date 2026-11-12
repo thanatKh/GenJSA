@@ -26,14 +26,14 @@ import { ThaiDatePicker } from "../../components/ThaiDatePicker";
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import { saveNames } from "../../lib/rememberedNames";
-import type { JsaDocument, JsaStep } from "../../lib/schema";
+import type { JsaDocument, JsaStep, JsaSubStep } from "../../lib/schema";
 import { CompanySection } from "../company/CompanySection";
 import { docDraft } from "../../store";
 import { StepCard } from "./StepCard";
 
 const UNDO_TIMEOUT_MS = 6000;
 
-// What's needed to put a deleted step or hazard back exactly where it was
+// What's needed to put a deleted step, sub-step or hazard back exactly where it was
 type PendingDelete =
   | { kind: "step"; index: number; step: JsaStep; key: string; message: string }
   | {
@@ -42,7 +42,31 @@ type PendingDelete =
       hazardIndex: number;
       hazard: JsaStep["hazards"][number];
       message: string;
+    }
+  | {
+      kind: "sub";
+      stepIndex: number;
+      subIndex: number;
+      sub: JsaSubStep;
+      key: string;
+      /** It was the step's last sub-step, so the step went back to a plain
+       * step carrying its hazards — undo makes it a heading again */
+      wasLast: boolean;
+      message: string;
+    }
+  | {
+      kind: "subHazard";
+      stepIndex: number;
+      subIndex: number;
+      hazardIndex: number;
+      hazard: JsaStep["hazards"][number];
+      message: string;
     };
+
+// Mirrors backend/app/models/jsa.py's MAX_SUB_STEPS
+const MAX_SUB_STEPS = 20;
+
+const EMPTY_SUB_STEP: JsaSubStep = { no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] };
 
 // Mirrors backend/app/models/jsa.py's JsaHeader.work_activity max_length
 const WORK_ACTIVITY_MAX = 500;
@@ -51,6 +75,7 @@ const EMPTY_STEP: Omit<JsaStep, "no"> = {
   procedure: "",
   details: "",
   hazards: [{ hazard: "", controls: [""] }],
+  sub_steps: [],
 };
 
 
@@ -121,6 +146,80 @@ export function EditorStep({
     stepKeys.current = Array.from({ length: doc.steps.length }, newStepKey);
   }
 
+  // Sub-step card identities, per step (keyed by the step's own key so they
+  // follow it when steps move) — same reasoning as stepKeys
+  const subKeys = useRef(new Map<string, string[]>());
+  const subKeysFor = (stepIndex: number): string[] => {
+    const owner = stepKeys.current[stepIndex];
+    const count = doc.steps[stepIndex].sub_steps.length;
+    let keys = subKeys.current.get(owner);
+    if (!keys || keys.length !== count) {
+      keys = Array.from({ length: count }, () => `${owner}-sub-${(stepKeySeq.current += 1)}`);
+      subKeys.current.set(owner, keys);
+    }
+    return keys;
+  };
+
+  const patchStep = (stepIndex: number, change: (step: JsaStep) => JsaStep) =>
+    setSteps(doc.steps.map((s, i) => (i === stepIndex ? change(s) : s)));
+
+  /** A plain step becomes a heading: its hazards move to a new 1.1, so
+   * nothing typed so far is lost, and the new sub-step's title is left for
+   * the user to fill in */
+  const splitStep = (stepIndex: number) => {
+    const step = doc.steps[stepIndex];
+    const hazards = step.hazards.length ? step.hazards : EMPTY_SUB_STEP.hazards;
+    patchStep(stepIndex, (s) => ({ ...s, hazards: [], sub_steps: [{ ...EMPTY_SUB_STEP, hazards }] }));
+    setLiveMessage(`แบ่งขั้นตอนที่ ${stepIndex + 1} เป็นขั้นตอนย่อยแล้ว`);
+    requestAnimationFrame(() => focusJsaField(`procedure-${stepIndex}-s0`));
+  };
+
+  const addSubStep = (stepIndex: number) => {
+    const subs = doc.steps[stepIndex].sub_steps;
+    if (subs.length >= MAX_SUB_STEPS) return;
+    subKeysFor(stepIndex).push(`${stepKeys.current[stepIndex]}-sub-${(stepKeySeq.current += 1)}`);
+    patchStep(stepIndex, (s) => ({ ...s, sub_steps: [...subs, { ...EMPTY_SUB_STEP, no: subs.length + 1 }] }));
+    requestAnimationFrame(() => focusJsaField(`procedure-${stepIndex}-s${subs.length}`));
+  };
+
+  const patchSub = (stepIndex: number, subIndex: number, next: JsaSubStep) =>
+    patchStep(stepIndex, (s) => ({ ...s, sub_steps: s.sub_steps.map((sub, j) => (j === subIndex ? next : sub)) }));
+
+  const moveSub = (stepIndex: number, subIndex: number, direction: -1 | 1) => {
+    const subs = [...doc.steps[stepIndex].sub_steps];
+    const target = subIndex + direction;
+    if (target < 0 || target >= subs.length) return;
+    [subs[subIndex], subs[target]] = [subs[target], subs[subIndex]];
+    const keys = subKeysFor(stepIndex);
+    [keys[subIndex], keys[target]] = [keys[target], keys[subIndex]];
+    patchStep(stepIndex, (s) => ({ ...s, sub_steps: subs }));
+    setLiveMessage(`ย้ายขั้นตอนย่อยไปอยู่ลำดับที่ ${stepIndex + 1}.${target + 1}`);
+  };
+
+  const removeSub = (stepIndex: number, subIndex: number) => {
+    const step = doc.steps[stepIndex];
+    const sub = step.sub_steps[subIndex];
+    const keys = subKeysFor(stepIndex);
+    const key = keys[subIndex];
+    keys.splice(subIndex, 1);
+    const wasLast = step.sub_steps.length === 1;
+    patchStep(stepIndex, (s) => wasLast
+      // The last one gone: back to a plain step, keeping its hazards
+      ? { ...s, sub_steps: [], hazards: sub.hazards.length ? sub.hazards : EMPTY_SUB_STEP.hazards }
+      : { ...s, sub_steps: s.sub_steps.filter((_, j) => j !== subIndex) });
+    armUndo({ kind: "sub", stepIndex, subIndex, sub, key, wasLast, message: `ลบขั้นตอนย่อยที่ ${stepIndex + 1}.${subIndex + 1} แล้ว` });
+  };
+
+  const removeSubHazard = (stepIndex: number, subIndex: number, hazardIndex: number) => {
+    const hazard = doc.steps[stepIndex].sub_steps[subIndex].hazards[hazardIndex];
+    patchStep(stepIndex, (s) => ({
+      ...s,
+      sub_steps: s.sub_steps.map((sub, j) =>
+        j === subIndex ? { ...sub, hazards: sub.hazards.filter((_, h) => h !== hazardIndex) } : sub),
+    }));
+    armUndo({ kind: "subHazard", stepIndex, subIndex, hazardIndex, hazard, message: "ลบอันตรายนี้แล้ว" });
+  };
+
   const moveStep = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= doc.steps.length) return;
@@ -184,6 +283,25 @@ export function EditorStep({
       keys.splice(pendingDelete.index, 0, pendingDelete.key);
       stepKeys.current = keys;
       setSteps(steps);
+    } else if (pendingDelete.kind === "sub") {
+      const { stepIndex, subIndex, sub, key, wasLast } = pendingDelete;
+      subKeysFor(stepIndex).splice(subIndex, 0, key);
+      patchStep(stepIndex, (s) => {
+        const subs = wasLast ? [] : [...s.sub_steps];
+        subs.splice(subIndex, 0, sub);
+        return { ...s, sub_steps: subs, hazards: [] };
+      });
+    } else if (pendingDelete.kind === "subHazard") {
+      const { stepIndex, subIndex, hazardIndex, hazard } = pendingDelete;
+      patchStep(stepIndex, (s) => ({
+        ...s,
+        sub_steps: s.sub_steps.map((sub, j) => {
+          if (j !== subIndex) return sub;
+          const hazards = [...sub.hazards];
+          hazards.splice(hazardIndex, 0, hazard);
+          return { ...sub, hazards };
+        }),
+      }));
     } else {
       const { stepIndex, hazardIndex, hazard } = pendingDelete;
       setSteps(
@@ -398,21 +516,47 @@ export function EditorStep({
           exactly where they're supposed to line up straight. */}
       <ul className="mt-2 grid list-none gap-2 p-0 lg:mt-0 lg:gap-0 lg:overflow-hidden lg:border lg:border-line">
         <AnimatePresence initial={false}>
-          {doc.steps.map((step, index) => (
-            <StepCard
-              key={stepKeys.current[index]}
-              step={step}
-              index={index}
-              total={doc.steps.length}
-              incomplete={!step.procedure.trim()}
-              onChange={(next) =>
-                setSteps(doc.steps.map((s, i) => (i === index ? next : s)))
-              }
-              onRemove={() => removeStep(index)}
-              onRemoveHazard={(hazardIndex) => removeHazard(index, hazardIndex)}
-              onMove={(direction) => moveStep(index, direction)}
-            />
-          ))}
+          {doc.steps.flatMap((step, index) => {
+            const heading = step.sub_steps.length > 0;
+            const keys = subKeysFor(index);
+            return [
+              <StepCard
+                key={stepKeys.current[index]}
+                step={step}
+                index={index}
+                variant={heading ? "heading" : "step"}
+                first={index === 0}
+                last={index === doc.steps.length - 1}
+                canRemove={doc.steps.length > 1}
+                incomplete={!step.procedure.trim()}
+                onChange={(next) => patchStep(index, () => next)}
+                onRemove={() => removeStep(index)}
+                onRemoveHazard={(hazardIndex) => removeHazard(index, hazardIndex)}
+                onMove={(direction) => moveStep(index, direction)}
+                onSplit={heading ? undefined : () => splitStep(index)}
+                onAddSub={heading && step.sub_steps.length < MAX_SUB_STEPS ? () => addSubStep(index) : undefined}
+              />,
+              ...step.sub_steps.map((sub, subIndex) => (
+                <StepCard
+                  key={keys[subIndex]}
+                  step={sub}
+                  // Never the table's first row, so its top divider always shows
+                  index={1}
+                  label={`${index + 1}.${subIndex + 1}`}
+                  idBase={`${index}-s${subIndex}`}
+                  variant="sub"
+                  first={subIndex === 0}
+                  last={subIndex === step.sub_steps.length - 1}
+                  canRemove
+                  incomplete={!sub.procedure.trim()}
+                  onChange={(next) => patchSub(index, subIndex, next)}
+                  onRemove={() => removeSub(index, subIndex)}
+                  onRemoveHazard={(hazardIndex) => removeSubHazard(index, subIndex, hazardIndex)}
+                  onMove={(direction) => moveSub(index, subIndex, direction)}
+                />
+              )),
+            ];
+          })}
         </AnimatePresence>
       </ul>
 

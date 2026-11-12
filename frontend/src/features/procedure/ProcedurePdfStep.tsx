@@ -25,6 +25,7 @@ import { formatThaiDate } from "../../lib/thaidate";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import type { PhotoMap } from "../../lib/pdf/layout";
 import type { JsaDocument, ProcedureDocument } from "../../lib/schema";
+import { hazardCount as countHazards } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { PdfDeliveryCard } from "../pdf-view/PdfDeliveryCard";
 import { usePdfDelivery } from "../pdf-view/usePdfDelivery";
@@ -132,10 +133,7 @@ export function ProcedurePdfStep({
     (total, step) => total + step.sub_steps.length,
     0,
   );
-  const hazardCount = doc.steps.reduce(
-    (total, step) => total + step.hazards.length,
-    0,
-  );
+  const hazardCount = countHazards(doc);
 
   return (
     <section>

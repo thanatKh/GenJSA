@@ -5,12 +5,17 @@ export function jsaProblems(doc: JsaDocument): { id: string; message: string }[]
   if (!doc.header.work_activity.trim()) issues.push({ id: "work_activity", message: "กรุณากรอกงาน/กิจกรรม" });
   if (!doc.header.supervisor.trim()) issues.push({ id: "supervisor", message: "กรุณากรอกชื่อหัวหน้างาน" });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(doc.header.analysis_date)) issues.push({ id: "analysis_date", message: "กรุณาเลือกวันที่วิเคราะห์" });
-  doc.steps.forEach((step, i) => {
-    if (!step.procedure.trim()) issues.push({ id: `procedure-${i}`, message: `กรุณากรอกชื่อขั้นตอนที่ ${i + 1}` });
-    step.hazards.forEach((hazard, h) => {
-      if (!hazard.hazard.trim()) issues.push({ id: `hazard-${i}-${h}`, message: `ขั้นตอน ${i + 1}: กรุณาระบุอันตรายที่ ${h + 1}` });
-      if (!hazard.controls.some((c) => c.trim())) issues.push({ id: `controls-${i}-${h}-0`, message: `ขั้นตอน ${i + 1}: กรุณาระบุมาตรการของอันตรายที่ ${h + 1}` });
+  // A row's ids carry its path: "0" for step 1, "0-s1" for step 1.2 (StepCard's idBase)
+  const checkRow = (row: { procedure: string; hazards: JsaDocument["steps"][number]["hazards"] }, idBase: string, label: string) => {
+    if (!row.procedure.trim()) issues.push({ id: `procedure-${idBase}`, message: `กรุณากรอกชื่อขั้นตอนที่ ${label}` });
+    row.hazards.forEach((hazard, h) => {
+      if (!hazard.hazard.trim()) issues.push({ id: `hazard-${idBase}-${h}`, message: `ขั้นตอน ${label}: กรุณาระบุอันตรายที่ ${h + 1}` });
+      if (!hazard.controls.some((c) => c.trim())) issues.push({ id: `controls-${idBase}-${h}-0`, message: `ขั้นตอน ${label}: กรุณาระบุมาตรการของอันตรายที่ ${h + 1}` });
     });
+  };
+  doc.steps.forEach((step, i) => {
+    checkRow(step, `${i}`, `${i + 1}`);
+    step.sub_steps.forEach((sub, j) => checkRow(sub, `${i}-s${j}`, `${i + 1}.${j + 1}`));
   });
   return issues;
 }

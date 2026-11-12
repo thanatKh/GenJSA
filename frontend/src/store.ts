@@ -13,7 +13,15 @@
  * contradiction of this file.
  */
 
-import type { InputForm, JsaDocument, ProcedureDocument, ProjectDocument } from "./lib/schema";
+import type { z } from "zod";
+import {
+  jsaDocumentSchema,
+  projectDocumentSchema,
+  type InputForm,
+  type JsaDocument,
+  type ProcedureDocument,
+  type ProjectDocument,
+} from "./lib/schema";
 import type { DetailLevel } from "./lib/personalAi";
 
 const INPUT_KEY = "genjsa.draft.input";
@@ -31,6 +39,17 @@ function read<T>(key: string): T | null {
     // Some browsers' private mode blocks storage entirely — keep working without a draft
     return null;
   }
+}
+
+/** A document draft, filled in to the current shape — a draft written
+ * before a field existed (a JSA step's sub_steps) gets its default instead of
+ * reaching code that assumes it's there. Anything the schema can't make sense
+ * of is handed back as it was, as before. */
+function readDoc<T>(key: string, schema: z.ZodType<T>): T | null {
+  const raw = read<unknown>(key);
+  if (raw === null) return null;
+  const parsed = schema.safeParse(raw);
+  return parsed.success ? parsed.data : (raw as T);
 }
 
 function write(key: string, value: unknown): void {
@@ -56,7 +75,12 @@ export const inputDraft = {
 };
 
 export type AdvancedKind = "jsa" | "wp";
-type AdvancedDraft = { source: string; work: string; instructions: string; answer: string; level: DetailLevel };
+type AdvancedDraft = {
+  source: string; work: string; instructions: string; answer: string; level: DetailLevel;
+  /** JSA only: ask the AI to split every main step into sub-steps. Optional
+   * so drafts saved before it existed still load. */
+  split?: boolean;
+};
 const ADVANCED_PREFIX = "genjsa.draft.advanced.";
 const advancedKey = (kind: AdvancedKind, scope = "single") => `${ADVANCED_PREFIX}${kind}.${scope}`;
 export const advancedDraft = {
@@ -66,7 +90,7 @@ export const advancedDraft = {
 };
 
 export const docDraft = {
-  load: () => read<JsaDocument>(DOC_KEY),
+  load: () => readDoc<JsaDocument>(DOC_KEY, jsaDocumentSchema),
   save: (value: JsaDocument) => write(DOC_KEY, value),
   clear: () => remove(DOC_KEY),
 };
@@ -98,7 +122,12 @@ export type ProjectDraft = {
   screen?: number;
 };
 export const projectDraft = {
-  load: () => read<ProjectDraft>(PROJECT_KEY),
+  load: (): ProjectDraft | null => {
+    const draft = read<ProjectDraft>(PROJECT_KEY);
+    if (!draft) return null;
+    const project = projectDocumentSchema.safeParse(draft.project);
+    return project.success ? { ...draft, project: project.data } : draft;
+  },
   save: (value: ProjectDraft) => write(PROJECT_KEY, value),
   clear: () => remove(PROJECT_KEY),
 };

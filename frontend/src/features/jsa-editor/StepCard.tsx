@@ -1,11 +1,14 @@
 import { Fragment, useRef } from "react";
-import { ChevronDown, ChevronUp, Plus, TriangleAlert, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ListTree, Plus, TriangleAlert, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { AutoGrowTextarea, Button } from "../../components/ui";
 import { FADE_IN_CLASS, listItem } from "../../lib/motion";
 import { ControlsEditor } from "./ControlsEditor";
-import type { JsaStep } from "../../lib/schema";
+import type { Hazard } from "../../lib/schema";
+
+/** What one card edits: a step or a sub-step, which share these fields */
+type RowFields = { procedure: string; details: string; hazards: Hazard[] };
 
 // Mirrors backend/app/models/jsa.py's per-field caps — keeps the editor from
 // growing a document past what the backend would accept if it were ever
@@ -52,28 +55,55 @@ const CELL_FOCUS_WITHIN =
   "focus-within:relative focus-within:z-10 focus-within:bg-cyan-soft " +
   "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring";
 
-export function StepCard({
+export function StepCard<T extends RowFields>({
   step,
   index,
-  total,
+  label = `${index + 1}`,
+  idBase = `${index}`,
+  variant = "step",
+  first,
+  last,
+  canRemove,
   incomplete = false,
   onChange,
   onRemove,
   onRemoveHazard,
   onMove,
+  onSplit,
+  onAddSub,
 }: {
-  step: JsaStep;
+  step: T;
+  /** The row's position in the whole table — only the very first row (0)
+   * drops its top divider */
   index: number;
-  total: number;
+  /** The number as printed: "2", or "2.1" for a sub-step */
+  label?: string;
+  /** Field ids are `procedure-${idBase}` etc. — "1" for step 2, "1-s0" for
+   * step 2.1 (jsaValidation.ts builds the same ids to focus a problem) */
+  idBase?: string;
+  /** "step": a plain step · "heading": a step split into sub-steps, which
+   * has no hazards of its own · "sub": one of those sub-steps */
+  variant?: "step" | "heading" | "sub";
+  /** Among its siblings, for the move buttons */
+  first: boolean;
+  last: boolean;
+  canRemove: boolean;
   incomplete?: boolean;
-  onChange: (next: JsaStep) => void;
+  onChange: (next: T) => void;
   onRemove: () => void;
   onRemoveHazard: (hazardIndex: number) => void;
   onMove: (direction: -1 | 1) => void;
+  /** Plain steps only: split into sub-steps (its hazards move to 1.1) */
+  onSplit?: () => void;
+  /** Headings only: add another sub-step */
+  onAddSub?: () => void;
 }) {
-  const patch = (partial: Partial<JsaStep>) => onChange({ ...step, ...partial });
+  const patch = (partial: Partial<RowFields>) => onChange({ ...step, ...partial });
+  const heading = variant === "heading";
+  // A heading has no hazard rows, but its cells still need one grid row
+  const rowSpan = Math.max(step.hazards.length, 1);
 
-  const patchHazard = (hazardIndex: number, partial: Partial<JsaStep["hazards"][number]>) => {
+  const patchHazard = (hazardIndex: number, partial: Partial<Hazard>) => {
     const hazards = step.hazards.map((hz, i) =>
       i === hazardIndex ? { ...hz, ...partial } : hz,
     );
@@ -116,7 +146,7 @@ export function StepCard({
 
   return (
     <motion.li
-      id={`jsa-step-${index}`}
+      id={`jsa-step-${idBase}`}
       layout
       {...listItem}
       className={cx(
@@ -128,6 +158,8 @@ export function StepCard({
         incomplete ? "border-danger" : "border-line",
         "lg:rounded-none lg:border-x-0 lg:border-b-0 lg:bg-transparent lg:p-0 lg:border-line",
         index === 0 && "lg:border-t-0",
+        // Sub-steps sit indented under their heading on phones
+        variant === "sub" && "ml-4 sm:ml-6 lg:ml-0",
       )}
     >
       {/* Mobile/tablet header — step number, incomplete flag, move/delete.
@@ -137,11 +169,11 @@ export function StepCard({
           layout and the number/controls fit far more cheaply merged into the
           content column. */}
       <div className="flex items-center gap-2 lg:hidden">
-        <span className="flex size-7 items-center justify-center rounded-full bg-navy-soft text-sm font-semibold text-navy">
-          {index + 1}
+        <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-navy-soft px-1.5 text-sm font-semibold text-navy">
+          {label}
         </span>
         <h3 className="font-display font-semibold text-ink">
-          ขั้นตอนที่ {index + 1}
+          {variant === "sub" ? "ขั้นตอนย่อย" : "ขั้นตอนที่"} {label}
         </h3>
         {incomplete ? (
           <span
@@ -160,8 +192,8 @@ export function StepCard({
             variant="ghost"
             size="icon"
             onClick={() => onMove(-1)}
-            disabled={index === 0}
-            aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ขึ้น`}
+            disabled={first}
+            aria-label={`เลื่อนขั้นตอนที่ ${label} ขึ้น`}
             className="text-muted"
           >
             <ChevronUp className="size-5" aria-hidden="true" />
@@ -171,8 +203,8 @@ export function StepCard({
             variant="ghost"
             size="icon"
             onClick={() => onMove(1)}
-            disabled={index === total - 1}
-            aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ลง`}
+            disabled={last}
+            aria-label={`เลื่อนขั้นตอนที่ ${label} ลง`}
             className="text-muted"
           >
             <ChevronDown className="size-5" aria-hidden="true" />
@@ -182,8 +214,8 @@ export function StepCard({
             variant="ghost"
             size="icon"
             onClick={onRemove}
-            disabled={total === 1}
-            aria-label={`ลบขั้นตอนที่ ${index + 1}`}
+            disabled={!canRemove}
+            aria-label={`ลบขั้นตอนที่ ${label}`}
             className="text-muted hover:bg-danger-soft hover:text-danger-text"
           >
             <Trash2 className="size-5" aria-hidden="true" />
@@ -207,15 +239,15 @@ export function StepCard({
             procedure cell to start right at its own text, and keeping every
             per-step control in one place instead of split across columns. */}
         <div
-          style={{ gridRow: `span ${step.hazards.length}` }}
+          style={{ gridRow: `span ${rowSpan}` }}
           className={cx(
             "flex flex-col items-center gap-1 border-r border-line pt-2 pb-2",
             incomplete ? "bg-danger-soft" : "bg-raised",
           )}
         >
-          <h3 className="sr-only">ขั้นตอนที่ {index + 1}</h3>
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-navy-soft text-xs font-semibold text-navy">
-            {index + 1}
+          <h3 className="sr-only">{variant === "sub" ? "ขั้นตอนย่อย" : "ขั้นตอนที่"} {label}</h3>
+          <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-navy-soft px-1 text-xs font-semibold text-navy">
+            {label}
           </span>
           {incomplete ? (
             <span title="ยังไม่ได้กรอกขั้นตอนการทำงาน" className={FADE_IN_CLASS}>
@@ -236,8 +268,8 @@ export function StepCard({
               variant="ghost"
               size="icon-sm"
               onClick={() => onMove(-1)}
-              disabled={index === 0}
-              aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ขึ้น`}
+              disabled={first}
+              aria-label={`เลื่อนขั้นตอนที่ ${label} ขึ้น`}
               className="text-muted hover:bg-white hover:text-ink"
             >
               <ChevronUp className="size-4" aria-hidden="true" />
@@ -247,8 +279,8 @@ export function StepCard({
               variant="ghost"
               size="icon-sm"
               onClick={() => onMove(1)}
-              disabled={index === total - 1}
-              aria-label={`เลื่อนขั้นตอนที่ ${index + 1} ลง`}
+              disabled={last}
+              aria-label={`เลื่อนขั้นตอนที่ ${label} ลง`}
               className="text-muted hover:bg-white hover:text-ink"
             >
               <ChevronDown className="size-4" aria-hidden="true" />
@@ -258,8 +290,8 @@ export function StepCard({
               variant="ghost"
               size="icon-sm"
               onClick={onRemove}
-              disabled={total === 1}
-              aria-label={`ลบขั้นตอนที่ ${index + 1}`}
+              disabled={!canRemove}
+              aria-label={`ลบขั้นตอนที่ ${label}`}
               // hover:bg-white, not the usual hover:bg-danger-soft — this
               // gutter's own background is already bg-danger-soft whenever
               // the step is incomplete, so that hover was invisible exactly
@@ -272,21 +304,23 @@ export function StepCard({
         </div>
 
         <div
-          style={{ gridRow: `span ${step.hazards.length}` }}
+          style={{ gridRow: `span ${rowSpan}` }}
           className={cx(
             "flex flex-col border-r border-line p-2",
             incomplete ? "bg-danger-soft" : "bg-white",
+            // A sub-step's text sits indented under its heading's
+            variant === "sub" && "pl-6",
             CELL_FOCUS_WITHIN,
           )}
         >
           <label
-            htmlFor={`procedure-${index}`}
+            htmlFor={`procedure-${idBase}`}
             className="sr-only"
           >
             ขั้นตอนการทำงาน
           </label>
           <AutoGrowTextarea
-            id={`procedure-${index}`}
+            id={`procedure-${idBase}`}
             minRows={1}
             maxLength={PROCEDURE_MAX}
             value={step.procedure}
@@ -294,20 +328,42 @@ export function StepCard({
             className={CELL_INPUT}
           />
           <label
-            htmlFor={`details-${index}`}
+            htmlFor={`details-${idBase}`}
             className="mt-2 block text-sm font-medium text-muted"
           >
             รายละเอียด
           </label>
           <AutoGrowTextarea
-            id={`details-${index}`}
+            id={`details-${idBase}`}
             minRows={1}
             maxLength={DETAILS_MAX}
             value={step.details}
             onChange={(event) => patch({ details: event.target.value })}
             className={cx("mt-1", CELL_INPUT)}
           />
+          {onSplit ? (
+            <div className="mt-auto pt-1">
+              <Button type="button" variant="ghost" size="sm" onClick={onSplit} className="text-sm text-muted">
+                <ListTree className="size-4" aria-hidden="true" />
+                แบ่งเป็นขั้นตอนย่อย
+              </Button>
+            </div>
+          ) : null}
         </div>
+
+        {heading ? (
+          <div className="col-span-2 flex flex-col items-start justify-between gap-2 bg-raised p-3">
+            <p className="text-sm text-muted">
+              ขั้นตอนนี้เป็นหัวข้อ อันตรายและมาตรการอยู่ที่ขั้นตอนย่อยด้านล่าง
+            </p>
+            {onAddSub ? (
+              <Button type="button" variant="ghost" size="sm" onClick={onAddSub} className="text-sm">
+                <Plus className="size-4" aria-hidden="true" />
+                เพิ่มขั้นตอนย่อย
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {step.hazards.map((hazard, hazardIndex) => (
           <Fragment key={hazardKeys.current[hazardIndex]}>
@@ -325,7 +381,7 @@ export function StepCard({
                   nobody could tell which one removed what. */}
               <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
                 <label
-                  htmlFor={`hazard-${index}-${hazardIndex}`}
+                  htmlFor={`hazard-${idBase}-${hazardIndex}`}
                   className="text-xs font-semibold text-navy"
                 >
                   อันตรายที่ {hazardIndex + 1}
@@ -345,7 +401,7 @@ export function StepCard({
                 ) : null}
               </div>
               <AutoGrowTextarea
-                id={`hazard-${index}-${hazardIndex}`}
+                id={`hazard-${idBase}-${hazardIndex}`}
                 minRows={1}
                 maxLength={HAZARD_MAX}
                 value={hazard.hazard}
@@ -382,7 +438,7 @@ export function StepCard({
                 อันตรายที่ {hazardIndex + 1}
               </p>
               <ControlsEditor
-                id={`controls-${index}-${hazardIndex}`}
+                id={`controls-${idBase}-${hazardIndex}`}
                 controls={hazard.controls}
                 hazardIndex={hazardIndex}
                 multiple={step.hazards.length > 1}
@@ -397,13 +453,13 @@ export function StepCard({
       <div className="mt-2 grid gap-2.5 lg:hidden">
         <div>
           <label
-            htmlFor={`procedure-m-${index}`}
+            htmlFor={`procedure-m-${idBase}`}
             className="text-sm font-medium text-muted"
           >
             ขั้นตอนการทำงาน
           </label>
           <AutoGrowTextarea
-            id={`procedure-m-${index}`}
+            id={`procedure-m-${idBase}`}
             minRows={1}
             maxLength={PROCEDURE_MAX}
             value={step.procedure}
@@ -414,13 +470,13 @@ export function StepCard({
 
         <div>
           <label
-            htmlFor={`details-m-${index}`}
+            htmlFor={`details-m-${idBase}`}
             className="text-sm font-medium text-muted"
           >
             รายละเอียด
           </label>
           <AutoGrowTextarea
-            id={`details-m-${index}`}
+            id={`details-m-${idBase}`}
             minRows={1}
             maxLength={DETAILS_MAX}
             value={step.details}
@@ -428,6 +484,18 @@ export function StepCard({
             className="mt-1"
           />
         </div>
+
+        {heading ? (
+          <div className="rounded-field bg-raised p-2.5">
+            <p className="text-sm text-muted">ขั้นตอนนี้เป็นหัวข้อ อันตรายและมาตรการอยู่ที่ขั้นตอนย่อยด้านล่าง</p>
+            {onAddSub ? (
+              <Button type="button" variant="ghost" onClick={onAddSub} className="mt-1">
+                <Plus className="size-4" aria-hidden="true" />
+                เพิ่มขั้นตอนย่อย
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Animated on phones only: on desktop the hazards are rows of a
             grid whose step cells span them, and animating those rows makes
@@ -447,7 +515,7 @@ export function StepCard({
                     biggest single cost of a step card on a phone */}
                 <div className="flex min-h-6 items-center justify-between gap-2">
                   <label
-                    htmlFor={`hazard-m-${index}-${hazardIndex}`}
+                    htmlFor={`hazard-m-${idBase}-${hazardIndex}`}
                     className="text-sm font-medium text-muted"
                   >
                     อันตรายที่ {hazardIndex + 1}
@@ -470,7 +538,7 @@ export function StepCard({
                   ) : null}
                 </div>
                 <AutoGrowTextarea
-                  id={`hazard-m-${index}-${hazardIndex}`}
+                  id={`hazard-m-${idBase}-${hazardIndex}`}
                   minRows={1}
                   maxLength={HAZARD_MAX}
                   value={hazard.hazard}
@@ -485,7 +553,7 @@ export function StepCard({
                   มาตรการป้องกัน/ควบคุม · อันตรายที่ {hazardIndex + 1}
                 </p>
                 <ControlsEditor
-                  id={`controls-m-${index}-${hazardIndex}`}
+                  id={`controls-m-${idBase}-${hazardIndex}`}
                   controls={hazard.controls}
                   hazardIndex={hazardIndex}
                   multiple={step.hazards.length > 1}
@@ -497,16 +565,24 @@ export function StepCard({
         ))}
         </AnimatePresence>
 
-        <div>
-          {/* ghost, matching the desktop table's own เพิ่มอันตราย button —
-              previously variant="outline" here only, a heavier treatment on
-              mobile than desktop for the same purely-additive action with no
-              reason for the two to differ. */}
-          <Button type="button" variant="ghost" onClick={addHazard}>
-            <Plus className="size-4" aria-hidden="true" />
-            เพิ่มอันตราย
-          </Button>
-        </div>
+        {heading ? null : (
+          <div className="flex flex-wrap gap-1">
+            {/* ghost, matching the desktop table's own เพิ่มอันตราย button —
+                previously variant="outline" here only, a heavier treatment on
+                mobile than desktop for the same purely-additive action with no
+                reason for the two to differ. */}
+            <Button type="button" variant="ghost" onClick={addHazard}>
+              <Plus className="size-4" aria-hidden="true" />
+              เพิ่มอันตราย
+            </Button>
+            {onSplit ? (
+              <Button type="button" variant="ghost" onClick={onSplit} className="text-muted">
+                <ListTree className="size-4" aria-hidden="true" />
+                แบ่งเป็นขั้นตอนย่อย
+              </Button>
+            ) : null}
+          </div>
+        )}
       </div>
     </motion.li>
   );

@@ -94,7 +94,7 @@ function buildBlankDocument(
 ): JsaDocument {
   return {
     header: { work_activity: "", analysis_date: todayIso(), project: "", ...values },
-    steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] }],
+    steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }], sub_steps: [] }],
     assumptions: [],
   };
 }

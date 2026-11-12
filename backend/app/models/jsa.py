@@ -5,11 +5,15 @@ Maps onto the F-ปธบ.-1202 form (3 columns):
   Column 1 "ขั้นตอนการทำงาน"      <- procedure + details
   Column 2 "อันตรายที่อาจเกิดขึ้น"  <- hazards[].hazard
   Column 3 "มาตรการป้องกัน/ควบคุม" <- hazards[].controls
+
+A step may be split into sub-steps (1.1, 1.2 …) for detailed work. It then
+prints as a heading row with no hazards of its own — every hazard belongs to
+a sub-step — and the work procedure's 1.1 lines up with the JSA's 1.1.
 """
 
 from datetime import date
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Hazard(BaseModel):
@@ -22,11 +26,36 @@ class Hazard(BaseModel):
         return [c.strip() for c in v if c and c.strip()]
 
 
+class JsaSubStep(BaseModel):
+    # Always rewritten by JsaDocument.renumber_steps, so the AI may leave it out
+    no: int = Field(default=1, ge=1)
+    procedure: str = Field(min_length=1, max_length=2000)
+    details: str = Field(default="", max_length=4000)
+    hazards: list[Hazard] = Field(default_factory=list, max_length=30)
+
+
+# Same cap as models/procedure.py's ProcedureStep.sub_steps, so every JSA
+# sub-step always has a work-procedure line to pair with
+MAX_SUB_STEPS = 20
+
+
 class JsaStep(BaseModel):
     no: int = Field(ge=1)
     procedure: str = Field(min_length=1, max_length=2000)
     details: str = Field(default="", max_length=4000)
     hazards: list[Hazard] = Field(default_factory=list, max_length=30)
+    sub_steps: list[JsaSubStep] = Field(default_factory=list, max_length=MAX_SUB_STEPS)
+
+    @model_validator(mode="after")
+    def heading_has_no_hazards(self) -> "JsaStep":
+        """A step with sub-steps is a heading: its hazards live on the sub-steps.
+
+        Enforced here rather than trusted to the editor or the prompt, so a
+        model that answers with both can't print hazards twice.
+        """
+        if self.sub_steps:
+            self.hazards = []
+        return self
 
 
 class JsaHeader(BaseModel):
@@ -68,6 +97,8 @@ class JsaDocument(BaseModel):
         """
         for index, step in enumerate(v, start=1):
             step.no = index
+            for sub_index, sub in enumerate(step.sub_steps, start=1):
+                sub.no = sub_index
         return v
 
 
