@@ -496,20 +496,13 @@ export async function buildProcedurePdf(
   // number too ("5.1.1"), and that number shifted with whether a reference
   // section existed (4.x.x in one document, 5.x.x in another), so "check
   // step 1.2" said on screen pointed at nothing on paper.
-  // Reserve the heading plus the first step title, so the section never opens
-  // on the last line of a page
-  need(headingLineH + stepLineH + lineH);
-  drawHeading(P.sections.procedure);
-  y += blockGap;
 
   /** One run of steps and their sub-steps. Single Mode: "1." / "1.1".
    * Project Mode passes the phase's number as `prefix` ("2.") for "2.1" /
    * "2.1.1", indented one level further under the phase's own heading. */
-  const drawSteps = (steps: ProcedureStep[], prefix: string, extraIndent: number, photoPrefix: string) => {
-  const stepX = stepIndent + extraIndent;
-  const subX = subIndent + extraIndent;
-  steps.forEach((step, stepIndex) => {
-    if (stepIndex > 0) y += stepGap;
+  const measureStep = (step: ProcedureStep, prefix: string, extraIndent: number, photoPrefix: string) => {
+    const stepX = stepIndent + extraIndent;
+    const subX = subIndent + extraIndent;
     const titleLines = wrap(step.procedure, contentW - stepX, "bold", stepPt, prefix ? `${prefix}${step.no}` : `${step.no}.`);
 
     const subLines = step.sub_steps.map((sub) =>
@@ -556,6 +549,14 @@ export async function buildProcedurePdf(
       keepTogether =
         firstPhoto && withPhoto <= usableBodyH ? withPhoto : keepTogether + Math.min(subLines[0].length, 1) * lineH;
     }
+    return { stepX, subX, titleLines, subLines, subPhotos, photoMaxW, stepPhoto, stepPhotoMaxW, keepTogether };
+  };
+
+  const drawSteps = (steps: ProcedureStep[], prefix: string, extraIndent: number, photoPrefix: string) => {
+  steps.forEach((step, stepIndex) => {
+    if (stepIndex > 0) y += stepGap;
+    const { stepX, subX, titleLines, subLines, subPhotos, photoMaxW, stepPhoto, stepPhotoMaxW, keepTogether } =
+      measureStep(step, prefix, extraIndent, photoPrefix);
     need(keepTogether);
 
     drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
@@ -591,6 +592,17 @@ export async function buildProcedurePdf(
     });
   });
   };
+
+  // The section heading reserves what its first step will itself keep
+  // together — a title with its photo included. Reserving only a line or two
+  // left the heading alone at the foot of a page whenever step 1 had a photo:
+  // the step then moved on to the next page and the heading stayed behind.
+  // (Project Mode's phase headings reserve their own first step below.)
+  const firstStep = project ? undefined : procedure.steps[0];
+  const firstReserve = firstStep ? measureStep(firstStep, "", 0, "").keepTogether : stepLineH + lineH;
+  need(headingLineH + blockGap + Math.min(firstReserve, usableBodyH - headingLineH - blockGap));
+  drawHeading(P.sections.procedure);
+  y += blockGap;
 
   if (project) {
     project.phases.forEach((phase, phaseIndex) => {
