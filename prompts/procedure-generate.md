@@ -88,7 +88,8 @@
 
 เขียนเป็น**ภาษาไทย**ทั้งหมด ({{ rules.generation.language }})
 ใช้ศัพท์เทคนิคภาษาอังกฤษได้เมื่อเป็นคำที่หน้างานใช้จริงและไม่มีคำไทยที่สื่อความชัดกว่า
-เช่น LOTO, PPE, Hot Work, Gas Test, Isolation, Confined Space, Torque
+เช่น LOTO, PPE, Hot Work, Check Gas, Isolation, Confined Space, Torque
+การตรวจวัดก๊าซให้เรียกว่า Check Gas เสมอ ไม่ใช้คำว่า Gas Test หรือ Gas Testing
 ใช้ภาษาที่ผู้ปฏิบัติงานหน้างานอ่านแล้วทำตามได้ทันที ไม่ต้องเป็นภาษาราชการ
 
 # เรื่อง assumptions
