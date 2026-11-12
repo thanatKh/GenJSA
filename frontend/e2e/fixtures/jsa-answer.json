@@ -1,0 +1,106 @@
+{
+ "work_activity": "เปลี่ยนวาล์ว 6 นิ้วบนท่อน้ำมันดีเซลที่คลัง",
+ "assumptions": [],
+ "steps": [
+  {
+   "procedure": "ขอ Work Permit และกั้นเขต",
+   "details": "",
+   "hazards": [],
+   "sub_steps": [
+    {
+     "procedure": "ขอ Work Permit",
+     "details": "",
+     "hazards": [
+      {
+       "hazard": "ผู้ปฏิบัติงานไม่ทราบอันตราย",
+       "controls": [
+        "ชี้แจงก่อนเริ่มงาน"
+       ]
+      }
+     ]
+    },
+    {
+     "procedure": "กั้นเขตพื้นที่",
+     "details": "",
+     "hazards": [
+      {
+       "hazard": "บุคคลภายนอกเข้าพื้นที่",
+       "controls": [
+        "กั้นเขต",
+        "ติดป้ายเตือน"
+       ]
+      },
+      {
+       "hazard": "สะดุดล้ม",
+       "controls": [
+        "จัดเก็บสาย"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "procedure": "ตัดแยกระบบและระบายน้ำมัน",
+   "details": "",
+   "hazards": [
+    {
+     "hazard": "น้ำมันรั่ว",
+     "controls": [
+      "ปิดวาล์วและล็อก LOTO"
+     ]
+    },
+    {
+     "hazard": "ไอน้ำมันติดไฟ",
+     "controls": [
+      "Check Gas ก่อนเริ่มงาน"
+     ]
+    }
+   ],
+   "sub_steps": []
+  },
+  {
+   "procedure": "ถอดวาล์วเดิมและติดตั้งวาล์วใหม่",
+   "details": "",
+   "hazards": [],
+   "sub_steps": [
+    {
+     "procedure": "คลายน็อตหน้าแปลน",
+     "details": "",
+     "hazards": [
+      {
+       "hazard": "น้ำมันค้างพุ่ง",
+       "controls": [
+        "รองถาด"
+       ]
+      }
+     ]
+    },
+    {
+     "procedure": "ยกวาล์วเดิมออก",
+     "details": "ใช้รอกโซ่",
+     "hazards": [
+      {
+       "hazard": "ของหนักตกใส่",
+       "controls": [
+        "ห้ามยืนใต้ของที่ยก"
+       ]
+      }
+     ]
+    },
+    {
+     "procedure": "ติดตั้งวาล์วใหม่",
+     "details": "",
+     "hazards": [
+      {
+       "hazard": "มือถูกหนีบ",
+       "controls": [
+        "ใช้เครื่องมือจับ"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

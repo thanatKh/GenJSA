@@ -90,9 +90,34 @@ npm run dev       # vite dev server on :5173, proxies /api and /health to :8000
 npm run build      # tsc -b && vite build
 npm run lint       # oxlint
 npm run preview
+npm test           # Vitest unit tests (src/**/*.test.ts) — about a second
+npm run test:e2e   # Playwright browser tests (e2e/) — about half a minute
 ```
 
-There is no `npm test` — no frontend test suite exists.
+**Frontend tests come in two layers.**
+
+- **Unit (Vitest, `src/**/*.test.ts`, config `vitest.config.ts`)** — pure
+  logic, no browser: the outside-AI parsers and prompts (`personalAi.test.ts`),
+  the schema helpers behind printed numbering, counts, the WP lock and old-data
+  compatibility (`schema.test.ts`), validation ids (`jsaValidation.test.ts`)
+  and session drafts (`store.test.ts`, jsdom). Shared documents live in
+  `src/test/fixtures.ts`.
+- **Browser (Playwright, `e2e/`, config `playwright.config.ts`)** — the four
+  ways through the app (JSA / JSA + Procedure × built-in / outside AI), the
+  history row's WP button, the editor's sub-step actions, and the PDF/Word
+  builders, each at desktop and phone width (`desktop` / `phone` projects).
+  `e2e/helpers.ts`'s `mockApi` answers every `/api` call — the generate
+  endpoints with small documents, `/api/config/public` with a 503 so the app
+  runs on its fallbacks — so no backend, key or network is needed; the config
+  starts its own Vite on port 5174. `field()` finds a JSA editor field in
+  whichever layout is showing (`procedure-0` on desktop, `procedure-m-0` on a
+  phone). Answer files for the outside-AI screens are in `e2e/fixtures/`.
+  `@playwright/test` is pinned to the Playwright version whose Chromium is
+  installed (`npx playwright install chromium` once per machine). Traces are
+  off; debug a failure with `npm run test:e2e -- --trace on`.
+
+When a change alters a flow, update its spec rather than loosening it — each
+test there pins a behaviour that once broke or was asked for.
 
 ### Model selection / connectivity check
 

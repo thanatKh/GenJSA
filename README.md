@@ -97,8 +97,17 @@ outage affecting the entire ThaiLLM service.
 ## Tests
 
 ```bash
-cd backend && source .venv/bin/activate && pytest
+cd backend && source .venv/bin/activate && pytest   # backend: models, prompts, generation pipeline
+
+cd frontend
+npm test                    # unit tests (Vitest): parsers, numbering, validation — about a second
+npx playwright install chromium   # once per machine, for the browser tests
+npm run test:e2e            # browser tests (Playwright): the four flows, sub-step editing,
+                            # PDF/Word builds — desktop and phone width, about half a minute
 ```
+
+The browser tests answer every `/api` call themselves (`frontend/e2e/helpers.ts`),
+so they need no backend, API key or network — only the Vite server they start.
 
 ## What to change → where
 
