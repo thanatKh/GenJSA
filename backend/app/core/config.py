@@ -192,6 +192,14 @@ class PdfSignature(BaseModel):
     label_pt: float = 14
 
 
+class PdfPhoto(BaseModel):
+    """Work procedure photos (config/pdf.yaml's photo:)."""
+
+    # Tallest a photo may print; landscape shots are usually width-limited first
+    max_height_mm: float = 60
+    caption_pt: float = 13
+
+
 class PdfConfig(BaseModel):
     page: PdfPage = Field(default_factory=PdfPage)
     font: PdfFont = Field(default_factory=PdfFont)
@@ -199,6 +207,7 @@ class PdfConfig(BaseModel):
     logo: PdfLogo = Field(default_factory=PdfLogo)
     footer: PdfFooter = Field(default_factory=PdfFooter)
     signature: PdfSignature = Field(default_factory=PdfSignature)
+    photo: PdfPhoto = Field(default_factory=PdfPhoto)
 
 
 # --------------------------------------------------------------------------- #

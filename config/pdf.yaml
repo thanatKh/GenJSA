@@ -60,3 +60,10 @@ signature:
   show: true
   gap_above_mm: 8   # space between the table bottom and the line
   label_pt: 14
+
+# Photos in the work procedure (PDF and Word)
+photo:
+  # Tallest a photo may print. 60mm keeps a step's photo beside its text; at
+  # 80mm two landscape photos filled a whole A4 page
+  max_height_mm: 60
+  caption_pt: 13    # "ภาพประกอบขั้นตอน 1.1" under each photo

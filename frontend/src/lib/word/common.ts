@@ -68,6 +68,28 @@ export function markerIndent(marker: string, left = 0, bold = false) {
   return { left: left + hanging, hanging };
 }
 
+/** A long title as two lines of about equal length, broken at a Thai word
+ * boundary (Intl.Segmenter, as the PDF uses) — so a cover title doesn't wrap
+ * with one short word left alone on its second line ("…ขนาด 20 นิ้ว ที่" /
+ * "คลังน้ำมัน"). Short titles, and browsers without Intl.Segmenter, come
+ * back as one line for Word to wrap itself. */
+export function balancedLines(text: string, minChars = 40): string[] {
+  const clean = text.trim();
+  if (clean.length <= minChars || typeof Intl === "undefined" || !("Segmenter" in Intl)) return [clean];
+  const middle = clean.length / 2;
+  const nearest = (cuts: number[]) =>
+    cuts.filter((i) => i > 0 && i < clean.length).reduce((best, i) => (best < 0 || Math.abs(i - middle) < Math.abs(best - middle) ? i : best), -1);
+  // A space near the middle first: Thai titles put spaces between phrases,
+  // while a word boundary can fall inside a compound ("น้ำดับ|เพลิง")
+  const spaces = [...clean.matchAll(/ /g)].map((m) => m.index!);
+  let best = nearest(spaces);
+  if (best < 0 || Math.abs(best - middle) > clean.length / 4) {
+    best = nearest([...new Intl.Segmenter("th", { granularity: "word" }).segment(clean)].map((w) => w.index));
+  }
+  if (best <= 0) return [clean];
+  return [clean.slice(0, best).trim(), clean.slice(best).trim()].filter(Boolean);
+}
+
 export function createWordKit(L: PdfLayout) {
   const contentW = A4.width - mm(L.page.margin_left_mm) - mm(L.page.margin_right_mm);
   const pad = mm(L.table.cell_padding_mm);

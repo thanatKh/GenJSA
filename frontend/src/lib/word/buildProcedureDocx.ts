@@ -20,6 +20,7 @@ import {
   LevelFormat,
   Paragraph,
   Table,
+  TableCell,
   TableRow,
   WidthType,
 } from "docx";
@@ -42,7 +43,7 @@ import {
 import type { ProjectProcedureLayout } from "../pdf/buildProcedurePdf";
 import type { ProcedureDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
-import { createWordKit, halfPt, markerIndent, mm, toBlob } from "./common";
+import { balancedLines, createWordKit, halfPt, markerIndent, mm, toBlob } from "./common";
 
 type BuildProcedureOptions = {
   /** Project Mode — the same layout buildProcedurePdf takes: phases as
@@ -75,12 +76,13 @@ export async function buildProcedureDocx(
   // Same scale as the PDF
   const headingPt = L.font.body_pt + 2;
   const stepPt = L.font.body_pt + 1;
-  const captionPt = Math.max(L.font.body_pt - 2, 8);
+  const photoConfig = L.photo ?? FALLBACK_LAYOUT.photo!;
+  const captionPt = photoConfig.caption_pt;
   const stepIndent = mm(6);
   const subIndent = mm(14);
   const sectionGap = mm(4);
   const stepGap = mm(4);
-  const photoMaxHmm = 80;
+  const photoMaxHmm = photoConfig.max_height_mm;
 
   // ------------------------------------------------------------------ cover --
   const authorName = h.analyst?.trim() || h.supervisor.trim();
@@ -137,7 +139,9 @@ export async function buildProcedureDocx(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: mm(12) },
-      children: [...K.run(h.work_activity, { bold: true, size: halfPt(L.font.title_en_pt + 6) })],
+      // Two even lines when long, so Word doesn't strand one short word below
+      children: balancedLines(h.work_activity).flatMap((line, i) =>
+        K.run(line, { bold: true, size: halfPt(L.font.title_en_pt + 6), break: i > 0 ? 1 : 0 })),
     }),
     ...infoLine(D.labels.company ?? "บริษัท", h.company?.trim() ?? ""),
     ...infoLine(P.labels.author, authorName),
@@ -313,7 +317,7 @@ export async function buildProcedureDocx(
         basedOn: "Normal",
         next: STYLE.subStep,
         quickFormat: true,
-        run: { size: halfPt(captionPt), color: "6E6E6E" },
+        run: { size: halfPt(captionPt), color: "505050" },
         paragraph: { alignment: AlignmentType.CENTER },
       },
     ],
@@ -334,19 +338,46 @@ export async function buildProcedureDocx(
     heading(title);
     body.push(new Paragraph({ style: STYLE.body, children: text(value) }));
   };
-  const listSection = (title: string, items: string[]) => {
+  /** As the PDF's listSection: tools and PPE go into two columns when every
+   * item is short. Word lays text out itself, so "short" is a character
+   * count rather than a measured width; the columns are a borderless
+   * two-cell table, so items stay ordinary editable bullets. */
+  const SHORT_ITEM_CHARS = 30;
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+  const listSection = (title: string, items: string[], twoColumns = false) => {
     const clean = items.map((i) => i.trim()).filter(Boolean);
     if (!clean.length) return;
     heading(title);
-    clean.forEach((item) => body.push(new Paragraph({ style: STYLE.bullet, children: text(item) })));
+    const bullets = (list: string[]) => list.map((item) => new Paragraph({ style: STYLE.bullet, children: text(item) }));
+    if (twoColumns && clean.length >= 3 && clean.every((item) => item.length <= SHORT_ITEM_CHARS)) {
+      const rows = Math.ceil(clean.length / 2);
+      const half = Math.floor(K.contentW / 2);
+      const column = (list: string[]) =>
+        new TableCell({
+          width: { size: half, type: WidthType.DXA },
+          borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+          // A cell must hold at least one paragraph
+          children: list.length ? bullets(list) : [new Paragraph({ style: STYLE.body })],
+        });
+      body.push(
+        new Table({
+          width: { size: K.contentW, type: WidthType.DXA },
+          columnWidths: [half, K.contentW - half],
+          borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
+          rows: [new TableRow({ children: [column(clean.slice(0, rows)), column(clean.slice(rows))] })],
+        }),
+      );
+      return;
+    }
+    body.push(...bullets(clean));
   };
 
   textSection(P.sections.purpose, procedure.purpose);
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
-  listSection(P.sections.tools, procedure.tools);
+  listSection(P.sections.tools, procedure.tools, true);
   // `?? []`: a procedure from before PPE existed that skipped the schema
-  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? []);
+  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? [], true);
   if (project) {
     textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);
     listSection(

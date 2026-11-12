@@ -360,6 +360,7 @@ first, then hand-merge.
 | Form number / effective-date text | `config/document.yaml` |
 | Header field labels / column names | `config/document.yaml` |
 | PDF font size / margins / header color | `config/pdf.yaml` |
+| Work procedure photo size / caption size (PDF and Word) | `config/pdf.yaml` → `photo` |
 | "บริษัท" header-row wording | `config/document.yaml` → `labels.company` |
 | Analyst line at the end of the PDF | `config/pdf.yaml` → `signature` (wording: `config/document.yaml` → `labels.analyst`) |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |

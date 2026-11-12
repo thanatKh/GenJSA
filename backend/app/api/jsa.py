@@ -98,6 +98,7 @@ async def public_config() -> dict:
             "logo": pdf.logo.model_dump(),
             "footer": pdf.footer.model_dump(),
             "signature": pdf.signature.model_dump(),
+            "photo": pdf.photo.model_dump(),
         },
     }
 

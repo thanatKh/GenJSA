@@ -95,7 +95,8 @@ export async function buildProcedurePdf(
   const stepPt = L.font.body_pt + 1;
   const stepLineH = stepPt * L.font.line_height;
   // Photo captions — small and gray, a label rather than content
-  const captionPt = Math.max(L.font.body_pt - 2, 8);
+  const photoConfig = L.photo ?? FALLBACK_LAYOUT.photo!;
+  const captionPt = photoConfig.caption_pt;
   const captionLineH = captionPt * L.font.line_height;
   // Sub-steps hang under their step, which hangs under the section — indents
   // are in mm so they hold at any body_pt
@@ -109,7 +110,7 @@ export async function buildProcedurePdf(
   const photoGap = mmToPt(2);
   // ~a third of an A4 page. Big enough to read a gauge or a valve tag, small
   // enough that a step with a photo still shares its page with other steps.
-  const photoMaxH = mmToPt(80);
+  const photoMaxH = mmToPt(photoConfig.max_height_mm);
 
   let y = mT;
 
@@ -253,7 +254,8 @@ export async function buildProcedurePdf(
     y += h;
 
     E.setFont("normal", captionPt);
-    doc.setTextColor(110, 110, 110);
+    // Dark enough to read on paper; the lighter grey all but vanished in print
+    doc.setTextColor(80, 80, 80);
     doc.text(label, centerX, y + captionPt * 1.05, { align: "center" });
     doc.setTextColor(0, 0, 0);
     y += captionLineH;
@@ -459,10 +461,33 @@ export async function buildProcedurePdf(
     y += sectionGap;
   };
 
-  /** A section whose body is a bulleted list (เอกสารอ้างอิง, เครื่องมือ). */
-  const listSection = (title: string, items: string[]) => {
+  /** A section whose body is a bulleted list (เอกสารอ้างอิง, เครื่องมือ, PPE).
+   *
+   * `twoColumns`: tools and PPE are short items ("หมวกนิรภัย") that took a
+   * full-width line each, so a list of eight filled half a page. When every
+   * item fits one line at half width they print in two columns, read down
+   * the left then the right; otherwise one column as before. */
+  const listSection = (title: string, items: string[], twoColumns = false) => {
     const clean = items.map((i) => i.trim()).filter(Boolean);
     if (!clean.length) return;
+
+    const colGap = mmToPt(6);
+    const colW = (contentW - stepIndent - colGap) / 2;
+    const halves = clean.map((item) => wrap(item, colW, "normal", L.font.body_pt, "•"));
+    if (twoColumns && clean.length >= 3 && halves.every((lines) => lines.length === 1)) {
+      const rows = Math.ceil(clean.length / 2);
+      need(headingLineH + lineH);
+      drawHeading(title);
+      for (let row = 0; row < rows; row++) {
+        if (y + lineH > bodyBottom) newPage();
+        drawLines(halves[row], mL + stepIndent, y, colW);
+        const right = halves[row + rows];
+        if (right) drawLines(right, mL + stepIndent + colW + colGap, y, colW);
+        y += lineH;
+      }
+      y += sectionGap;
+      return;
+    }
 
     const wrapped: Line[][] = clean.map((item) =>
       wrap(item, contentW - stepIndent, "normal", L.font.body_pt, "•"),
@@ -478,9 +503,9 @@ export async function buildProcedurePdf(
   textSection(P.sections.purpose, procedure.purpose);
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
-  listSection(P.sections.tools, procedure.tools);
+  listSection(P.sections.tools, procedure.tools, true);
   // `?? []`: a procedure from before PPE existed that skipped the schema
-  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? []);
+  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? [], true);
   const project = options.project;
   if (project) {
     textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);

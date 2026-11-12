@@ -42,6 +42,8 @@ export type PdfLayout = {
     show_company: boolean;
   };
   signature: { show: boolean; gap_above_mm: number; label_pt: number };
+  /** Optional: an older backend doesn't send it */
+  photo?: { max_height_mm: number; caption_pt: number };
 };
 
 export type DocumentMeta = {
@@ -128,6 +130,7 @@ export const FALLBACK_LAYOUT: PdfLayout = {
     show_company: true,
   },
   signature: { show: true, gap_above_mm: 8, label_pt: 14 },
+  photo: { max_height_mm: 60, caption_pt: 13 },
 };
 
 export const FALLBACK_DOCUMENT: DocumentMeta = {
