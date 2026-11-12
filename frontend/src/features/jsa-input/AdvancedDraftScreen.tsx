@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Copy, FileUp } from "lucide-react";
 import { Button, FieldError, Label } from "../../components/ui";
-import { buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, type DetailLevel } from "../../lib/personalAi";
+import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
 
 const textAreaClass = "w-full min-w-0 resize-y rounded-lg border border-line bg-surface p-3 text-base focus-visible:outline-2 focus-visible:outline-navy";
@@ -37,9 +37,45 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [copyStatus, setCopyStatus] = useState("");
   const promptField = useRef<HTMLTextAreaElement>(null);
   const answerField = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [fileStatus, setFileStatus] = useState("");
+  const [dragging, setDragging] = useState(false);
   const buildPrompt = kind === "wp" ? buildPersonalProcedurePrompt : buildPersonalPrompt;
   const prompt = buildPrompt(work, level, instructions);
   const sourceChanged = source !== description;
+  const fileName = answerFileNames[kind];
+
+  const check = (text: string) => {
+    if (sourceChanged) return;
+    try {
+      setDraft(parse(text));
+      setError("");
+    } catch (caught) {
+      setDraft(null);
+      setError(caught instanceof Error ? caught.message : "อ่านคำตอบไม่ได้");
+      answerField.current?.focus();
+    }
+  };
+
+  /* A file lands in the same answer box as pasted text, so there is one
+   * answer to check, keep in the session draft, and edit if it's slightly off. */
+  const readFile = async (file: File) => {
+    setFileStatus("");
+    if (file.size > MAX_ANSWER_FILE_BYTES) {
+      setError("ไฟล์ใหญ่เกิน 2 MB กรุณาตรวจว่าเลือกไฟล์คำตอบที่ถูกต้อง");
+      return;
+    }
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setError("เปิดไฟล์ไม่ได้ กรุณาดาวน์โหลดไฟล์จาก AI ใหม่แล้วลองอีกครั้ง");
+      return;
+    }
+    setAnswer(text);
+    setFileStatus(`นำเข้าไฟล์ ${file.name} แล้ว`);
+    check(text);
+  };
 
   const copy = async () => {
     try {
@@ -83,6 +119,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
         <p className="text-muted">แก้รายละเอียดที่จะส่งได้ที่นี่ และตัดข้อมูลภายในที่ไม่ควรแชร์ก่อนนำคำสั่งไปวางใน ChatGPT, Claude หรือ Gemini</p>
+        <p className="text-sm text-muted">คำสั่งจะขอให้ AI ส่งคำตอบเป็นไฟล์ <span className="font-medium text-ink">{fileName}</span> ให้ดาวน์โหลด หาก AI สร้างไฟล์ไม่ได้ จะตอบเป็นข้อความแทน ใช้ได้ทั้งสองแบบ</p>
         {kind === "wp" ? <p className="text-sm text-muted">คงเลขขั้นตอนหลักให้ตรงกับ JSA เพื่อจับคู่คำตอบตอนนำเข้า</p> : null}
         <div>
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
@@ -112,23 +149,44 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <span role="status" className="text-muted">{copyStatus}</span>
         </div>
       </section>
-      <form aria-labelledby="personal-import-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5" onSubmit={(event) => {
-        event.preventDefault();
-        if (sourceChanged) return;
-        try {
-          setDraft(parse(answer));
-          setError("");
-        } catch (caught) {
-          setError(caught instanceof Error ? caught.message : "อ่านคำตอบไม่ได้");
-          answerField.current?.focus();
-        }
-      }}>
+      <form aria-labelledby="personal-import-heading"
+        className={`grid gap-3 rounded-card border p-4 sm:p-5 ${dragging ? "border-navy bg-navy-soft" : "border-line"}`}
+        onSubmit={(event) => { event.preventDefault(); check(answer); }}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          const file = event.dataTransfer.files[0];
+          if (!file) return;
+          event.preventDefault();
+          setDragging(false);
+          void readFile(file);
+        }}>
         <h2 id="personal-import-heading" className="text-lg font-semibold text-ink">2. นำคำตอบกลับมา</h2>
+        <p className="text-muted">เลือกไฟล์ที่ดาวน์โหลดจาก AI หรือลากไฟล์มาวางในกรอบนี้ หรือวางข้อความ JSON ในช่องด้านล่าง</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" disabled={sourceChanged} onClick={() => fileInput.current?.click()}>
+            <FileUp className="size-4" aria-hidden="true" /> เลือกไฟล์คำตอบ
+          </Button>
+          <span role="status" className="text-muted [overflow-wrap:anywhere]">{fileStatus}</span>
+          <input ref={fileInput} type="file" accept=".json,.txt,application/json,text/plain" className="hidden"
+            aria-label="เลือกไฟล์คำตอบจาก AI"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void readFile(file);
+            }} />
+        </div>
         <div>
-          <Label htmlFor="personal-answer">คำตอบ JSON จาก AI</Label>
+          <Label htmlFor="personal-answer">หรือวางคำตอบ JSON จาก AI</Label>
           <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
             aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
-            onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); }} />
+            onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); setFileStatus(""); }} />
           <FieldError id="personal-answer-error">{error}</FieldError>
         </div>
         <Button type="submit" variant="outline" disabled={sourceChanged} className="justify-self-start">ตรวจรูปแบบคำตอบ</Button>

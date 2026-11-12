@@ -6,6 +6,18 @@ import { formatThaiDate } from "./thaidate";
 export const detailLevels = ["กระชับ", "มาตรฐาน", "ละเอียด"] as const;
 export type DetailLevel = (typeof detailLevels)[number];
 
+/** The file each prompt asks the outside AI to hand back. Long answers are
+ * hard to copy out of a chat, so the answer comes as a download; pasting the
+ * text still works when the AI can't make files. */
+export const answerFileNames = { jsa: "genjsa-jsa.json", wp: "genjsa-wp.json" } as const;
+/** Upper bound for an answer file — well past any real answer, and the text
+ * itself is still held to parseDraft's length cap. */
+export const MAX_ANSWER_FILE_BYTES = 2 * 1024 * 1024;
+
+function answerAsFile(fileName: string) {
+  return `ส่งคำตอบเป็นไฟล์ให้ดาวน์โหลด ชื่อ ${fileName} เนื้อหาในไฟล์เป็น JSON ล้วน (UTF-8) ไม่มีข้อความอื่นปน และไม่ต้องแสดง JSON ซ้ำในแชต หากสร้างไฟล์ไม่ได้ ให้ตอบ JSON ทั้งชุดในกล่องโค้ดเดียวแทน`;
+}
+
 export function buildPersonalPrompt(description: string, level: DetailLevel, instructions: string) {
   return [
     "ร่างการวิเคราะห์งานเพื่อความปลอดภัย (JSA) ภาษาไทยสำหรับให้ผู้รับผิดชอบตรวจทาน",
@@ -15,6 +27,7 @@ export function buildPersonalPrompt(description: string, level: DetailLevel, ins
     "จำนวนอันตรายให้เป็นไปตามงานจริง ตัวอย่างด้านล่างแสดงสองข้อเพื่อสาธิตโครงสร้าง หากพบเพียงข้อเดียวให้ใส่ข้อเดียวโดยไม่เพิ่มข้อที่ไม่เกี่ยวข้อง",
     "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือสภาพหน้างาน สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
     "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่เลขข้อหรือข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
+    answerAsFile(answerFileNames.jsa),
     '{"work_activity":"ชื่องาน","steps":[{"procedure":"ชื่อขั้นตอน","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายข้อแรก","controls":["มาตรการของข้อแรก"]},{"hazard":"อันตรายอีกข้อ","controls":["มาตรการของอีกข้อ"]}]}],"assumptions":["ข้อมูลที่ต้องยืนยัน"]}',
     `รายละเอียดงาน:\n${description.trim()}`,
     instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
@@ -36,7 +49,7 @@ const draftSchema = z.object({
 
 function parseDraft<T>(answer: string, schema: z.ZodType<T>): T {
   if (answer.length > 250_000) throw new Error("คำตอบยาวเกินไป กรุณาขอให้ AI ตอบกระชับขึ้น");
-  const trimmed = answer.trim();
+  const trimmed = answer.replace(/^\uFEFF/, "").trim();
   const fenced = [...trimmed.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)```/gi)];
   let data: unknown;
   try {
@@ -75,6 +88,7 @@ export function buildPersonalProcedurePrompt(work: string, level: DetailLevel, i
     "ขยายแต่ละขั้นตอนหลักเป็นขั้นตอนย่อยที่ปฏิบัติได้ ส่ง steps หนึ่งรายการต่อเลขขั้นตอนหลัก no ให้ครบทุกข้อ ห้ามเพิ่ม ลบ หรือรวมเลขขั้นตอนหลัก",
     "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือเอกสารอ้างอิง สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
     "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการด้านล่าง",
+    answerAsFile(answerFileNames.wp),
     '{"purpose":"วัตถุประสงค์","scope":"ขอบเขต","tools":["เครื่องมือ"],"steps":[{"no":1,"sub_steps":[{"action":"งานย่อย"}]}],"assumptions":[]}',
     `ขั้นตอนหลักจาก JSA:\n${work.trim()}`,
     instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
