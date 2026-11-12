@@ -127,7 +127,14 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         {kind === "wp" ? <p className="text-sm text-muted">คงเลขขั้นตอนหลักให้ตรงกับ JSA เพื่อจับคู่คำตอบตอนนำเข้า</p> : null}
         <div>
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
-          <textarea id="personal-work" rows={3} maxLength={kind === "jsa" ? 5000 : undefined} className={textAreaClass} value={work} onChange={(e) => { setWork(e.target.value); setCopyStatus(""); }} />
+          <textarea id="personal-work" rows={3} maxLength={kind === "jsa" ? 5000 : undefined} className={textAreaClass} value={work}
+            aria-describedby={kind === "jsa" ? "personal-work-hint" : undefined}
+            onChange={(e) => { setWork(e.target.value); setCopyStatus(""); }} />
+          {kind === "jsa" ? (
+            <p id="personal-work-hint" className="mt-1.5 text-sm text-muted">
+              ถ้ามีขั้นตอนงานอยู่แล้ว เช่น จากขั้นตอนงานเดิม ให้พิมพ์เป็นรายการ 1. 2. 3. ไว้ที่นี่ AI จะยึดลำดับนั้น ได้ผลตรงกว่าการกำหนดแค่จำนวนขั้นตอน
+            </p>
+          ) : null}
         </div>
         <fieldset>
           <legend className="font-medium text-ink">ระดับรายละเอียด</legend>
