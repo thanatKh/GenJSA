@@ -68,7 +68,11 @@ export function AppBar({
       <img src={logoUrl} alt="OR" width={2453} height={999} className="h-7 w-auto shrink-0 sm:h-9" />
       <span className="hidden h-8 w-px shrink-0 bg-line sm:block" aria-hidden="true" />
       <span className="min-w-0 text-left">
-        <span className="block font-title text-[1.375rem] font-semibold leading-tight tracking-tight text-navy sm:text-lg">
+        {/* Phones: sit the name on the same line as the "OR" letters, which
+            fill only the lower ~60% of the logo (the drop rises above them) —
+            centred on the whole image, the name floated ~5px high. From sm the
+            name has a second line and centring on the logo is right. */}
+        <span className="block translate-y-[5px] font-title text-[1.375rem] font-semibold leading-tight tracking-tight text-navy sm:translate-y-0 sm:text-lg">
           {appName}
         </span>
         {/* Hidden below sm: at phone width it only ever showed as a
