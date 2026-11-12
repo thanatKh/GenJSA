@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, Copy, FileUp } from "lucide-react";
+import { ArrowLeft, ChevronDown, Copy, ExternalLink, FileUp } from "lucide-react";
 import { Button, FieldError, Input, Label } from "../../components/ui";
 import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, MAX_SUB_STEPS, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
@@ -9,6 +9,23 @@ const textAreaClass = "w-full min-w-0 resize-y rounded-lg border border-line bg-
 
 type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: { hazards?: unknown[]; action?: string }[] };
 type PreviewDraft = { steps: PreviewStep[]; work_activity?: string; header?: { work_activity: string } };
+
+/** The outside AIs the prompt is written for, opened in a new tab so this
+ * page — and everything typed on it — stays where it is. On a phone with the
+ * app installed, these addresses usually open the app. */
+const OUTSIDE_AIS = [
+  { name: "ChatGPT", href: "https://chatgpt.com/" },
+  { name: "Claude", href: "https://claude.ai/new" },
+  { name: "Gemini", href: "https://gemini.google.com/app" },
+] as const;
+
+function AiLink({ name, href, className = "" }: { name: string; href: string; className?: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`font-medium text-navy underline underline-offset-2 hover:text-ink ${className}`}>
+      {name}
+    </a>
+  );
+}
 
 /** One preview line's note: a JSA step's hazards (or its sub-steps and
  * theirs), a WP step's sub-steps */
@@ -146,7 +163,10 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       ) : null}
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
-        <p className="text-muted">แก้รายละเอียดที่จะส่งได้ที่นี่ และตัดข้อมูลภายในที่ไม่ควรแชร์ก่อนนำคำสั่งไปวางใน ChatGPT, Claude หรือ Gemini</p>
+        <p className="text-muted">
+          แก้รายละเอียดที่จะส่งได้ที่นี่ และตัดข้อมูลภายในที่ไม่ควรแชร์ก่อนนำคำสั่งไปวางใน{" "}
+          <AiLink {...OUTSIDE_AIS[0]} />, <AiLink {...OUTSIDE_AIS[1]} /> หรือ <AiLink {...OUTSIDE_AIS[2]} />
+        </p>
         <p className="text-sm text-muted">คำสั่งจะขอให้ AI ส่งคำตอบเป็นไฟล์ <span className="font-medium text-ink">{fileName}</span> ให้ดาวน์โหลด หาก AI สร้างไฟล์ไม่ได้ จะตอบเป็นข้อความแทน ใช้ได้ทั้งสองแบบ</p>
         {kind === "wp" ? <p className="text-sm text-muted">คงเลขขั้นตอนหลักให้ตรงกับ JSA เพื่อจับคู่คำตอบตอนนำเข้า</p> : null}
         <div>
@@ -204,6 +224,11 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <Button type="button" onClick={() => void copy()}><Copy className="size-4" aria-hidden="true" /> คัดลอกคำสั่ง</Button>
           <span role="status" className="text-muted">{copyStatus}</span>
         </div>
+        {/* Copy, then straight on to an AI — no scrolling back up for the links */}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+          <span className="flex items-center gap-1"><ExternalLink className="size-4" aria-hidden="true" /> แล้วเปิด</span>
+          {OUTSIDE_AIS.map((ai) => <AiLink key={ai.name} {...ai} className="inline-flex min-h-11 items-center" />)}
+        </p>
         {/* The prompt itself, closed by default: the copy button is what most
             people need, but the text stays one tap away so anyone can check
             what is about to leave for an outside AI. */}
