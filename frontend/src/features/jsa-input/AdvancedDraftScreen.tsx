@@ -111,7 +111,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <ArrowLeft className="size-4" aria-hidden="true" />
           {backLabel}
         </Button>
-        <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ขั้นสูง</h1>
+        <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ใช้ AI ภายนอก</h1>
         <p className="mt-1.5 text-muted">
           {kind === "wp" ? "ร่างขั้นตอนปฏิบัติงาน (WP) จาก JSA ที่ตรวจทานแล้ว" : "ร่าง JSA ด้วย AI ที่คุณเลือก แล้วนำคำตอบกลับมาตรวจทาน"}
         </p>

@@ -34,7 +34,7 @@ import { fadeSwap } from "../../lib/motion";
 import type { PhotoMap, StepPhoto } from "../../lib/pdf/layout";
 import { SubStepItem } from "../procedure/ProcedureEditorStep";
 import { PhotoHint, StepPhotoSlot } from "../procedure/SubStepPhoto";
-import type { ProcedureDocument, ProjectDocument, ProjectPhase, SubStep } from "../../lib/schema";
+import { linkedSubSteps, type JsaDocument, type ProcedureDocument, type ProjectDocument, type ProjectPhase, type SubStep } from "../../lib/schema";
 import { UnassignedPhotos } from "../procedure/UnassignedPhotos";
 import { restorePhotoAt } from "../../lib/restorePhotoAt";
 import { StepNavigator } from "../../components/StepNavigator";
@@ -347,8 +347,8 @@ export function ProjectProcedureStep({
                       </Button>
                       {phase.reviewed ? (
                         <Button type="button" variant="ghost" disabled={busy}
-                          aria-label={`ขั้นสูงสำหรับ WP ของ ${phase.work}`}
-                          onClick={() => onAdvanced(phase.id)}>ขั้นสูง</Button>
+                          aria-label={`ใช้ AI ภายนอกร่าง WP ของ ${phase.work}`}
+                          onClick={() => onAdvanced(phase.id)}>ใช้ AI ภายนอก</Button>
                       ) : null}
                     </motion.div>
                   ) : (
@@ -357,6 +357,7 @@ export function ProjectProcedureStep({
                         phaseId={phase.id}
                         prefix={n}
                         procedure={phase.procedure}
+                        jsa={phase.jsa}
                         keysFor={keysFor}
                         newKey={newKey}
                         rowKeys={rowKeys}
@@ -446,6 +447,7 @@ function Section({
   phaseId,
   prefix,
   procedure,
+  jsa,
   keysFor,
   newKey,
   rowKeys,
@@ -459,6 +461,8 @@ function Section({
   phaseId: string;
   prefix: number;
   procedure: ProcedureDocument;
+  /** This phase's JSA: its sub-steps title and lock the section's */
+  jsa: JsaDocument | null;
   keysFor: (slot: string, count: number) => string[];
   newKey: () => string;
   rowKeys: { current: Record<string, string[]> };
@@ -472,6 +476,7 @@ function Section({
           const stepNo = `${prefix}.${stepIndex + 1}`;
           const slot = `${phaseId}:${stepIndex}`;
           const keys = keysFor(slot, step.sub_steps.length);
+          const linked = linkedSubSteps(jsa, stepIndex, step.sub_steps.length);
           return (
             <li key={stepIndex} id={`project-procedure-${phaseId}-${stepIndex}`} className="border-t border-line pt-3">
               <h3 className="font-display text-base font-semibold text-ink">
@@ -492,6 +497,9 @@ function Section({
                       <SubStepItem
                         key={keys[subIndex]}
                         label={label}
+                        jsaTitle={linked.titles[subIndex]}
+                        jsaLabel={`${stepIndex + 1}.${subIndex + 1}`}
+                        locked={linked.locked}
                         sub={sub}
                         photo={photos[key]}
                         onTextChange={(action) =>
@@ -508,19 +516,21 @@ function Section({
                   })}
                 </AnimatePresence>
               </ul>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mt-2 text-sm"
-                onClick={() => {
-                  rowKeys.current[slot] = [...keys, newKey()];
-                  setSubSteps(phaseId, stepIndex, [...step.sub_steps, { no: 0, action: "" }]);
-                }}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                เพิ่มขั้นตอนย่อย
-              </Button>
+              {linked.locked ? null : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-sm"
+                  onClick={() => {
+                    rowKeys.current[slot] = [...keys, newKey()];
+                    setSubSteps(phaseId, stepIndex, [...step.sub_steps, { no: 0, action: "" }]);
+                  }}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  เพิ่มขั้นตอนย่อย
+                </Button>
+              )}
             </li>
           );
         })}

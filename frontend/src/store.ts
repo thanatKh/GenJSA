@@ -30,6 +30,7 @@ const PROCEDURE_KEY = "genjsa.draft.procedure";
 const HISTORY_ID_KEY = "genjsa.draft.historyId";
 const PROJECT_KEY = "genjsa.draft.project";
 const MODE_KEY = "genjsa.draft.mode";
+const JSA_SOURCE_KEY = "genjsa.draft.jsaSource";
 
 function read<T>(key: string): T | null {
   try {
@@ -148,8 +149,19 @@ export const modeDraft = {
 
 /** Clears the in-progress draft only. History (history.ts) is untouched by
  * design, and so are saved projects (projects.ts). */
+/** Where the current JSA came from: "outside" when it was imported from an
+ * outside AI (ใช้ AI ภายนอก), else "builtin". Only steers which way the WP
+ * choice dialog suggests — the user still picks. */
+export type JsaSource = "builtin" | "outside";
+export const jsaSourceDraft = {
+  load: (): JsaSource => (read<string>(JSA_SOURCE_KEY) === "outside" ? "outside" : "builtin"),
+  save: (value: JsaSource) => write(JSA_SOURCE_KEY, value),
+  clear: () => remove(JSA_SOURCE_KEY),
+};
+
 export function clearAllDrafts(): void {
   inputDraft.clear();
+  jsaSourceDraft.clear();
   try {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);

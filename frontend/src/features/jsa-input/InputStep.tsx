@@ -475,7 +475,7 @@ export function InputStep({
                 if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) onOpenAdvanced();
               }}
             >
-              ขั้นสูง
+              ใช้ AI ภายนอก
             </button>
           </div>
         </form>
@@ -486,7 +486,7 @@ export function InputStep({
       <ConfirmDialog
         open={confirmReset}
         title="ล้างฟอร์ม?"
-        description="ข้อมูลที่กรอกและร่างในขั้นสูงจะถูกล้าง ชื่อและบริษัทที่จำไว้จะถูกเติมกลับมา"
+        description="ข้อมูลที่กรอกและร่างใน “ใช้ AI ภายนอก” จะถูกล้าง ชื่อและบริษัทที่จำไว้จะถูกเติมกลับมา"
         confirmLabel="ล้างฟอร์ม"
         onConfirm={applyReset}
         onCancel={() => setConfirmReset(false)}

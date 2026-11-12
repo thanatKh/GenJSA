@@ -376,6 +376,68 @@ export function ConfirmDialog({
   );
 }
 
+/* ----------------------------------------------------------- ChoiceDialog */
+
+export type Choice = {
+  label: string;
+  description: string;
+  icon?: ReactNode;
+  /** The suggested option — drawn as the primary button, and listed first */
+  recommended?: boolean;
+  onSelect: () => void;
+};
+
+/** "Which way?" — two or more options, each a full-width button with a line
+ * explaining it, plus ยกเลิก. The recommended one leads and is filled. */
+export function ChoiceDialog({
+  open,
+  title,
+  description,
+  choices,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  choices: Choice[];
+  onCancel: () => void;
+}) {
+  const ordered = [...choices].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended));
+  return (
+    <AlertDialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
+      <AlertDialogContent className="w-[min(92vw,28rem)] max-w-none data-[size=default]:max-w-none data-[size=default]:sm:max-w-none">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-lg text-navy">{title}</AlertDialogTitle>
+          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
+        </AlertDialogHeader>
+        <div className="grid gap-2">
+          {ordered.map((choice) => (
+            <Button
+              key={choice.label}
+              type="button"
+              variant={choice.recommended ? "default" : "outline"}
+              onClick={choice.onSelect}
+              className="h-auto min-h-14 w-full flex-col items-start gap-0.5 whitespace-normal px-4 py-2.5 text-left"
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                {choice.icon}
+                {choice.label}
+                {choice.recommended ? <span className="text-xs font-normal opacity-80">(แนะนำ)</span> : null}
+              </span>
+              <span className={cn("text-sm font-normal", choice.recommended ? "opacity-90" : "text-muted")}>
+                {choice.description}
+              </span>
+            </Button>
+          ))}
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel}>ยกเลิก</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 /* ------------------------------------------------------------- InfoDialog */
 
 export function InfoDialog({

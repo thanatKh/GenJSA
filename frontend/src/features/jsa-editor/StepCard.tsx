@@ -71,6 +71,7 @@ export function StepCard<T extends RowFields>({
   onMove,
   onSplit,
   onAddSub,
+  numberControls = true,
 }: {
   step: T;
   /** The row's position in the whole table — only the very first row (0)
@@ -97,6 +98,9 @@ export function StepCard<T extends RowFields>({
   onSplit?: () => void;
   /** Headings only: add another sub-step */
   onAddSub?: () => void;
+  /** Number controls 1.1 / 1.2 to pair with their hazard. Off in a JSA with
+   * sub-steps, where "1.1" names a step — bulleted there, as in the PDF */
+  numberControls?: boolean;
 }) {
   const patch = (partial: Partial<RowFields>) => onChange({ ...step, ...partial });
   const heading = variant === "heading";
@@ -438,7 +442,7 @@ export function StepCard<T extends RowFields>({
                 id={`controls-${idBase}-${hazardIndex}`}
                 controls={hazard.controls}
                 hazardIndex={hazardIndex}
-                multiple={step.hazards.length > 1}
+                multiple={step.hazards.length > 1 && numberControls}
                 onChange={(controls) => patchHazard(hazardIndex, { controls })}
               />
             </div>
@@ -552,7 +556,7 @@ export function StepCard<T extends RowFields>({
                   id={`controls-m-${idBase}-${hazardIndex}`}
                   controls={hazard.controls}
                   hazardIndex={hazardIndex}
-                  multiple={step.hazards.length > 1}
+                  multiple={step.hazards.length > 1 && numberControls}
                   onChange={(controls) => patchHazard(hazardIndex, { controls })}
                 />
               </div>

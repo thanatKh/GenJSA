@@ -247,12 +247,23 @@ and `openHistoryEntry` set `mode` to match, which is how the JSA PDF page's
 procedure card and the history list's procedure button move a JSA-only job
 onto it. Every track, Project Mode's included, ends on "เอกสาร PDF".
 
+**A first WP draft asks which AI writes it.** The JSA editor's ถัดไป, the JSA
+PDF page's card and the history row's WP button all open one `ChoiceDialog`
+(`wpChoiceFor`/`chooseWpAi` in `App.tsx`): **AI ในระบบ** drafts it now
+(`generateProcedureFrom`), **ใช้ AI ภายนอก** opens stage 6 (the outside-AI
+screen for the WP). The option matching how the JSA was made is suggested —
+`store.ts`'s `jsaSourceDraft`, "outside" when the JSA was imported from an
+outside AI. Before this, ถัดไป always used the built-in AI, even for a JSA
+drafted elsewhere. The procedure editor's ร่างใหม่ still redrafts with the
+built-in AI. "ใช้ AI ภายนอก" is the user-facing name of the screens the code
+calls "advanced" (`AdvancedDraftScreen`, stages 5–8).
+
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
-- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Each row has two buttons side by side: JSA (loads it into `EditorStep`) and the work procedure — which opens the procedure editor, or, when the job has none yet, drafts one straight from the list.
+- `features/jsa-input/HistoryList.tsx` — previously analysed jobs, listed under the form on step 0. Searchable, per-entry delete with undo, clear-all. Each row has two buttons side by side: JSA (loads it into `EditorStep`) and the work procedure — which opens the procedure editor, or, when the job has none yet, asks which AI drafts one (see above).
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
 - `features/pdf-view/PdfStep.tsx` — the JSA track's last page: the JSA PDF, plus the card that adds a work procedure (moving the job onto the JSA + Procedure track).
 - `features/pdf-view/usePdfDelivery.ts` — **shared by both PDF pages**: builds the blob and routes save/share by browser capability. Its header documents the popup-blocking, iOS-viewer and user-activation constraints behind every rule in it; each one is a fix for something that actually broke. Read it before changing how those buttons behave, and don't reimplement it inline for a third document.
-- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA) and a warning appears if the JSA's steps changed after the procedure was generated (going back to the JSA and editing it; ถัดไป then reopens the existing procedure rather than redrafting). Photos come in three ways (`SubStepPhoto.tsx`'s header) — the button, drag-and-drop, Ctrl+V — and `PhotoHint` says so, since the last two have nothing on screen of their own.
+- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA). Under a JSA step that has sub-steps, each WP line shows its JSA sub-step ("JSA 1.1 · …") and the list is locked to them — no add/delete there, they're changed on the JSA (`linkedSubSteps` in `lib/schema.ts`; Project Mode's section does the same). A warning appears if the JSA's steps changed after the procedure was generated (going back to the JSA and editing it; ถัดไป then reopens the existing procedure rather than redrafting). Photos come in three ways (`SubStepPhoto.tsx`'s header) — the button, drag-and-drop, Ctrl+V — and `PhotoHint` says so, since the last two have nothing on screen of their own.
 - `features/procedure/ProcedurePdfStep.tsx` — JSA + Procedure's last page, "เอกสาร PDF": both files (procedure, then JSA), numbered like Project Mode's page, same delivery hook.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.

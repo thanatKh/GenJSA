@@ -17,7 +17,7 @@ import type { PublicConfig } from "../../lib/api";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import { procedureDocxFileName, procedurePdfFileName, projectJsaDocxFileName, projectJsaPdfFileName } from "../../lib/pdf/fileName";
 import { FALLBACK_DOCUMENT, FALLBACK_PROCEDURE, type PhotoMap } from "../../lib/pdf/layout";
-import type { JsaDocument, ProcedureDocument, ProjectDocument } from "../../lib/schema";
+import { subStepCount, type JsaDocument, type ProcedureDocument, type ProjectDocument } from "../../lib/schema";
 import { formatThaiDate, todayIso } from "../../lib/thaidate";
 import { PdfDeliveryCard } from "../pdf-view/PdfDeliveryCard";
 import { usePdfDelivery } from "../pdf-view/usePdfDelivery";
@@ -132,6 +132,7 @@ export function ProjectFilesStep({
     0,
   );
   const jsaSteps = files.jsas.reduce((total, jsa) => total + jsa.steps.length, 0);
+  const jsaSubSteps = files.jsas.reduce((total, jsa) => total + subStepCount(jsa), 0);
 
   return (
     <section>
@@ -170,7 +171,7 @@ export function ProjectFilesStep({
         title={files.cover.name}
         summary={[
           { label: labels.supervisor, value: project.supervisor },
-          { label: "เนื้อหา", value: `หน้าปกและสารบัญ · JSA ${files.jsas.length} ฉบับ · ${jsaSteps} ขั้นตอน` },
+          { label: "เนื้อหา", value: `หน้าปกและสารบัญ · JSA ${files.jsas.length} ฉบับ · ${jsaSteps} ขั้นตอน${jsaSubSteps ? ` · ${jsaSubSteps} ขั้นตอนย่อย` : ""}` },
         ]}
         delivery={jsaPdf}
         word={jsaWord}

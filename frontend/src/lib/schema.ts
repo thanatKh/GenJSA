@@ -208,6 +208,21 @@ export function jsaRows(doc: JsaDocument): JsaRow[] {
   });
 }
 
+/** How a WP step's sub-steps tie to its JSA step's: the JSA sub-step titles
+ * to show over each WP line, and whether the list is locked to them (the JSA
+ * step has sub-steps and the WP has exactly one line per sub-step, as drafting
+ * makes it). A WP that no longer matches — the JSA changed afterwards — is
+ * left unlocked; the stale-procedure warning covers that case. */
+export function linkedSubSteps(jsa: JsaDocument | null | undefined, stepIndex: number, wpCount: number) {
+  const subs = jsa?.steps[stepIndex]?.sub_steps ?? [];
+  return { titles: subs.map((sub) => sub.procedure), locked: subs.length > 0 && subs.length === wpCount };
+}
+
+/** Sub-steps across a JSA */
+export function subStepCount(doc: JsaDocument): number {
+  return doc.steps.reduce((total, step) => total + step.sub_steps.length, 0);
+}
+
 /** Total hazards in a JSA, counting sub-steps' */
 export function hazardCount(doc: JsaDocument): number {
   return jsaRows(doc).reduce((total, row) => total + row.hazards.length, 0);

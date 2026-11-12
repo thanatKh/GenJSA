@@ -91,10 +91,8 @@ export function EditorStep({
   saveState,
   project,
   onDuplicate,
-  onAdvanced,
 }: {
   onDuplicate?: () => Promise<void>;
-  onAdvanced?: () => void;
   doc: JsaDocument;
   onChange: (next: JsaDocument) => void;
   /** Browser-only, beside the document rather than in it — see useCompanyLogo.ts */
@@ -344,10 +342,7 @@ export function EditorStep({
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           {onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}
-          {onAdvanced ? (
-            <Button type="button" variant="ghost" size="sm" title="ร่าง WP จาก JSA นี้"
-              onClick={() => continueReviewed(onAdvanced)}>ขั้นสูง</Button>
-          ) : null}
+
         </div>
       </div>
       {project ? (
@@ -516,7 +511,8 @@ export function EditorStep({
           exactly where they're supposed to line up straight. */}
       <ul className="mt-2 grid list-none gap-2 p-0 lg:mt-0 lg:gap-0 lg:overflow-hidden lg:border lg:border-line">
         <AnimatePresence initial={false}>
-          {doc.steps.flatMap((step, index) => {
+          {doc.steps.flatMap((step, index, all) => {
+            const numberControls = !all.some((s) => s.sub_steps.length);
             const heading = step.sub_steps.length > 0;
             const keys = subKeysFor(index);
             return [
@@ -535,6 +531,7 @@ export function EditorStep({
                 onMove={(direction) => moveStep(index, direction)}
                 onSplit={heading ? undefined : () => splitStep(index)}
                 onAddSub={heading && step.sub_steps.length < MAX_SUB_STEPS ? () => addSubStep(index) : undefined}
+                numberControls={numberControls}
               />,
               ...step.sub_steps.map((sub, subIndex) => (
                 <StepCard
@@ -553,6 +550,7 @@ export function EditorStep({
                   onRemove={() => removeSub(index, subIndex)}
                   onRemoveHazard={(hazardIndex) => removeSubHazard(index, subIndex, hazardIndex)}
                   onMove={(direction) => moveSub(index, subIndex, direction)}
+                  numberControls={numberControls}
                 />
               )),
             ];

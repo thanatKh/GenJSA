@@ -33,7 +33,7 @@ import {
 import { type SaveState, SaveStatus } from "../../components/SaveStatus";
 import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
-import type { ProcedureDocument, SubStep } from "../../lib/schema";
+import { linkedSubSteps, type JsaDocument, type ProcedureDocument, type SubStep } from "../../lib/schema";
 import { PhotoButton, PhotoHint, PhotoPreview, StepPhotoSlot } from "./SubStepPhoto";
 import { StepNavigator } from "../../components/StepNavigator";
 import { UnassignedPhotos } from "./UnassignedPhotos";
@@ -57,7 +57,10 @@ export function ProcedureEditorStep({
   onRegenerate,
   stale,
   error,
+  jsa,
 }: {
+  /** The JSA this WP was drafted from: its sub-steps title and lock the WP's */
+  jsa?: JsaDocument | null;
   procedure: ProcedureDocument;
   onChange: (next: ProcedureDocument) => void;
   /** Sub-step photos keyed by photoKey(step.no, sub.no). Kept outside
@@ -361,6 +364,8 @@ export function ProcedureEditorStep({
                   <SubStepItem
                     key={keysFor(stepIndex, step.sub_steps.length)[subIndex]}
                     label={`${stepIndex + 1}.${subIndex + 1}`}
+                    jsaTitle={linkedSubSteps(jsa, stepIndex, step.sub_steps.length).titles[subIndex]}
+                    locked={linkedSubSteps(jsa, stepIndex, step.sub_steps.length).locked}
                     sub={sub}
                     photo={photos[photoKey(step.no, sub.no)]}
                     onTextChange={(action) => patchSub(stepIndex, subIndex, { action })}
@@ -371,18 +376,20 @@ export function ProcedureEditorStep({
                 </AnimatePresence>
               </ul>
 
-              <div className="mt-3 flex justify-start border-t border-line pt-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => addSub(stepIndex)}
-                  className="text-sm"
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  เพิ่มขั้นตอนย่อย
-                </Button>
-              </div>
+              {linkedSubSteps(jsa, stepIndex, step.sub_steps.length).locked ? null : (
+                <div className="mt-3 flex justify-start border-t border-line pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => addSub(stepIndex)}
+                    className="text-sm"
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    เพิ่มขั้นตอนย่อย
+                  </Button>
+                </div>
+              )}
 
             </Card>
           </li>
@@ -487,6 +494,9 @@ export function ProcedureEditorStep({
  * usePhotoInput state — busy spinner, error, drag highlight. */
 export function SubStepItem({
   label,
+  jsaTitle,
+  jsaLabel = label,
+  locked = false,
   sub,
   photo,
   onTextChange,
@@ -495,6 +505,13 @@ export function SubStepItem({
 }: {
   /** "1.2" as shown on screen */
   label: string;
+  /** The JSA sub-step this line writes up, when the JSA step has sub-steps */
+  jsaTitle?: string;
+  /** That sub-step's number in its JSA — differs from `label` in Project
+   * Mode, where the WP is numbered by phase (2.1.1) and each JSA from 1 (1.1) */
+  jsaLabel?: string;
+  /** Tied one-to-one to the JSA's sub-steps: added or removed on the JSA, not here */
+  locked?: boolean;
   sub: SubStep;
   photo: StepPhoto | undefined;
   onTextChange: (action: string) => void;
@@ -515,6 +532,11 @@ export function SubStepItem({
     >
       <span className="pt-2.5 text-sm text-muted tabular-nums">{label}</span>
       <div className="min-w-0">
+        {jsaTitle ? (
+          <p className="mb-1 text-sm font-medium text-ink [overflow-wrap:anywhere]">
+            <span className="text-muted">JSA {jsaLabel} ·</span> {jsaTitle || "(ไม่มีชื่อ)"}
+          </p>
+        ) : null}
         <AutoGrowTextarea
           minRows={1}
           value={sub.action}
@@ -549,16 +571,21 @@ export function SubStepItem({
             onClick={input.openPicker}
           />
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          aria-label={`ลบขั้นตอนย่อยที่ ${label}`}
-          onClick={onRemove}
-          className="mt-1 text-muted hover:bg-danger-soft hover:text-danger-text"
-        >
-          <Trash2 className="size-4" aria-hidden="true" />
-        </Button>
+        {locked ? (
+          // Same width kept so locked and unlocked rows line up
+          <span className="mt-1 size-10 shrink-0" aria-hidden="true" />
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            aria-label={`ลบขั้นตอนย่อยที่ ${label}`}
+            onClick={onRemove}
+            className="mt-1 text-muted hover:bg-danger-soft hover:text-danger-text"
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+          </Button>
+        )}
       </div>
       {input.fileInput}
     </motion.li>

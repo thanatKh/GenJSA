@@ -160,8 +160,8 @@ export function ProjectHub({
                   ) : isWaiting ? null : (
                     <motion.div key="draft" {...fadeSwap} className="flex flex-wrap justify-end gap-2">
                       <Button type="button" variant="ghost" disabled={busy}
-                        aria-label={`ขั้นสูงสำหรับ JSA ของ ${phase.work}`}
-                        onClick={() => onAdvanced(phase.id)}>ขั้นสูง</Button>
+                        aria-label={`ใช้ AI ภายนอกร่าง JSA ของ ${phase.work}`}
+                        onClick={() => onAdvanced(phase.id)}>ใช้ AI ภายนอก</Button>
                       <Button
                         type="button"
                         variant="ghost"

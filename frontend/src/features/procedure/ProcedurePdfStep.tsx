@@ -25,7 +25,7 @@ import { formatThaiDate } from "../../lib/thaidate";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import type { PhotoMap } from "../../lib/pdf/layout";
 import type { JsaDocument, ProcedureDocument } from "../../lib/schema";
-import { hazardCount as countHazards } from "../../lib/schema";
+import { hazardCount as countHazards, subStepCount as countSubSteps } from "../../lib/schema";
 import type { PublicConfig } from "../../lib/api";
 import { PdfDeliveryCard } from "../pdf-view/PdfDeliveryCard";
 import { usePdfDelivery } from "../pdf-view/usePdfDelivery";
@@ -167,7 +167,7 @@ export function ProcedurePdfStep({
         summary={[
           { label: labels.supervisor, value: doc.header.supervisor },
           { label: labels.analysis_date, value: formatThaiDate(doc.header.analysis_date) },
-          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน · ${hazardCount} รายการอันตราย` },
+          { label: "เนื้อหา", value: `${doc.steps.length} ขั้นตอน${countSubSteps(doc) ? ` · ${countSubSteps(doc)} ขั้นตอนย่อย` : ""} · ${hazardCount} รายการอันตราย` },
         ]}
         delivery={jsaDelivery}
         word={jsaWord}

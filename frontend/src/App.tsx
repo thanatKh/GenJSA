@@ -6,7 +6,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { AppBar } from "./components/AppBar";
 import type { SaveState } from "./components/SaveStatus";
 import { Stepper } from "./components/Stepper";
-import { Toaster } from "./components/ui";
+import { ExternalLink, Sparkles } from "lucide-react";
+import { ChoiceDialog, Toaster } from "./components/ui";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
 import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
@@ -58,6 +59,7 @@ import {
   clearAllDrafts,
   currentHistoryId,
   docDraft,
+  jsaSourceDraft,
   modeDraft,
   procedureDraft,
   projectDraft,
@@ -409,7 +411,8 @@ export default function App() {
     procedureDraft.clear();
   };
 
-  const openNewDraft = (draft: JsaDocument, logo: CompanyLogo | null) => {
+  const openNewDraft = (draft: JsaDocument, logo: CompanyLogo | null, source: "builtin" | "outside" = "builtin") => {
+    jsaSourceDraft.save(source);
     setDoc(draft);
     docDraft.save(draft);
     discardProcedure();
@@ -469,6 +472,9 @@ export default function App() {
   /** Restore both documents from a history entry. `to` is where to land —
    * the two callers differ only in that. */
   const openHistoryEntry = (entry: HistoryEntry, to: Stage) => {
+    // History doesn't record which AI drafted a JSA; the WP dialog then just
+    // suggests the built-in one
+    jsaSourceDraft.save("builtin");
     setDoc(entry.doc);
     // Required, not belt-and-braces: without it the blank-screen guard above
     // can bounce straight back to step 1
@@ -536,7 +542,24 @@ export default function App() {
       goto(3);
       return;
     }
-    void generateProcedureFrom(doc);
+    // The procedure editor's "ร่างใหม่" has already been confirmed and redrafts
+    // with the built-in AI; a first draft asks which AI to use
+    if (force) void generateProcedureFrom(doc);
+    else setWpChoiceFor(doc);
+  };
+
+  /* A first WP draft asks which AI writes it (ChoiceDialog below): the
+   * built-in one drafts it now, an outside one opens ใช้ AI ภายนอก for the
+   * WP. Asked rather than assumed — before this, ถัดไป always used the
+   * built-in AI, even for a JSA the user had drafted with an outside one. */
+  const [wpChoiceFor, setWpChoiceFor] = useState<JsaDocument | null>(null);
+  const chooseWpAi = (ai: "builtin" | "outside") => {
+    const source = wpChoiceFor;
+    setWpChoiceFor(null);
+    if (!source) return;
+    setMode("procedure");
+    if (ai === "builtin") void generateProcedureFrom(source);
+    else goto(6);
   };
 
   /** "สร้างขั้นตอนปฏิบัติงาน" on a history row with no procedure yet: open
@@ -549,7 +572,7 @@ export default function App() {
   const handleCreateHistoryProcedure = (entry: HistoryEntry) => {
     openHistoryEntry(entry, 1);
     setMode("procedure");
-    void generateProcedureFrom(entry.doc);
+    setWpChoiceFor(entry.doc);
   };
 
   const generateProcedureFrom = async (source: JsaDocument) => {
@@ -691,7 +714,8 @@ export default function App() {
     if (stage === 6 && !hasView) setStage(doc ? 1 : 0);
     if ((stage === 7 || stage === 8) && !hasView) setStage(projectState?.id ? (stage === 7 ? 10 : 12) : 0);
   }, [stage, mode, hasView, doc, projectState?.id]);
-  const inProject = stage >= 10;
+  // 7/8: a project phase's ใช้ AI ภายนอก screens, shown under the project's stepper
+  const inProject = stage >= 10 || stage === 7 || stage === 8;
   // Single Mode's track (see the note on Stage)
   const withProcedure = mode === "procedure";
 
@@ -722,20 +746,20 @@ export default function App() {
             an exiting screen would move the old content mid-fade. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={view?.kind === "advancedInput" ? "input" : view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
-            {stage !== 0 && (stage < 5 || stage >= 10) && view ? (
+            {stage !== 0 && stage !== 5 && view ? (
               <div className={stage === 1 || stage === 11 ? undefined : "mx-auto max-w-[45rem]"}>
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
                     {inProject ? (
                       <Stepper
                         steps={PROJECT_STEPS}
-                        current={stage === 12 ? 2 : stage === 13 ? 3 : 1}
+                        current={stage === 12 || stage === 8 ? 2 : stage === 13 ? 3 : 1}
                         onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
                       />
                     ) : withProcedure ? (
                       <Stepper
                         steps={PROCEDURE_STEPS}
-                        current={stage === 1 ? 1 : stage === 3 ? 2 : 3}
+                        current={stage === 1 ? 1 : stage === 3 || stage === 6 ? 2 : 3}
                         onNavigate={(index) => goto(PROCEDURE_TRACK[index])}
                       />
                     ) : (
@@ -797,7 +821,7 @@ export default function App() {
                           withProcedure={mode === "procedure"}
                           jsaRules={config?.jsaRules}
                           onGenerate={handleGenerate}
-                          onImportDraft={openNewDraft}
+                          onImportDraft={(draft, logo) => openNewDraft(draft, logo, "outside")}
                           advanced={view.kind === "advancedInput"}
                           onOpenAdvanced={() => goto(5)}
                           onCloseAdvanced={() => goto(0)}
@@ -879,7 +903,6 @@ export default function App() {
             {view?.kind === "editing" ? (
               <EditorStep
                 doc={view.doc}
-                onAdvanced={procedure ? undefined : () => goto(6)}
                 onDuplicate={async () => {
                   if (!historyId) return;
                   const { duplicateJob } = await import("./lib/backup");
@@ -939,6 +962,7 @@ export default function App() {
               <div className="mx-auto max-w-[45rem]">
                 <ProcedureEditorStep
                   procedure={view.procedure}
+                  jsa={doc}
                   onChange={updateProcedure}
                   photos={photos}
                   onPhotoChange={updatePhoto}
@@ -1056,6 +1080,28 @@ export default function App() {
           {view?.kind === "input" && !busy ? <BackupControls /> : null}
         </div>
       </footer>
+      <ChoiceDialog
+        open={!!wpChoiceFor}
+        title="ร่างขั้นตอนปฏิบัติงาน (WP) ด้วย"
+        description="WP จะร่างจาก JSA ที่ตรวจทานแล้ว เลขขั้นตอนตรงกับ JSA ทุกข้อ"
+        choices={[
+          {
+            label: "AI ในระบบ",
+            description: "ร่างให้ทันทีในหน้านี้",
+            icon: <Sparkles className="size-4" aria-hidden="true" />,
+            recommended: jsaSourceDraft.load() !== "outside",
+            onSelect: () => chooseWpAi("builtin"),
+          },
+          {
+            label: "ใช้ AI ภายนอก",
+            description: "คัดลอกคำสั่งไปใช้กับ ChatGPT, Claude หรือ Gemini แล้วนำคำตอบกลับมา",
+            icon: <ExternalLink className="size-4" aria-hidden="true" />,
+            recommended: jsaSourceDraft.load() === "outside",
+            onSelect: () => chooseWpAi("outside"),
+          },
+        ]}
+        onCancel={() => setWpChoiceFor(null)}
+      />
       <Toaster />
     </div>
   );
