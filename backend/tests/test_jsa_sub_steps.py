@@ -110,3 +110,14 @@ def test_a_full_step_of_sub_steps_fits_the_wp_too():
     wp = _assemble(doc, payload, get_settings())
     assert MAX_SUB_STEPS == 30
     assert len(wp.steps[0].sub_steps) == MAX_SUB_STEPS
+
+
+def test_ppe_is_its_own_list_and_old_procedures_load(jsa):
+    from app.models.procedure import ProcedureDocument
+
+    payload = AiProcedurePayload(tools=["ประแจ"], ppe=[" หมวกนิรภัย ", "", "แว่นตานิรภัย"], steps=[])
+    doc = _assemble(jsa, payload, get_settings())
+    assert doc.ppe == ["หมวกนิรภัย", "แว่นตานิรภัย"]
+    assert doc.tools == ["ประแจ"]
+    old = ProcedureDocument.model_validate({"header": jsa.header.model_dump(mode="json"), "steps": [{"no": 1, "procedure": "ก"}]})
+    assert old.ppe == []

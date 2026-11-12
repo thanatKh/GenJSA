@@ -82,6 +82,8 @@ export type ProcedureMeta = {
     scope: string;
     references: string;
     tools: string;
+    /** Optional: an older backend doesn't send it */
+    ppe?: string;
     procedure: string;
     /** Project Mode only — optional so an older backend that doesn't send them still works */
     notes?: string;
@@ -163,6 +165,7 @@ export const FALLBACK_PROCEDURE: ProcedureMeta = {
     scope: "ขอบเขต",
     references: "เอกสารอ้างอิง",
     tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม",
+    ppe: "อุปกรณ์ป้องกันส่วนบุคคล (PPE)",
     procedure: "ขั้นตอนการปฏิบัติงาน",
     notes: "ข้อจำกัด / หมายเหตุ",
     tags: "รายการวาล์ว / Blind / Tag",

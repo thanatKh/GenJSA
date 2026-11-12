@@ -46,6 +46,9 @@ class ProcedureDocument(BaseModel):
     # prompts/jsa-generate.md's own "ห้ามอ้างว่าเป็นไปตามกฎหมายหรือมาตรฐานใด" rule exists to stop
     references: list[str] = Field(default_factory=list, max_length=10)
     tools: list[str] = Field(default_factory=list, max_length=40)
+    # อุปกรณ์ป้องกันส่วนบุคคล — its own list, not mixed into tools. Defaulted so
+    # procedures saved before it existed still load.
+    ppe: list[str] = Field(default_factory=list, max_length=30)
     steps: list[ProcedureStep] = Field(min_length=1, max_length=200)
     # Shown in the editor, never printed — same treatment as the JSA's
     assumptions: list[str] = Field(default_factory=list, max_length=30)
@@ -133,10 +136,11 @@ class AiProcedurePayload(BaseModel):
     purpose: str = Field(default="", max_length=1000)
     scope: str = Field(default="", max_length=1000)
     tools: list[str] = Field(default_factory=list, max_length=40)
+    ppe: list[str] = Field(default_factory=list, max_length=30)
     steps: list[AiProcedureStep] = Field(default_factory=list, max_length=200)
     assumptions: list[str] = Field(default_factory=list, max_length=30)
 
-    @field_validator("tools", "assumptions")
+    @field_validator("tools", "ppe", "assumptions")
     @classmethod
     def drop_blanks(cls, v: list[str]) -> list[str]:
         return [item.strip() for item in v if item and item.strip()]

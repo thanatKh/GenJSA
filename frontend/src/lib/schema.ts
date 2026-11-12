@@ -76,6 +76,8 @@ export const procedureDocumentSchema = z.object({
   scope: z.string().default(""),
   references: z.array(z.string()).default([]),
   tools: z.array(z.string()).default([]),
+  // อุปกรณ์ป้องกันส่วนบุคคล — defaulted so procedures saved before it parse
+  ppe: z.array(z.string()).default([]),
   steps: z.array(procedureStepSchema),
   assumptions: z.array(z.string()).default([]),
 });
@@ -135,6 +137,7 @@ export const projectProcedureIntroSchema = z.object({
   purpose: z.string().default(""),
   scope: z.string().default(""),
   tools: z.array(z.string()).default([]),
+  ppe: z.array(z.string()).default([]),
 });
 
 export const projectDocumentSchema = z.object({

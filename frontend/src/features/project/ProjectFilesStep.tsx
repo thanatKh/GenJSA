@@ -61,6 +61,7 @@ export function ProjectFilesStep({
       // Built from the project, never by the system — the JSAs this procedure comes from
       references: project.phases.map((phase, i) => `JSA ${i + 1}: ${phase.work}`),
       tools: intro?.tools ?? [],
+      ppe: intro?.ppe ?? [],
       steps: [],
       assumptions: [],
     };

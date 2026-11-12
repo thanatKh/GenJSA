@@ -87,6 +87,8 @@ test.describe("JSA + Procedure", () => {
     await expect(page.getByRole("button", { name: /ลบขั้นตอนย่อยที่ 1\./ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /ลบขั้นตอนย่อยที่ 2\./ })).toHaveCount(2);
     await expect(page.getByRole("button", { name: "เพิ่มขั้นตอนย่อย" })).toHaveCount(1);
+    // PPE arrives as its own list, separate from tools
+    await expect(page.locator("#ppe")).toHaveValue("หมวกนิรภัย\nแว่นตานิรภัย\nถุงมือกันสารเคมี");
 
     await forward(page, "สร้าง PDF").click();
     await expect(page.getByText("3 ขั้นตอน · 7 ขั้นตอนย่อย")).toBeVisible();

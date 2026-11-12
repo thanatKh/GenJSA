@@ -167,18 +167,21 @@ export function sectionStale(phase: ProjectPhase): boolean {
 
 /** Put a freshly drafted section on its phase. The first section drafted
  * also supplies the project-wide วัตถุประสงค์/ขอบเขต (its prompt asks for
- * them at project level); every section adds any tools not listed yet. */
+ * them at project level); every section adds any tools and PPE not listed yet. */
 export function withPhaseProcedure(
   project: ProjectDocument,
   phaseId: string,
   section: ProcedureDocument,
 ): ProjectDocument {
-  const intro = project.procedureIntro ?? { purpose: section.purpose, scope: section.scope, tools: [] };
-  const known = new Set(intro.tools.map((tool) => tool.trim()));
-  const tools = [...intro.tools, ...section.tools.filter((tool) => tool.trim() && !known.has(tool.trim()))];
+  const intro = project.procedureIntro ?? { purpose: section.purpose, scope: section.scope, tools: [], ppe: [] };
+  // Tools and PPE grow as sections are drafted: each adds what isn't listed yet
+  const merge = (have: string[], add: string[]) => {
+    const known = new Set(have.map((item) => item.trim()));
+    return [...have, ...add.filter((item) => item.trim() && !known.has(item.trim()))];
+  };
   return {
     ...project,
-    procedureIntro: { ...intro, tools },
+    procedureIntro: { ...intro, tools: merge(intro.tools, section.tools), ppe: merge(intro.ppe ?? [], section.ppe) },
     phases: project.phases.map((phase) => (phase.id === phaseId ? { ...phase, procedure: section } : phase)),
   };
 }

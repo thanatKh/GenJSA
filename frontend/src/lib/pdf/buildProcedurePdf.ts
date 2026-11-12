@@ -479,6 +479,8 @@ export async function buildProcedurePdf(
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
   listSection(P.sections.tools, procedure.tools);
+  // `?? []`: a procedure from before PPE existed that skipped the schema
+  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? []);
   const project = options.project;
   if (project) {
     textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);

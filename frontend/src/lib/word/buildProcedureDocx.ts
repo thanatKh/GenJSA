@@ -345,6 +345,8 @@ export async function buildProcedureDocx(
   textSection(P.sections.scope, procedure.scope);
   listSection(P.sections.references, procedure.references);
   listSection(P.sections.tools, procedure.tools);
+  // `?? []`: a procedure from before PPE existed that skipped the schema
+  listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? []);
   if (project) {
     textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);
     listSection(

@@ -28,6 +28,7 @@ document:
     scope: "ขอบเขต"
     references: "เอกสารอ้างอิง"
     tools: "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
+    ppe: "อุปกรณ์ป้องกันส่วนบุคคล (PPE)"
     procedure: "ขั้นตอนการปฏิบัติงาน"
     # Project Mode only — the project's ข้อจำกัด/หมายเหตุ and its tag list
     notes: "ข้อจำกัด / หมายเหตุ"

@@ -125,6 +125,7 @@ const FIELD_NAMES: Record<string, string> = {
   purpose: "วัตถุประสงค์",
   scope: "ขอบเขต",
   tools: "เครื่องมือ",
+  ppe: "PPE",
 };
 
 /** A zod issue's path in the user's terms: ["steps", 0, "sub_steps", 1,
@@ -212,7 +213,7 @@ export function buildPersonalProcedurePrompt(work: string, level: DetailLevel, i
     "# สิ่งที่ต้องตอบ",
     "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการขั้นตอนหลักด้านล่าง",
     answerAsFile(answerFileNames.wp),
-    '{"purpose":"วัตถุประสงค์","scope":"ขอบเขต","tools":["เครื่องมือ"],"steps":[{"no":1,"sub_steps":[{"action":"งานย่อย"}]}],"assumptions":[]}',
+    '{"purpose":"วัตถุประสงค์","scope":"ขอบเขต","tools":["เครื่องมือ"],"ppe":["อุปกรณ์ป้องกันส่วนบุคคล"],"steps":[{"no":1,"sub_steps":[{"action":"งานย่อย"}]}],"assumptions":[]}',
     `# ขั้นตอนหลักจาก JSA\n${work.trim()}`,
     instructions.trim() && `# คำขอเพิ่มเติม\n${instructions.trim()}`,
   ].filter(Boolean).join("\n\n");
@@ -222,6 +223,7 @@ const procedureSchema = z.object({
   purpose: z.string().trim().max(1000).default(""),
   scope: z.string().trim().max(1000).default(""),
   tools: z.array(z.string().trim().min(1).max(1000)).max(40).default([]),
+  ppe: z.array(z.string().trim().min(1).max(1000)).max(30).default([]),
   assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
   steps: z.array(z.object({
     no: z.number().int().positive(),

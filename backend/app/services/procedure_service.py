@@ -153,6 +153,7 @@ def _assemble(
         scope=payload.scope.strip(),
         references=[reference],
         tools=payload.tools,
+        ppe=payload.ppe,
         steps=steps,
         assumptions=payload.assumptions,
     )

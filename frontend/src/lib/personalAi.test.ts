@@ -75,6 +75,15 @@ describe("parsePersonalProcedure — reading an outside AI's WP", () => {
     expect(() => parsePersonalProcedure(wp([{ no: 1, sub_steps: [{ action: "ก" }] }]), splitJsa())).toThrow(/เลขขั้นตอนหลัก/);
   });
 
+  it("keeps PPE as its own list", () => {
+    const doc = parsePersonalProcedure(JSON.stringify({ tools: ["ประแจ"], ppe: ["หมวกนิรภัย"], steps: [
+      { no: 1, sub_steps: [{ action: "ก" }] },
+      { no: 2, sub_steps: [{ action: "ข" }] },
+    ] }), splitJsa());
+    expect(doc.ppe).toEqual(["หมวกนิรภัย"]);
+    expect(doc.tools).toEqual(["ประแจ"]);
+  });
+
   it("builds the reference from the JSA, never from the AI", () => {
     const doc = parsePersonalProcedure(wp([
       { no: 1, sub_steps: [{ action: "ก" }] },

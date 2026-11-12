@@ -248,6 +248,7 @@ class ProcedureSections(BaseModel):
     scope: str = "ขอบเขต"
     references: str = "เอกสารอ้างอิง"
     tools: str = "เครื่องมือ/อุปกรณ์ที่ต้องเตรียม"
+    ppe: str = "อุปกรณ์ป้องกันส่วนบุคคล (PPE)"
     procedure: str = "ขั้นตอนการปฏิบัติงาน"
     # Project Mode only: the project's notes and its tag list, printed before
     # the procedure section

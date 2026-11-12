@@ -85,6 +85,11 @@ export function ProjectProcedureStep({
   useEffect(() => {
     if (document.activeElement?.id !== "project_tools") setToolsText(toolsJoined);
   }, [toolsJoined]);
+  const [ppeText, setPpeText] = useState(() => intro?.ppe?.join("\n") ?? "");
+  const ppeJoined = intro?.ppe?.join("\n") ?? "";
+  useEffect(() => {
+    if (document.activeElement?.id !== "project_ppe") setPpeText(ppeJoined);
+  }, [ppeJoined]);
 
   // Stable on-screen identities for sub-step rows, per phase and step — the
   // same approach (and reason) as ProcedureEditorStep's rowKeys
@@ -108,10 +113,10 @@ export function ProjectProcedureStep({
   const patchIntro = (patch: Partial<NonNullable<ProjectDocument["procedureIntro"]>>) =>
     onChange((p) => ({
       ...p,
-      procedureIntro: { purpose: "", scope: "", tools: [], ...p.procedureIntro, ...patch },
+      procedureIntro: { purpose: "", scope: "", tools: [], ppe: [], ...p.procedureIntro, ...patch },
     }));
-  const flushTools = () =>
-    patchIntro({ tools: toolsText.split("\n").map((line) => line.trim()).filter(Boolean) });
+  const lines = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const flushTools = () => patchIntro({ tools: lines(toolsText), ppe: lines(ppeText) });
 
   const setSubSteps = (phaseId: string, stepIndex: number, subs: SubStep[]) =>
     onChange((p) => ({
@@ -271,6 +276,17 @@ export function ProjectProcedureStep({
                   <p id="project_tools_hint" className="mt-1.5 text-sm text-muted">
                     พิมพ์หนึ่งรายการต่อบรรทัด · รวมจากทุกส่วนที่ร่างแล้ว
                   </p>
+                </div>
+                <div>
+                  <Label htmlFor="project_ppe">อุปกรณ์ป้องกันส่วนบุคคล (PPE)</Label>
+                  <AutoGrowTextarea
+                    id="project_ppe"
+                    minRows={1}
+                    value={ppeText}
+                    onChange={(event) => setPpeText(event.target.value)}
+                    onBlur={flushTools}
+                    aria-describedby="project_tools_hint"
+                  />
                 </div>
               </div>
             </Card>

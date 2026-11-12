@@ -102,6 +102,7 @@ export function ProcedureEditorStep({
   // history entry replaces the page the same way — so every case that
   // changes `procedure` out from under this field is already a fresh mount.
   const [toolsText, setToolsText] = useState(() => procedure.tools.join("\n"));
+  const [ppeText, setPpeText] = useState(() => procedure.ppe.join("\n"));
 
   // Stable on-screen identities for sub-step rows, per step — never part of
   // the document. Sub-steps are renumbered on every change, so neither
@@ -225,7 +226,7 @@ export function ProcedureEditorStep({
   // case the user clicks straight from the textarea without blurring it
   // first — otherwise the last line they typed would ship in the editor's
   // local state but never reach procedure.tools or the PDF.
-  const flushTools = () => patch({ tools: linesToList(toolsText) });
+  const flushTools = () => patch({ tools: linesToList(toolsText), ppe: linesToList(ppeText) });
   const exportIssues = [
     ...(stale ? ["JSA เปลี่ยนหลังจากร่างขั้นตอนปฏิบัติงาน"] : []),
     ...(procedure.steps.some((s) => !s.sub_steps.length || s.sub_steps.some((sub) => !sub.action.trim())) ? ["บางขั้นตอนยังไม่มีรายละเอียดครบ"] : []),
@@ -316,6 +317,19 @@ export function ProcedureEditorStep({
             <p id="tools_hint" className="mt-1.5 text-sm text-muted">
               พิมพ์หนึ่งรายการต่อบรรทัด
             </p>
+          </div>
+
+          <div>
+            <Label htmlFor="ppe">อุปกรณ์ป้องกันส่วนบุคคล (PPE)</Label>
+            <AutoGrowTextarea
+              id="ppe"
+              minRows={1}
+              // Raw text while typing, committed on blur — same as tools above
+              value={ppeText}
+              onChange={(event) => setPpeText(event.target.value)}
+              onBlur={flushTools}
+              aria-describedby="tools_hint"
+            />
           </div>
 
           {procedure.references.length > 0 ? (
