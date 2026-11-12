@@ -33,9 +33,9 @@ import { usePhotoInput } from "./usePhotoInput";
 export function PhotoHint({ note }: { note?: string }) {
   return (
     <p className="mt-1 text-sm text-muted">
-      แนบรูปภาพประกอบได้ทั้งที่หัวข้อหลักและที่แต่ละขั้นตอนย่อยด้วยปุ่มรูปภาพ
+      แนบรูปได้ที่หัวข้อและทุกขั้นตอนย่อย
       <span className="hidden pointer-fine:inline">
-        {" "}ลากรูปมาวางที่ขั้นตอนย่อย (หรือหัวข้อ) หรือคัดลอกรูปแล้ววาง (Ctrl+V) ในช่องข้อความ
+        {" "}ด้วยปุ่มรูปภาพ ลากรูปมาวาง หรือวาง (Ctrl+V) ในช่องข้อความ
       </span>
       {note ? ` (${note})` : null}
     </p>

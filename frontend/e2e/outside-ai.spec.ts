@@ -24,7 +24,7 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
     await expect(links.first()).toHaveAttribute("target", "_blank");
   }
 
-  const check = page.getByRole("button", { name: "ตรวจรูปแบบคำตอบ" });
+  const check = page.getByRole("button", { name: "ตรวจคำตอบ" });
   await expect(check).toBeDisabled();
 
   if (info.project.name === "desktop") {
@@ -51,5 +51,5 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
   await page.locator("#personal-answer").fill('{"bad": true}');
   await expect(check).toBeEnabled();
   await check.click();
-  await expect(page.getByText(/ข้อมูลไม่ครบหรือผิดรูปแบบ/)).toBeVisible();
+  await expect(page.getByText(/คำตอบไม่ครบหรือผิดรูปแบบ/)).toBeVisible();
 });

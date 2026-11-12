@@ -207,7 +207,7 @@ export function ProjectProcedureStep({
       </div>
       <p className="mt-1.5 font-medium text-ink">{project.name}</p>
       <p className="mt-0.5 text-sm text-muted">
-        ฉบับเดียวทั้งโครงการ ร่างทีละส่วนจาก JSA ของแต่ละขั้นตอน โดยระบบรู้ว่าขั้นตอนก่อนหน้าทำอะไรไว้แล้ว
+        ฉบับเดียวทั้งโครงการ ร่างทีละส่วนจาก JSA ของแต่ละขั้นตอน ต่อเนื่องกัน
       </p>
       <PhotoHint />
       <div className="mt-4 rounded-lg border border-line bg-raised p-3 text-sm" role="status">

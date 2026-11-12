@@ -147,9 +147,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       </header>
       {sourceChanged ? (
         <section className="grid min-w-0 gap-2 rounded-card border border-line bg-raised p-4">
-          <p role="status" className="text-sm text-ink">ข้อมูลต้นทางเปลี่ยนแล้ว คำสั่งและคำตอบเดิมยังอยู่ เลือกใช้ร่างเดิมหรือเริ่มใหม่จากข้อมูลล่าสุด</p>
+          <p role="status" className="text-sm text-ink">รายละเอียดงานเปลี่ยนจากครั้งก่อน จะใช้คำสั่งและคำตอบเดิม หรือเริ่มใหม่?</p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setSource(description)}>ใช้ร่างเดิม</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setSource(description)}>ใช้ของเดิม</Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => {
               setSource(description);
               setWork(description);
@@ -157,18 +157,16 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
               setDraft(null);
               setError("");
               setCopyStatus("");
-            }}>ล้างคำตอบและใช้ข้อมูลใหม่</Button>
+            }}>เริ่มใหม่</Button>
           </div>
         </section>
       ) : null}
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
         <p className="text-muted">
-          แก้รายละเอียดที่จะส่งได้ที่นี่ และตัดข้อมูลภายในที่ไม่ควรแชร์ก่อนนำคำสั่งไปวางใน{" "}
+          ตัดข้อมูลภายในที่ไม่ควรแชร์ออกก่อน แล้วคัดลอกคำสั่งไปวางใน{" "}
           <AiLink {...OUTSIDE_AIS[0]} />, <AiLink {...OUTSIDE_AIS[1]} /> หรือ <AiLink {...OUTSIDE_AIS[2]} />
         </p>
-        <p className="text-sm text-muted">คำสั่งจะขอให้ AI ส่งคำตอบเป็นไฟล์ <span className="font-medium text-ink">{fileName}</span> ให้ดาวน์โหลด หาก AI สร้างไฟล์ไม่ได้ จะตอบเป็นข้อความแทน ใช้ได้ทั้งสองแบบ</p>
-        {kind === "wp" ? <p className="text-sm text-muted">คงเลขขั้นตอนหลักให้ตรงกับ JSA เพื่อจับคู่คำตอบตอนนำเข้า</p> : null}
         <div>
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
           <textarea id="personal-work" rows={3} maxLength={kind === "jsa" ? 5000 : undefined} className={textAreaClass} value={work}
@@ -176,7 +174,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             onChange={(e) => { setWork(e.target.value); setCopyStatus(""); }} />
           {kind === "jsa" ? (
             <p id="personal-work-hint" className="mt-1.5 text-sm text-muted">
-              ถ้ามีขั้นตอนงานอยู่แล้ว เช่น จากขั้นตอนงานเดิม ให้พิมพ์เป็นรายการ 1. 2. 3. ไว้ที่นี่ AI จะยึดลำดับนั้น ได้ผลตรงกว่าการกำหนดแค่จำนวนขั้นตอน
+              มีขั้นตอนอยู่แล้ว พิมพ์เป็นรายการ 1. 2. 3. ไว้ที่นี่ AI จะยึดลำดับนั้น
             </p>
           ) : null}
         </div>
@@ -198,7 +196,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             <span>
               <span className="font-medium text-ink">แตกขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …)</span>
               <span id="personal-split-hint" className="block text-sm text-muted">
-                สำหรับงานละเอียด แต่ละขั้นตอนย่อยมีอันตรายและมาตรการของตัวเอง ขั้นตอนหลักเป็นหัวข้อ และ WP จะใช้เลขเดียวกัน
+                แต่ละข้อย่อยมีอันตรายและมาตรการของตัวเอง
               </span>
             </span>
           </label>
@@ -211,8 +209,8 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
               onChange={(e) => { setTarget(e.target.value); setCopyStatus(""); }} />
             <p id="personal-target-hint" className={`mt-1 text-sm ${overCap ? "text-danger-text" : "text-muted"}`}>
               {overCap
-                ? `ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้สูงสุด ${targetCap} ขั้นตอนย่อย (ข้อละไม่เกิน ${MAX_SUB_STEPS}) จะขอ AI ไม่เกิน ${targetCap} ข้อ`
-                : "เว้นว่างไว้ ให้ AI กำหนดตามงานจริง ตัวเลขนี้เป็นค่าประมาณ AI จะกระจายตามความซับซ้อนของแต่ละขั้นตอน"}
+                ? `สูงสุด ${targetCap} ข้อ (ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS})`
+                : "เว้นว่างได้ AI จะกำหนดตามงานจริง"}
             </p>
           </div>
         ) : null}
@@ -291,7 +289,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         {/* The way forward, so it's the primary button — until the answer
             checks out, when "เปิดร่างเพื่อตรวจทาน" below takes its place */}
         {draft && !sourceChanged ? null : (
-          <Button type="submit" disabled={sourceChanged || !answer.trim()} className="justify-self-start">ตรวจรูปแบบคำตอบ</Button>
+          <Button type="submit" disabled={sourceChanged || !answer.trim()} className="justify-self-start">ตรวจคำตอบ</Button>
         )}
         {draft && !sourceChanged ? (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-lg bg-navy-soft p-3 [overflow-wrap:anywhere]">

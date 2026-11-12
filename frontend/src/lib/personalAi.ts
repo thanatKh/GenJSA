@@ -113,6 +113,38 @@ const draftSchema = z.object({
   assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
 });
 
+const FIELD_NAMES: Record<string, string> = {
+  work_activity: "ชื่องาน",
+  procedure: "ชื่อขั้นตอน",
+  details: "รายละเอียด",
+  hazards: "อันตราย",
+  hazard: "อันตราย",
+  controls: "มาตรการ",
+  action: "วิธีปฏิบัติ",
+  assumptions: "ข้อสันนิษฐาน",
+  purpose: "วัตถุประสงค์",
+  scope: "ขอบเขต",
+  tools: "เครื่องมือ",
+};
+
+/** A zod issue's path in the user's terms: ["steps", 0, "sub_steps", 1,
+ * "hazards"] → "ขั้นตอน 1.2 · อันตราย", not "steps.0.sub_steps.1.hazards" */
+function describePath(path: PropertyKey[]): string {
+  const step: number[] = [];
+  let field = "";
+  for (let i = 0; i < path.length; i++) {
+    const key = path[i];
+    const next = path[i + 1];
+    if ((key === "steps" || key === "sub_steps") && typeof next === "number") {
+      step.push(next + 1);
+      i++;
+    } else if (typeof key === "string" && FIELD_NAMES[key]) {
+      field = FIELD_NAMES[key];
+    }
+  }
+  return [step.length ? ` ขั้นตอน ${step.join(".")}` : "", field ? ` ${step.length ? "· " : ""}${field}` : ""].join("");
+}
+
 function parseDraft<T>(answer: string, schema: z.ZodType<T>): T {
   if (answer.length > 250_000) throw new Error("คำตอบยาวเกินไป กรุณาขอให้ AI ตอบกระชับขึ้น");
   const trimmed = answer.replace(/^\uFEFF/, "").trim();
@@ -125,8 +157,8 @@ function parseDraft<T>(answer: string, schema: z.ZodType<T>): T {
   }
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
-    const field = parsed.error.issues[0]?.path.join(".");
-    throw new Error(`ข้อมูลไม่ครบหรือผิดรูปแบบ${field ? ` ที่ ${field}` : ""} กรุณาให้ AI ตอบตามโครงสร้างในคำสั่ง`);
+    const field = describePath(parsed.error.issues[0]?.path ?? []);
+    throw new Error(`คำตอบไม่ครบหรือผิดรูปแบบ${field ? ` ที่${field}` : ""} ให้ AI ตอบใหม่ตามคำสั่ง`);
   }
   return parsed.data;
 }

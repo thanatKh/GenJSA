@@ -315,7 +315,7 @@ export function HistoryList({
                           title="เปิดขั้นตอนปฏิบัติงาน"
                           className={docButton + "bg-navy-soft hover:bg-navy-soft/70"}>
                           <ListOrdered className="size-3.5" aria-hidden="true" />
-                          ขั้นตอน
+                          WP
                         </button>
                       </motion.div>
                     ) : (
@@ -325,7 +325,7 @@ export function HistoryList({
                           title="สร้างขั้นตอนปฏิบัติงาน"
                           className={docButton + "border border-line hover:bg-navy-soft"}>
                           <Plus className="size-3.5" aria-hidden="true" />
-                          ขั้นตอน
+                          WP
                         </button>
                       </motion.div>
                     )}

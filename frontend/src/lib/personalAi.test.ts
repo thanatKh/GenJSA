@@ -32,7 +32,15 @@ describe("parsePersonalDraft — reading an outside AI's JSA", () => {
   });
 
   it("rejects a plain step with no hazards, naming the field", () => {
-    expect(() => parsePersonalDraft(answer([{ procedure: "กั้นเขต", hazards: [] }]))).toThrow(/steps\.0\.hazards/);
+    expect(() => parsePersonalDraft(answer([{ procedure: "กั้นเขต", hazards: [] }]))).toThrow("ที่ ขั้นตอน 1 · อันตราย");
+  });
+
+  it("names a sub-step's problem in the user's terms, not as a JSON path", () => {
+    const bad = answer([{ procedure: "เตรียม", hazards: [], sub_steps: [
+      { procedure: "กั้นเขต", hazards: [hazard] },
+      { procedure: "Check Gas", hazards: [{ hazard: "ไอน้ำมัน", controls: [] }] },
+    ] }]);
+    expect(() => parsePersonalDraft(bad)).toThrow("ที่ ขั้นตอน 1.2 · มาตรการ");
   });
 
   it("rejects text that isn't JSON with a message the user can act on", () => {

@@ -14,7 +14,7 @@ export function UnassignedPhotos({ photos, targets, onChange }: {
   if (!pending.length) return null;
   return <section className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
     <h2 className="font-semibold text-ink">รูปที่ต้องจับคู่ใหม่ ({pending.length})</h2>
-    <p className="mt-1 text-sm text-muted">ร่างใหม่แล้ว รูปเหล่านี้ยังไม่ถูกใส่ในเอกสาร กรุณาเลือกข้อความที่ตรงกับภาพ</p>
+    <p className="mt-1 text-sm text-muted">ร่างใหม่แล้ว รูปเหล่านี้ยังไม่อยู่ในเอกสาร เลือกขั้นตอนให้แต่ละรูป</p>
     <ul className="mt-3 grid list-none gap-3 p-0">
       {pending.map(([key, photo]) => <li key={key} className="flex flex-wrap items-center gap-2">
         <img src={photo.data} alt="รูปเดิมที่รอจับคู่กับขั้นตอนใหม่" className="size-16 rounded-lg object-contain" />

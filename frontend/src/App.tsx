@@ -1083,18 +1083,18 @@ export default function App() {
       <ChoiceDialog
         open={!!wpChoiceFor}
         title="ร่างขั้นตอนปฏิบัติงาน (WP) ด้วย"
-        description="WP จะร่างจาก JSA ที่ตรวจทานแล้ว เลขขั้นตอนตรงกับ JSA ทุกข้อ"
+        description="ร่างจาก JSA ที่ตรวจทานแล้ว"
         choices={[
           {
             label: "AI ในระบบ",
-            description: "ร่างให้ทันทีในหน้านี้",
+            description: "ร่างให้ทันที",
             icon: <Sparkles className="size-4" aria-hidden="true" />,
             recommended: jsaSourceDraft.load() !== "outside",
             onSelect: () => chooseWpAi("builtin"),
           },
           {
             label: "ใช้ AI ภายนอก",
-            description: "คัดลอกคำสั่งไปใช้กับ ChatGPT, Claude หรือ Gemini แล้วนำคำตอบกลับมา",
+            description: "ChatGPT, Claude หรือ Gemini",
             icon: <ExternalLink className="size-4" aria-hidden="true" />,
             recommended: jsaSourceDraft.load() === "outside",
             onSelect: () => chooseWpAi("outside"),
