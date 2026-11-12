@@ -73,6 +73,9 @@ async def public_config() -> dict:
         "jsaRules": {
             "hazardChecklist": settings.rules.hazard_checklist,
             "considerWhenRelevant": settings.rules.consider_when_relevant,
+            "terminology": [
+                {"use": t.use, "insteadOf": t.instead_of} for t in settings.rules.terminology
+            ],
         },
         "limits": {
             "workDescriptionMaxChars": settings.app.limits.work_description_max_chars,

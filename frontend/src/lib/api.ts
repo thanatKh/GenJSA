@@ -160,7 +160,12 @@ export type PublicConfig = {
   pdf: PdfLayout;
 };
 
-export type JsaPromptRules = { hazardChecklist: string[]; considerWhenRelevant: string[] };
+export type JsaPromptRules = {
+  hazardChecklist: string[];
+  considerWhenRelevant: string[];
+  // Optional: a backend from before the word list doesn't send it
+  terminology?: { use: string; insteadOf: string[] }[];
+};
 
 export async function fetchPublicConfig(): Promise<PublicConfig | null> {
   // Config is a nice-to-have — if it fails to load, fall back to on-screen defaults, no error needed

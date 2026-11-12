@@ -138,7 +138,12 @@ async def generate_procedure(
     model = settings.ai.detailed_model or settings.ai.model
 
     payload = await generate_validated(
-        system_prompt=render_prompt("procedure-generate.md", rules=settings.procedure),
+        system_prompt=render_prompt(
+            "procedure-generate.md",
+            rules=settings.procedure,
+            # config/jsa-rules.yaml's terminology — one word list for both documents
+            terminology=settings.rules.terminology,
+        ),
         user_prompt=_build_user_prompt(request.jsa, request.project),
         model=model,
         payload_model=AiProcedurePayload,

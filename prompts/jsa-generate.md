@@ -84,8 +84,10 @@
 เขียนเป็น**ภาษาไทย**ทั้งหมด ({{ rules.generation.language }})
 ใช้ศัพท์เทคนิคภาษาอังกฤษได้เมื่อเป็นคำที่หน้างานใช้จริงและไม่มีคำไทยที่สื่อความชัดกว่า
 เช่น LOTO, PPE, Hot Work, Check Gas, Isolation, Confined Space
-การตรวจวัดก๊าซให้เรียกว่า Check Gas เสมอ ไม่ใช้คำว่า Gas Test หรือ Gas Testing
-ใช้ภาษาที่ผู้ปฏิบัติงานหน้างานอ่านเข้าใจ ไม่ต้องเป็นภาษาราชการ
+{% for term in rules.terminology %}{% if loop.first %}
+**ใช้ศัพท์ของหน้างานนี้เสมอ:**
+{% endif %}- เขียน "{{ term.use }}"{% if term.instead_of %} ห้ามใช้ {% for word in term.instead_of %}"{{ word }}"{% if not loop.last %} หรือ {% endif %}{% endfor %}{% endif %}
+{% endfor %}ใช้ภาษาที่ผู้ปฏิบัติงานหน้างานอ่านเข้าใจ ไม่ต้องเป็นภาษาราชการ
 
 # เรื่อง assumptions
 

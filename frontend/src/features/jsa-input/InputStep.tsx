@@ -54,7 +54,7 @@ const headerSchema = inputFormSchema.pick({ supervisor: true, analyst: true, com
 // lengths/styles signals that any level of detail and any kind of work is
 // fine to type here.
 const PLACEHOLDERS = [
-  "เปลี่ยน mechanical seal ของ LPG Pump P-400 ที่ Tank Farm " +
+  "เปลี่ยน mechanical seal ของ LPG Pump P-400 ที่คลัง " +
     "ต้อง isolate ปั๊ม ระบายความดันและ drain product ก่อนเริ่มงาน " +
     "จากนั้นถอด seal เดิม ติดตั้ง seal ใหม่ และตรวจสอบการรั่วก่อนคืนระบบ",
 
@@ -108,7 +108,7 @@ const PLACEHOLDERS = [
   // actually write this stuff (numbered steps / dashed bullets), so the
   // placeholder doesn't quietly imply prose is the only accepted format
   "เปลี่ยนแบริ่งของปั๊ม Fresh Water ตัว B\n" +
-    "1. ขออนุญาตทำงาน (work permit) และตัด LOTO ปั๊ม\n" +
+    "1. ขออนุญาตทำงาน (Work Permit) และตัด LOTO ปั๊ม\n" +
     "2. ถอดฝาครอบและแบริ่งเดิมออก\n" +
     "3. ตรวจสอบเพลาและตำแหน่งแบริ่งใหม่\n" +
     "4. ประกอบแบริ่งใหม่และฝาครอบ\n" +

@@ -216,3 +216,16 @@ def test_single_mode_procedure_prompt_is_unchanged(jsa):
 def test_project_phase_index_must_point_at_a_phase():
     with pytest.raises(ValueError):
         _context(phase_index=3)
+
+
+async def test_procedure_system_prompt_uses_site_terminology(jsa, settings):
+    # The word list lives in config/jsa-rules.yaml, not procedure.yaml, so it
+    # has to be handed to the procedure prompt explicitly
+    provider = AsyncMock(spec=LLMProvider)
+    provider.complete.return_value = _payload().model_dump_json()
+
+    await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
+
+    system_prompt = provider.complete.await_args.args[0]
+    for term in settings.rules.terminology:
+        assert f'เขียน "{term.use}"' in system_prompt

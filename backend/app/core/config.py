@@ -215,10 +215,16 @@ class JsaGeneration(BaseModel):
     hazards_per_step_max: int = 4
 
 
+class Term(BaseModel):
+    use: str
+    instead_of: list[str] = Field(default_factory=list)
+
+
 class JsaRulesConfig(BaseModel):
     generation: JsaGeneration = Field(default_factory=JsaGeneration)
     consider_when_relevant: list[str] = Field(default_factory=list)
     hazard_checklist: list[str] = Field(default_factory=list)
+    terminology: list[Term] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #

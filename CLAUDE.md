@@ -299,6 +299,7 @@ first, then hand-merge.
 | Analyst line at the end of the PDF | `config/pdf.yaml` → `signature` (wording: `config/document.yaml` → `labels.analyst`) |
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | Hazard sources the AI must check for every step (both the built-in AI and the advanced mode's outside-AI prompt) | `config/jsa-rules.yaml` → `hazard_checklist` |
+| Site wording the AI must use (e.g. "Check Gas" not "Gas Test") — every JSA and procedure prompt, built-in and outside-AI | `config/jsa-rules.yaml` → `terminology` |
 | How the AI thinks / what it must not do | `prompts/jsa-generate.md` |
 | Work procedure titles / section headings / labels | `config/procedure.yaml` (optional file — deleting it falls back to built-in defaults) |
 | Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |

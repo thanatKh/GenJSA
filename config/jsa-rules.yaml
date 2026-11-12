@@ -17,6 +17,18 @@ generation:
   hazards_per_step_min: 1
   hazards_per_step_max: 4
 
+# The site's own words. Every AI prompt (JSA and work procedure, built-in and
+# the advanced mode's outside-AI one) tells the model to write `use` and never
+# any of `instead_of`. Add a line here when the AI keeps using a word your
+# site doesn't.
+terminology:
+  - use: "Check Gas"
+    instead_of: ["Gas Test", "Gas Testing"]
+  - use: "Work Permit"
+    instead_of: ["Permit to Work", "PTW"]
+  - use: "คลัง"
+    instead_of: ["Tank Farm"]
+
 # Hazard sources the AI must run through for EVERY step before writing that
 # step's hazards — it lists only the ones that really apply. This is what
 # stops a step from getting just its single most obvious hazard. Shared by the

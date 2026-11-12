@@ -18,7 +18,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   onBack: () => void;
   parse: (answer: string) => T;
   onImport: (draft: T) => void;
-  /** config/jsa-rules.yaml's lists, for the JSA prompt (unused for WP). */
+  /** config/jsa-rules.yaml's lists (the WP prompt uses only its terminology). */
   jsaRules?: JsaPromptRules;
 }) {
   const [saved] = useState(() => {
@@ -44,7 +44,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [fileStatus, setFileStatus] = useState("");
   const [dragging, setDragging] = useState(false);
   const prompt = kind === "wp"
-    ? buildPersonalProcedurePrompt(work, level, instructions)
+    ? buildPersonalProcedurePrompt(work, level, instructions, jsaRules)
     : buildPersonalPrompt(work, level, instructions, jsaRules);
   const sourceChanged = source !== description;
   const fileName = answerFileNames[kind];

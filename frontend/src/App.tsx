@@ -834,7 +834,7 @@ export default function App() {
 
             {view?.kind === "advancedProcedure" ? (
               <div className="mx-auto max-w-[45rem]">
-                <AdvancedDraftScreen kind="wp" scope={historyId ?? undefined} description={procedureSourceText(view.doc)}
+                <AdvancedDraftScreen kind="wp" jsaRules={config?.jsaRules} scope={historyId ?? undefined} description={procedureSourceText(view.doc)}
                   backLabel="กลับไปตรวจทาน JSA"
                   onBack={() => goto(1)}
                   parse={(answer) => parsePersonalProcedure(answer, view.doc, config?.procedure?.jsaReferenceLabel)}
@@ -860,7 +860,7 @@ export default function App() {
                       openPhase(view.phase.id);
                     }} />
                 ) : view.phase.jsa ? (
-                  <AdvancedDraftScreen kind="wp" scope={`${projectState?.id}.${view.phase.id}`} description={procedureSourceText(view.phase.jsa)}
+                  <AdvancedDraftScreen kind="wp" jsaRules={config?.jsaRules} scope={`${projectState?.id}.${view.phase.id}`} description={procedureSourceText(view.phase.jsa)}
                     backLabel="กลับไปขั้นตอนปฏิบัติงานโครงการ"
                     onBack={() => goto(12)}
                     parse={(answer) => parsePersonalProcedure(answer, view.phase.jsa!, config?.procedure?.jsaReferenceLabel)}
