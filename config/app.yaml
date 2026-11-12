@@ -7,6 +7,13 @@ app:
   developer: "ธนัฐ เข็มทอง"
   contact_email: "thanat.k@pttor.com"
 
+analytics:
+  # Cloudflare Web Analytics: visit counts (page, time, country, browser) —
+  # no cookies, and it never sees what users type or the documents they make.
+  # Loaded only on the deployed site, not on localhost. Blank turns it off.
+  # The token isn't a secret: it ships in the page to every visitor.
+  cloudflare_token: "8bd2a321f99a43f8858fbffd75bebc45"
+
 limits:
   # Max length of the "work description" field (characters) — guards against bloated payloads and long prompt injection
   work_description_max_chars: 5000

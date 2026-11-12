@@ -8,6 +8,7 @@ import type { SaveState } from "./components/SaveStatus";
 import { Stepper } from "./components/Stepper";
 import { ExternalLink, Sparkles } from "lucide-react";
 import { ChoiceDialog, Toaster } from "./components/ui";
+import { loadCloudflareAnalytics } from "./lib/analytics";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
 import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
@@ -391,6 +392,7 @@ export default function App() {
       if (!loaded) return;
       setConfig(loaded);
       setAppName(loaded.appName);
+      loadCloudflareAnalytics(loaded.analytics?.cloudflareToken);
     });
   }, []);
 
@@ -732,6 +734,7 @@ export default function App() {
         department={config?.company.department}
         developer={config?.about?.developer}
         contactEmail={config?.about?.contactEmail}
+        visitStats={!!config?.analytics?.cloudflareToken}
         onHome={stage >= 5 && stage <= 8 ? () => goto(0) : startOver}
       />
 

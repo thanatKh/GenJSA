@@ -66,6 +66,13 @@ against them before adding anything:
   be able to tune lives in `config/*.yaml`, not in source.
 - **The ThaiLLM API key never reaches the browser** — it's read from the
   `THAILLM_API_KEY` env var on the backend only.
+- **One outside script, for visit counts only.** Cloudflare Web Analytics
+  (`lib/analytics.ts`) is the single third-party script the page loads: its
+  token is `config/app.yaml` → `analytics.cloudflare_token` (blank = off), it
+  is skipped on localhost, and the เกี่ยวกับ dialog's privacy section says so.
+  It sees page loads, not documents — nothing users type goes into the URL.
+  Don't add other third-party scripts (counters, widgets, CDNs): one that runs
+  in the page can read every field on it.
 
 ## Commands
 
@@ -378,6 +385,7 @@ first, then hand-merge.
 | "โครงการ" header-row wording | `config/document.yaml` → `labels.project` |
 | Project procedure's notes / tag-list headings | `config/procedure.yaml` → `sections.notes` / `sections.tags` |
 | Request size / rate limit / CORS | `config/app.yaml` |
+| Visit statistics (Cloudflare Web Analytics token; blank = off) | `config/app.yaml` → `analytics.cloudflare_token` |
 
 ## Fonts
 

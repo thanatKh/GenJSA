@@ -149,6 +149,8 @@ export type PublicConfig = {
   // config/app.yaml — shown in the เกี่ยวกับ dialog. Optional: an older
   // backend doesn't send it.
   about?: { developer: string; contactEmail: string };
+  // config/app.yaml's analytics. Optional: an older backend doesn't send it
+  analytics?: { cloudflareToken: string };
   company: { name: string; department: string };
   document: DocumentMeta;
   // The work procedure document (config/procedure.yaml)

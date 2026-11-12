@@ -71,3 +71,11 @@ def test_user_steps_rule_keeps_meaning_and_tags_but_may_tidy_wording():
     # Splitting into sub-steps must not read as forbidden splitting of main steps
     assert "ไม่นับเป็นการแยกขั้นตอนหลัก" in rules
     assert f"ไม่เกิน {MAX_SUB_STEPS} ขั้นตอนย่อย" in rules
+
+
+def test_public_config_carries_the_analytics_token_only():
+    """The analytics token is public by design; nothing else from app.yaml's
+    analytics section, and no AI settings, ride along with it."""
+    body = TestClient(app).get("/api/config/public").json()
+    assert body["analytics"] == {"cloudflareToken": get_settings().app.analytics.cloudflare_token.strip()}
+    assert "model" not in str(body["analytics"]).lower()

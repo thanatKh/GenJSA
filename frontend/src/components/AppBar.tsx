@@ -41,6 +41,7 @@ export function AppBar({
   department,
   developer,
   contactEmail,
+  visitStats = false,
   onHome,
 }: {
   appName?: string;
@@ -49,6 +50,9 @@ export function AppBar({
   /** From config/app.yaml (via the public config) — not constants here */
   developer?: string;
   contactEmail?: string;
+  /** Visit statistics are on (config/app.yaml's analytics) — the privacy
+   * section says so only then */
+  visitStats?: boolean;
   /** Reset to a fresh JSA — the same "เริ่มใหม่"/"สร้าง JSA ใหม่" action already
    * on EditorStep/PdfStep. No confirm dialog here for the same reason those
    * don't have one: in-progress work is already autosaved to history as the
@@ -178,6 +182,12 @@ export function AppBar({
                 เก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น (สูงสุด {MAX_ENTRIES} งานล่าสุด)
                 และลบได้ตลอดเวลา หากใช้เครื่องร่วมกับผู้อื่น ควรล้างประวัติหลังใช้งาน
               </p>
+              {visitStats ? (
+                <p>
+                  เว็บนี้นับสถิติการเข้าใช้งานด้วย Cloudflare Web Analytics (จำนวนครั้ง หน้า และประเทศ)
+                  ไม่ใช้คุกกี้ และไม่ได้รับข้อมูลที่กรอกหรือเนื้อหาเอกสาร
+                </p>
+              ) : null}
             </div>
           </AboutSection>
 

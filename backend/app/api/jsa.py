@@ -47,6 +47,9 @@ async def public_config() -> dict:
             "contactEmail": settings.app.app.contact_email,
         },
         "company": {"name": company.name, "department": company.department},
+        # Cloudflare Web Analytics' site token — public by design (it ships in
+        # the page); blank means the browser loads no analytics
+        "analytics": {"cloudflareToken": settings.app.analytics.cloudflare_token.strip()},
         "document": {
             "formCode": doc.form_code,
             "footerText": doc.footer_text,

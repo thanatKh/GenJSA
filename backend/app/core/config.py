@@ -27,6 +27,11 @@ class AppSection(BaseModel):
     contact_email: str = ""
 
 
+class Analytics(BaseModel):
+    # Cloudflare Web Analytics site token; blank = no analytics at all
+    cloudflare_token: str = ""
+
+
 class Limits(BaseModel):
     work_description_max_chars: int = 5000
     supervisor_max_chars: int = 200
@@ -44,6 +49,7 @@ class Cors(BaseModel):
 
 class AppConfig(BaseModel):
     app: AppSection = Field(default_factory=AppSection)
+    analytics: Analytics = Field(default_factory=Analytics)
     limits: Limits = Field(default_factory=Limits)
     rate_limit: RateLimit = Field(default_factory=RateLimit)
     cors: Cors = Field(default_factory=Cors)
