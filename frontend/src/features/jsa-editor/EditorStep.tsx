@@ -64,7 +64,7 @@ type PendingDelete =
     };
 
 // Mirrors backend/app/models/jsa.py's MAX_SUB_STEPS
-const MAX_SUB_STEPS = 20;
+const MAX_SUB_STEPS = 30;
 
 const EMPTY_SUB_STEP: JsaSubStep = { no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }] };
 
@@ -352,11 +352,8 @@ export function EditorStep({
         </p>
       ) : null}
       <p className="mt-1.5 text-muted">
-        เอกสารนี้ระบบร่างให้เป็นจุดเริ่มต้น{" "}
-        <strong className="font-semibold text-ink">
-          ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้ตรวจสอบและรับผิดชอบเนื้อหา
-        </strong>{" "}
-        โปรดอ่านทุกขั้นตอนและแก้ไขให้ตรงกับงานจริงก่อนนำไปใช้
+        ตรวจทุกช่องให้ตรงกับงานจริง{" "}
+        <strong className="font-semibold text-ink">ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้รับผิดชอบเนื้อหา</strong>
       </p>
 
       <Card className="mt-4">
@@ -590,8 +587,7 @@ export function EditorStep({
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
           </h2>
           <p className="mt-1 text-sm text-[var(--warning-text)]">
-            ข้อมูลเหล่านี้ไม่ได้ระบุมาในรายละเอียดงาน กรุณาตรวจสอบว่าตรงกับหน้างานจริง
-            (ส่วนนี้ไม่แสดงในเอกสาร)
+            ไม่แสดงในเอกสาร
           </p>
           <ul className="mt-2 grid gap-1 pl-5 text-sm text-[var(--warning-text)]">
             {doc.assumptions.map((assumption, index) => (

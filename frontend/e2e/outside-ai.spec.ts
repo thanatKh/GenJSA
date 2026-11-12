@@ -19,7 +19,7 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
   // Each outside AI is a link that opens in a new tab, keeping this page as it is
   for (const [name, href] of [["ChatGPT", "https://chatgpt.com/"], ["Claude", "https://claude.ai/new"], ["Gemini", "https://gemini.google.com/app"]]) {
     const links = page.getByRole("link", { name, exact: true });
-    await expect(links).toHaveCount(2); // in the intro, and next to the copy button
+    await expect(links).toHaveCount(1); // next to the copy button
     await expect(links.first()).toHaveAttribute("href", href);
     await expect(links.first()).toHaveAttribute("target", "_blank");
   }

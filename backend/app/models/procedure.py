@@ -15,7 +15,7 @@ never allowed to invent the step list — see AiProcedurePayload below.
 
 from pydantic import BaseModel, Field, field_validator
 
-from .jsa import JsaDocument, JsaHeader, ProjectReference
+from .jsa import MAX_SUB_STEPS, JsaDocument, JsaHeader, ProjectReference
 
 
 class SubStep(BaseModel):
@@ -27,7 +27,7 @@ class ProcedureStep(BaseModel):
     no: int = Field(ge=1)
     # Copied verbatim from the source JSA — never written by the AI (see below)
     procedure: str = Field(min_length=1, max_length=2000)
-    sub_steps: list[SubStep] = Field(default_factory=list, max_length=20)
+    sub_steps: list[SubStep] = Field(default_factory=list, max_length=MAX_SUB_STEPS)
 
 
 class ProcedureDocument(BaseModel):
@@ -114,7 +114,7 @@ class GenerateProcedureRequest(BaseModel):
 
 class AiProcedureStep(BaseModel):
     no: int = Field(ge=1)
-    sub_steps: list[SubStep] = Field(default_factory=list, max_length=20)
+    sub_steps: list[SubStep] = Field(default_factory=list, max_length=MAX_SUB_STEPS)
 
 
 class AiProcedurePayload(BaseModel):

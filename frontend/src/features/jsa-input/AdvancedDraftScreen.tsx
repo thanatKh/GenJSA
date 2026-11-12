@@ -141,9 +141,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           {backLabel}
         </Button>
         <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ใช้ AI ภายนอก</h1>
-        <p className="mt-1.5 text-muted">
-          {kind === "wp" ? "ร่างขั้นตอนปฏิบัติงาน (WP) จาก JSA ที่ตรวจทานแล้ว" : "ร่าง JSA ด้วย AI ที่คุณเลือก แล้วนำคำตอบกลับมาตรวจทาน"}
-        </p>
+        <p className="mt-1.5 text-muted">{kind === "wp" ? "ร่างขั้นตอนปฏิบัติงานจาก JSA" : "ร่าง JSA"}</p>
       </header>
       {sourceChanged ? (
         <section className="grid min-w-0 gap-2 rounded-card border border-line bg-raised p-4">
@@ -164,8 +162,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
         <p className="text-muted">
-          ตัดข้อมูลภายในที่ไม่ควรแชร์ออกก่อน แล้วคัดลอกคำสั่งไปวางใน{" "}
-          <AiLink {...OUTSIDE_AIS[0]} />, <AiLink {...OUTSIDE_AIS[1]} /> หรือ <AiLink {...OUTSIDE_AIS[2]} />
+          ตัดข้อมูลภายในที่ไม่ควรแชร์ออกก่อนคัดลอก
         </p>
         <div>
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
@@ -191,13 +188,10 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         </fieldset>
         {kind === "jsa" ? (
           <label className="flex min-h-12 items-start gap-2 py-2">
-            <input type="checkbox" checked={split} className="mt-1 size-4 shrink-0 accent-navy" aria-describedby="personal-split-hint"
+            <input type="checkbox" checked={split} className="mt-1 size-4 shrink-0 accent-navy"
               onChange={(e) => { setSplit(e.target.checked); setCopyStatus(""); }} />
             <span>
               <span className="font-medium text-ink">แตกขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …)</span>
-              <span id="personal-split-hint" className="block text-sm text-muted">
-                แต่ละข้อย่อยมีอันตรายและมาตรการของตัวเอง
-              </span>
             </span>
           </label>
         ) : null}
@@ -205,13 +199,13 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <div className="-mt-1 ps-6">
             <Label htmlFor="personal-target">จำนวนขั้นตอนย่อยรวมโดยประมาณ (ไม่บังคับ)</Label>
             <Input id="personal-target" type="number" inputMode="numeric" min={1} max={9999} className="w-32"
-              value={target} aria-describedby="personal-target-hint"
+              value={target} aria-describedby={overCap ? "personal-target-hint" : undefined}
               onChange={(e) => { setTarget(e.target.value); setCopyStatus(""); }} />
-            <p id="personal-target-hint" className={`mt-1 text-sm ${overCap ? "text-danger-text" : "text-muted"}`}>
-              {overCap
-                ? `ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้ข้อละไม่เกิน ${MAX_SUB_STEPS} รวมสูงสุด ${targetCap} ข้อย่อย`
-                : "เว้นว่างได้ AI จะกำหนดตามงานจริง"}
-            </p>
+            {overCap ? (
+              <p id="personal-target-hint" className="mt-1 text-sm text-danger-text">
+                {`ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้ข้อละไม่เกิน ${MAX_SUB_STEPS} รวมสูงสุด ${targetCap} ข้อย่อย`}
+              </p>
+            ) : null}
           </div>
         ) : null}
         <div>
@@ -280,7 +274,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             }} />
         </div>
         <div>
-          <Label htmlFor="personal-answer">หรือวางคำตอบ JSON จาก AI (ถ้า AI ตอบเป็นข้อความ)</Label>
+          <Label htmlFor="personal-answer">หรือวางคำตอบที่เป็นข้อความ</Label>
           <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
             aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
             onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); setFileStatus(""); }} />

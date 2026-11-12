@@ -144,7 +144,6 @@ const PLACEHOLDERS = [
 ] as const;
 
 export function InputStep({
-  withProcedure,
   onGenerate,
   onImportDraft,
   advanced,
@@ -157,10 +156,6 @@ export function InputStep({
   error,
   jsaRules,
 }: {
-  /** ModeChoice's "JSA + Procedure", chosen above this form (App.tsx). Only
-   * changes the wording here: this screen drafts the JSA either way, and the
-   * procedure is drafted later, from the JSA once it has been reviewed. */
-  withProcedure: boolean;
   onGenerate: (values: InputForm, companyLogo: CompanyLogo | null) => void;
   onImportDraft: (doc: JsaDocument, companyLogo: CompanyLogo | null) => void;
   advanced: boolean;
@@ -327,13 +322,6 @@ export function InputStep({
         {busy ? "กำลังสร้าง JSA" : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
         </span>
       </h1>
-      {busy ? null : (
-        <p className="mt-1.5 text-muted">
-          {withProcedure
-            ? "ระบุรายละเอียดงาน ระบบจะร่าง JSA ให้ตรวจทาน แล้วจึงร่างขั้นตอนปฏิบัติงานต่อ"
-            : "ระบุรายละเอียดงาน ระบบจะร่าง JSA ให้ตรวจทาน"}
-        </p>
-      )}
 
       {/* Form and progress panel trade places with a fade (mode="wait": the
           old one leaves first, so the two are never on screen together) */}
@@ -371,7 +359,7 @@ export function InputStep({
               {...register("work_description")}
             />
             <p id="work_description_hint" className="mt-1.5 text-sm text-muted">
-              ระบุขั้นตอนการปฏิบัติงานที่ทราบให้ครบถ้วน เพื่อให้ JSA ตรงกับงานจริงมากที่สุด
+              ใส่ขั้นตอนที่ทราบให้ครบ JSA จะตรงกับงานจริงมากขึ้น
             </p>
             <FieldError id="work_description_error">{errors.work_description?.message}</FieldError>
           </div>

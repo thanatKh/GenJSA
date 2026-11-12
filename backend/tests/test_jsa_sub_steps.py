@@ -95,3 +95,18 @@ def test_ai_payload_sub_steps_need_no_numbers():
         ]}],
     })
     assert payload.steps[0].sub_steps[0].procedure == "กั้นเขต"
+
+
+def test_a_full_step_of_sub_steps_fits_the_wp_too():
+    from app.models.jsa import MAX_SUB_STEPS
+
+    doc = JsaDocument(
+        header=JsaHeader(work_activity="ล้างถัง", supervisor="สมชาย", analysis_date=date(2026, 8, 12)),
+        steps=[JsaStep(no=1, procedure="งานใหญ่", sub_steps=[
+            JsaSubStep(procedure=f"งานย่อย {i}", hazards=[_hz("อันตราย")]) for i in range(MAX_SUB_STEPS)
+        ])],
+    )
+    payload = AiProcedurePayload(steps=[AiProcedureStep(no=1, sub_steps=[SubStep(no=i + 1, action="ทำ") for i in range(MAX_SUB_STEPS)])])
+    wp = _assemble(doc, payload, get_settings())
+    assert MAX_SUB_STEPS == 30
+    assert len(wp.steps[0].sub_steps) == MAX_SUB_STEPS

@@ -137,7 +137,6 @@ export function ProjectFilesStep({
   return (
     <section>
       <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">เอกสาร PDF</h1>
-      <p className="mt-1.5 text-muted">2 ไฟล์ แต่ละไฟล์เปิดเป็น PDF หรือดาวน์โหลดเป็น Word ได้</p>
 
       {undrafted || stale ? (
         <div className="mt-4 rounded-card border border-[var(--warning-border)] bg-[var(--warning-soft)] p-3">

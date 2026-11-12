@@ -8,6 +8,7 @@ If either path drops the list, steps quietly go back to one hazard each.
 from fastapi.testclient import TestClient
 
 from app.core.config import Term, get_settings
+from app.models.jsa import MAX_SUB_STEPS
 from app.main import app
 from app.services.ai_service import jsa_prompt_context, procedure_prompt_context, render_prompt
 
@@ -69,4 +70,4 @@ def test_user_steps_rule_keeps_meaning_and_tags_but_may_tidy_wording():
     assert "ห้ามแก้เลขอุปกรณ์ เลขวาล์ว ค่าตัวเลข" in rules
     # Splitting into sub-steps must not read as forbidden splitting of main steps
     assert "ไม่นับเป็นการแยกขั้นตอนหลัก" in rules
-    assert "ไม่เกิน 20 ขั้นตอนย่อย" in rules
+    assert f"ไม่เกิน {MAX_SUB_STEPS} ขั้นตอนย่อย" in rules

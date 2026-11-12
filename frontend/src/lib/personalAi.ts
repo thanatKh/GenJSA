@@ -37,7 +37,7 @@ function hazardScan(rules?: JsaPromptRules) {
 }
 
 /* Mirrors backend/app/models/jsa.py's MAX_SUB_STEPS */
-export const MAX_SUB_STEPS = 20;
+export const MAX_SUB_STEPS = 30;
 
 /** The outside-AI-only line for the "แตกขั้นตอนหลักเป็นขั้นตอนย่อย" box, with
  * its optional rough total. The shared rules already allow sub-steps; this
@@ -225,7 +225,7 @@ const procedureSchema = z.object({
   assumptions: z.array(z.string().trim().min(1).max(4000)).max(30).default([]),
   steps: z.array(z.object({
     no: z.number().int().positive(),
-    sub_steps: z.array(z.object({ action: z.string().trim().min(1).max(1000) })).min(1).max(20),
+    sub_steps: z.array(z.object({ action: z.string().trim().min(1).max(1000) })).min(1).max(MAX_SUB_STEPS),
   })).min(1).max(200),
 });
 

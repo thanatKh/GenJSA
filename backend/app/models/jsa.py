@@ -36,7 +36,7 @@ class JsaSubStep(BaseModel):
 
 # Same cap as models/procedure.py's ProcedureStep.sub_steps, so every JSA
 # sub-step always has a work-procedure line to pair with
-MAX_SUB_STEPS = 20
+MAX_SUB_STEPS = 30
 
 
 class JsaStep(BaseModel):

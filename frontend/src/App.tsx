@@ -818,7 +818,6 @@ export default function App() {
                         ) : null
                       ) : (
                         <InputStep
-                          withProcedure={mode === "procedure"}
                           jsaRules={config?.jsaRules}
                           onGenerate={handleGenerate}
                           onImportDraft={(draft, logo) => openNewDraft(draft, logo, "outside")}
@@ -1083,7 +1082,6 @@ export default function App() {
       <ChoiceDialog
         open={!!wpChoiceFor}
         title="ร่างขั้นตอนปฏิบัติงาน (WP) ด้วย"
-        description="ร่างจาก JSA ที่ตรวจทานแล้ว"
         choices={[
           {
             label: "AI ในระบบ",

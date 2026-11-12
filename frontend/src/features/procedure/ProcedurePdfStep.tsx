@@ -138,9 +138,6 @@ export function ProcedurePdfStep({
   return (
     <section>
       <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">เอกสาร PDF</h1>
-      <p className="mt-1.5 text-muted">
-        2 ไฟล์ แต่ละไฟล์เปิดเป็น PDF หรือดาวน์โหลดเป็น Word ได้
-      </p>
 
       {/* Two equal files, numbered — the same as Project Mode's page. The
           kicker is what tells them apart: both titles are the same job. */}

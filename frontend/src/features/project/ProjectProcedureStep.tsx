@@ -223,7 +223,6 @@ export function ProjectProcedureStep({
 
       {undrafted.length > 0 && !busy ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-raised p-3 sm:p-4">
-          <p className="text-sm text-muted">ร่างทีละส่วนตามลำดับ ระหว่างรอแก้ไขส่วนที่เสร็จแล้วได้</p>
           <Button type="button" onClick={() => drafting.draft(undrafted)}>
             <Sparkles className="size-4" aria-hidden="true" />
             {undrafted.length === project.phases.length

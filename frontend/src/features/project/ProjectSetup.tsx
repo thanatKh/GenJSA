@@ -174,12 +174,11 @@ export function ProjectSetup({
             value={project.notes}
             onChange={(event) => update({ notes: event.target.value })}
           />
-          <p className="mt-1.5 text-sm text-muted">ระบบใช้เป็นข้อมูลประกอบตอนร่าง JSA ทุกขั้นตอน</p>
         </div>
 
         <Section
           title="รายการวาล์ว / Blind / Tag"
-          hint="เลขวาล์ว / Blind / Tag ของจุดแยกระบบ (isolation) ที่ใช้ในโครงการ กรอกครั้งเดียวใช้กับทุกขั้นตอน"
+          hint="กรอกครั้งเดียว ใช้กับทุกขั้นตอน"
         >
           <ul className="grid list-none gap-2 p-0">
             <AnimatePresence initial={false}>

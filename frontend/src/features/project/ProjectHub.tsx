@@ -91,9 +91,6 @@ export function ProjectHub({
 
       {undrafted.length > 1 && !busy ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-raised p-3 sm:p-4">
-          <p className="text-sm text-muted">
-            ร่างทีละขั้นตอนตามลำดับ ระหว่างรอตรวจทานขั้นตอนที่ร่างเสร็จแล้วได้
-          </p>
           <Button type="button" onClick={() => drafting.draft(undrafted)}>
             <Sparkles className="size-4" aria-hidden="true" />
             ร่าง JSA ที่เหลือทั้งหมด ({undrafted.length})

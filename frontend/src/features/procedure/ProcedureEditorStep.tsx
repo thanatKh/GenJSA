@@ -237,9 +237,6 @@ export function ProcedureEditorStep({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานขั้นตอนปฏิบัติงาน</h1>
       </div>
-      <p className="mt-1.5 text-muted">
-        ระบบร่างขั้นตอนย่อยจาก JSA กรุณาตรวจสอบให้ตรงกับวิธีทำงานจริงก่อนสร้างเอกสาร
-      </p>
 
       <UnassignedPhotos photos={photos} onChange={onPhotoChange}
         targets={procedure.steps.flatMap((step) => [
@@ -338,9 +335,6 @@ export function ProcedureEditorStep({
 
       <StepNavigator steps={procedure.steps.map((s) => ({ id: `procedure-step-${s.no}`, label: `${s.no}. ${s.procedure}` }))} />
       <h2 className="mt-8 text-lg font-semibold text-navy">ขั้นตอนการปฏิบัติงาน</h2>
-      <p className="mt-1 text-sm text-muted">
-        ชื่อขั้นตอนหลักมาจาก JSA — แก้ไขได้ที่หน้าตรวจทาน JSA
-      </p>
       {/* Said once here rather than under every photo — with a photo on
           each sub-step, a per-photo note would repeat down the whole page */}
       <PhotoHint />
@@ -403,8 +397,7 @@ export function ProcedureEditorStep({
             ข้อสันนิษฐานที่ระบบใช้ — กรุณาตรวจสอบ
           </h2>
           <p className="mt-1 text-sm text-[var(--warning-text)]">
-            ข้อมูลเหล่านี้ไม่ได้ระบุมาใน JSA กรุณาตรวจสอบว่าตรงกับหน้างานจริง
-            (ส่วนนี้ไม่แสดงในเอกสาร)
+            ไม่แสดงในเอกสาร
           </p>
           <ul className="mt-2 grid gap-1 pl-5 text-sm text-[var(--warning-text)]">
             {procedure.assumptions.map((assumption, index) => (

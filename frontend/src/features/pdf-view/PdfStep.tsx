@@ -96,11 +96,10 @@ export function PdfStep({
   return (
     <section>
       <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">เอกสาร JSA</h1>
-      <p className="mt-1.5 text-muted">
-        {delivery.savePickerSupported
-          ? "เปิดเพื่อดูหรือพิมพ์ หรือบันทึกเป็นไฟล์ในเครื่อง"
-          : "เปิดเอกสาร แล้วบันทึก พิมพ์ หรือแชร์จากเมนูของเบราว์เซอร์"}
-      </p>
+      {/* Only where there's no save button: the browser's own menu is the way */}
+      {delivery.savePickerSupported ? null : (
+        <p className="mt-1.5 text-muted">เปิดเอกสาร แล้วบันทึก พิมพ์ หรือแชร์จากเมนูของเบราว์เซอร์</p>
+      )}
 
       <PdfDeliveryCard
         className="mt-4"
