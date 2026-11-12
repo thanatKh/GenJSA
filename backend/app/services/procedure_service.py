@@ -23,7 +23,7 @@ from ..models.procedure import (
 )
 from ..core.thaidate import format_thai_date
 from ..providers.llm.base import LLMProvider
-from .ai_service import generate_validated, render_prompt
+from .ai_service import generate_validated, procedure_prompt_context, render_prompt
 
 logger = logging.getLogger("genjsa")
 
@@ -168,12 +168,7 @@ async def generate_procedure(
     model = settings.ai.detailed_model or settings.ai.model
 
     payload = await generate_validated(
-        system_prompt=render_prompt(
-            "procedure-generate.md",
-            rules=settings.procedure,
-            # config/jsa-rules.yaml's terminology — one word list for both documents
-            terminology=settings.rules.terminology,
-        ),
+        system_prompt=render_prompt("procedure-generate.md", **procedure_prompt_context(settings)),
         user_prompt=_build_user_prompt(request.jsa, request.project),
         model=model,
         payload_model=AiProcedurePayload,

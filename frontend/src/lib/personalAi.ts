@@ -37,40 +37,53 @@ function hazardScan(rules?: JsaPromptRules) {
 }
 
 /* Mirrors backend/app/models/jsa.py's MAX_SUB_STEPS */
-const MAX_SUB_STEPS = 20;
+export const MAX_SUB_STEPS = 20;
+
+/** The outside-AI-only line for the "แตกขั้นตอนหลักเป็นขั้นตอนย่อย" box, with
+ * its optional rough total. The shared rules already allow sub-steps; this
+ * asks for them on every main step. */
+function splitRequest(target?: number) {
+  const total = target
+    ? ` รวมทั้งเอกสารประมาณ ${target} ขั้นตอนย่อย กระจายตามความซับซ้อนของแต่ละขั้นตอนหลัก ขั้นตอนที่งานเยอะแตกได้หลายข้อ ขั้นตอนง่ายแตกน้อยข้อ`
+    : "";
+  return `แตกแต่ละขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …) ใน sub_steps ตามลำดับการทำงานจริง${total} ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS} ข้อ ห้ามแตกหรือเติมข้อเพียงเพื่อให้ได้จำนวน ถ้าขั้นตอนหลักใดไม่มีอะไรต้องแตกจริง ให้ sub_steps เป็น [] และใส่ hazards ที่ขั้นตอนหลักนั้นแทน`;
+}
+
+/* Used only when the server's rules (prompts/jsa-rules.md, through
+ * /api/config/public) didn't arrive — config failed to load. A short stand-in
+ * for them, not a second copy to keep in step: the real rules are the file. */
+function fallbackJsaRules(rules?: JsaPromptRules) {
+  return [
+    "เรียงขั้นตอนตามลำดับงาน ถ้ารายละเอียดงานมีรายการขั้นตอนมาแล้ว ให้ยึดตามลำดับและความหมายนั้น ห้ามรวม แยก หรือตัดขั้นตอนหลัก เกลาถ้อยคำได้แต่ห้ามแก้เลขอุปกรณ์ ค่าตัวเลข หรือชื่อเฉพาะ",
+    `ขั้นตอนย่อยอยู่ใน sub_steps ของขั้นตอนหลัก (ไม่เกิน ${MAX_SUB_STEPS} ข้อ) ขั้นตอนหลักที่มี sub_steps เป็นหัวข้อ ให้ hazards เป็น [] ถ้าไม่ใช้ให้ sub_steps เป็น []`,
+    hazardScan(rules),
+    "แยกหนึ่งอันตรายต่อหนึ่ง object พร้อม controls ของอันตรายนั้น มาตรการต้องทำได้จริงหน้างาน ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
+    terminology(rules),
+  ].filter(Boolean).join("\n\n");
+}
 
 export function buildPersonalPrompt(
   description: string,
   level: DetailLevel,
   instructions: string,
   rules?: JsaPromptRules,
-  /** The advanced screen's "แตกเป็นขั้นตอนย่อย" box: split every main step */
+  /** The screen's "แตกขั้นตอนหลักเป็นขั้นตอนย่อย" box: split every main step */
   splitSubSteps = false,
+  /** Its optional rough total of sub-steps */
+  subStepTarget?: number,
 ) {
   return [
     "ร่างการวิเคราะห์งานเพื่อความปลอดภัย (JSA) ภาษาไทยสำหรับให้ผู้รับผิดชอบตรวจทาน",
     `ระดับรายละเอียด: ${level} โดยยังคงอันตรายและมาตรการสำคัญครบถ้วน`,
-    "เรียงขั้นตอนตามลำดับงาน ขั้นตอนเดียวมีอันตรายได้หลายข้อ ให้สำรวจอันตรายที่เกี่ยวข้องให้ครบก่อนเขียนมาตรการ",
-    // Same rule as prompts/jsa-generate.md's rule 3 — the advanced screen's
-    // hint tells users to list their steps, so the prompt has to honour them
-    "ถ้ารายละเอียดงานมีรายการขั้นตอนมาแล้ว ให้ยึดตามลำดับและถ้อยคำนั้นเป็นหลัก ห้ามรวม แตก หรือตัดขั้นตอนที่ให้มา เพิ่มได้เฉพาะขั้นตอนที่จำเป็นด้านความปลอดภัยและควรมีอย่างชัดเจน",
-    splitSubSteps
-      ? `แตกแต่ละขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …) ใน sub_steps ตามลำดับการทำงานจริง ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS} ข้อ จำนวนขั้นตอนย่อยให้เป็นไปตามงานจริง ห้ามแตกเพียงเพื่อให้ได้จำนวน ถ้าขั้นตอนหลักใดไม่มีอะไรต้องแตกจริง ให้ sub_steps เป็น [] และใส่ hazards ที่ขั้นตอนหลักนั้นแทน`
-      : `ถ้ารายละเอียดงานมีขั้นตอนย่อยมาแล้ว (เช่น 1.1, 1.2) ให้ใส่ใน sub_steps ของขั้นตอนหลักนั้นตามลำดับเดิม ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS} ข้อ ถ้าไม่มีให้ sub_steps เป็น []`,
-    "ขั้นตอนหลักที่มี sub_steps เป็นหัวข้อ ให้ hazards ของขั้นตอนหลักนั้นเป็น [] อันตรายและมาตรการทั้งหมดอยู่ที่ขั้นตอนย่อย แต่ละขั้นตอนย่อยมี procedure details hazards แบบเดียวกับขั้นตอนหลัก",
-    hazardScan(rules),
-    "ใน hazards ให้แยกหนึ่งอันตรายต่อหนึ่ง object พร้อม controls ของอันตรายนั้นเอง หากพบหลายข้อให้ใส่หลาย object ในขั้นตอนเดิม อย่ารวมหลายอันตรายไว้ในข้อความเดียวหรือแยกขั้นตอนเพียงเพื่อให้เหลือข้อเดียว",
-    "จำนวนอันตรายให้เป็นไปตามงานจริง ตัวอย่างด้านล่างแสดงสองข้อเพื่อสาธิตโครงสร้างเท่านั้น ใส่อันตรายเพียงข้อเดียวได้ก็ต่อเมื่อไล่ตรวจครบแล้วพบจริงเพียงข้อเดียว และห้ามเติมข้อที่ไม่เกี่ยวข้องเพื่อให้ได้จำนวน",
-    rules?.considerWhenRelevant.length
-      ? `พิจารณาหัวข้อต่อไปนี้ถ้าเกี่ยวข้องกับงาน (ถ้าไม่เกี่ยวข้องไม่ต้องใส่):\n${rules.considerWhenRelevant.map((item) => `- ${item}`).join("\n")}`
-      : "",
-    "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือสภาพหน้างาน สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
-    terminology(rules),
+    splitSubSteps ? splitRequest(subStepTarget) : "",
+    // The same rules the built-in AI follows (prompts/jsa-rules.md)
+    rules?.prompts?.jsa || fallbackJsaRules(rules),
+    "# สิ่งที่ต้องตอบ",
     "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่เลขข้อหรือข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
     answerAsFile(answerFileNames.jsa),
     '{"work_activity":"ชื่องาน","steps":[{"procedure":"ขั้นตอนที่ไม่แบ่งย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายข้อแรก","controls":["มาตรการของข้อแรก"]},{"hazard":"อันตรายอีกข้อ","controls":["มาตรการของอีกข้อ"]}],"sub_steps":[]},{"procedure":"ขั้นตอนหลักที่แบ่งย่อย","details":"","hazards":[],"sub_steps":[{"procedure":"ขั้นตอนย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายของขั้นตอนย่อย","controls":["มาตรการ"]}]}]}],"assumptions":["ข้อมูลที่ต้องยืนยัน"]}',
-    `รายละเอียดงาน:\n${description.trim()}`,
-    instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
+    `# รายละเอียดงาน\n${description.trim()}`,
+    instructions.trim() && `# คำขอเพิ่มเติม\n${instructions.trim()}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -148,20 +161,28 @@ export function procedureSourceText(jsa: JsaDocument) {
   ].join("\n\n");
 }
 
+/* As fallbackJsaRules, for prompts/procedure-rules.md */
+function fallbackProcedureRules(rules?: JsaPromptRules) {
+  return [
+    "ขยายแต่ละขั้นตอนหลักเป็นขั้นตอนย่อยที่ปฏิบัติได้ ส่ง steps หนึ่งรายการต่อเลขขั้นตอนหลัก no ให้ครบทุกข้อ ห้ามเพิ่ม ลบ หรือรวมเลขขั้นตอนหลัก",
+    "ขั้นตอนหลักที่ JSA แบ่งขั้นตอนย่อยไว้แล้ว (1.1, 1.2 …) ให้ส่ง sub_steps จำนวนเท่ากับใน JSA พอดี เรียงตามลำดับเดิม",
+    "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือเอกสารอ้างอิง สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
+    terminology(rules),
+  ].filter(Boolean).join("\n\n");
+}
+
 export function buildPersonalProcedurePrompt(work: string, level: DetailLevel, instructions: string, rules?: JsaPromptRules) {
   return [
     "ร่างขั้นตอนปฏิบัติงาน (WP) ภาษาไทยจาก JSA ที่ตรวจทานแล้ว",
     `ระดับรายละเอียด: ${level}`,
-    "ขยายแต่ละขั้นตอนหลักเป็นขั้นตอนย่อยที่ปฏิบัติได้ ส่ง steps หนึ่งรายการต่อเลขขั้นตอนหลัก no ให้ครบทุกข้อ ห้ามเพิ่ม ลบ หรือรวมเลขขั้นตอนหลัก",
-    // Same rule as prompts/procedure-generate.md: a JSA's 1.1 is the WP's 1.1
-    "ขั้นตอนหลักที่ JSA แบ่งขั้นตอนย่อยไว้แล้ว (มีรายการ 1.1, 1.2 … อยู่ใต้ขั้นตอนนั้น) ให้ส่ง sub_steps จำนวนเท่ากับใน JSA พอดี เรียงตามลำดับเดิม ข้อละหนึ่งรายการ แต่ละ action เขียนวิธีปฏิบัติของขั้นตอนย่อยข้อนั้นโดยขึ้นต้นด้วยชื่อขั้นตอนย่อยนั้น",
-    "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือเอกสารอ้างอิง สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
-    terminology(rules),
-    "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการด้านล่าง",
+    // The same rules the built-in AI follows (prompts/procedure-rules.md)
+    rules?.prompts?.procedure || fallbackProcedureRules(rules),
+    "# สิ่งที่ต้องตอบ",
+    "ตอบ JSON หนึ่ง object ตามตัวอย่างนี้ ขยาย steps ให้ครบตามรายการขั้นตอนหลักด้านล่าง",
     answerAsFile(answerFileNames.wp),
     '{"purpose":"วัตถุประสงค์","scope":"ขอบเขต","tools":["เครื่องมือ"],"steps":[{"no":1,"sub_steps":[{"action":"งานย่อย"}]}],"assumptions":[]}',
-    `ขั้นตอนหลักจาก JSA:\n${work.trim()}`,
-    instructions.trim() && `คำขอเพิ่มเติม:\n${instructions.trim()}`,
+    `# ขั้นตอนหลักจาก JSA\n${work.trim()}`,
+    instructions.trim() && `# คำขอเพิ่มเติม\n${instructions.trim()}`,
   ].filter(Boolean).join("\n\n");
 }
 

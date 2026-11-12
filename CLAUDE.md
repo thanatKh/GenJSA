@@ -130,7 +130,18 @@ config-tunable from both sides without duplicating logic.
 it, so retry behaviour can only ever be fixed (or broken) in one place:
 
 1. Load the prompt via `render_prompt()`, rendered with Jinja2 against its
-   config (not cached — edits take effect immediately).
+   config (auto-reloaded — edits take effect immediately). Each prompt is
+   split in two: `jsa-generate.md` / `procedure-generate.md` hold only the
+   built-in AI's role and exact JSON, and `{% include %}` the drafting rules
+   from `jsa-rules.md` / `procedure-rules.md`. Those rules files are also
+   served, rendered, as `/api/config/public`'s `jsaRules.prompts`, and the
+   ใช้ AI ภายนอก screen (`lib/personalAi.ts`) wraps them with its own parts
+   (detail level, the split box and its rough sub-step total, file output,
+   the example). **One set of rules for both AIs** — edit the rules files,
+   never re-type a rule in `personalAi.ts`. `jsa_prompt_context()` /
+   `procedure_prompt_context()` build every render's values, so the two
+   renders can't disagree; `tests/test_hazard_checklist.py` checks the
+   served rules appear verbatim in the built-in prompt.
 2. Call the LLM provider (`providers/llm/`) with the system + user prompt.
 3. `services/json_repair.py` attempts to coerce the raw text into valid JSON.
 4. Validate into the caller's payload model (Pydantic).
@@ -328,10 +339,11 @@ first, then hand-merge.
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | Hazard sources the AI must check for every step (both the built-in AI and the advanced mode's outside-AI prompt) | `config/jsa-rules.yaml` → `hazard_checklist` |
 | Site wording the AI must use (e.g. "Check Gas" not "Gas Test") — every JSA and procedure prompt, built-in and outside-AI | `config/jsa-rules.yaml` → `terminology` |
-| How the AI thinks / what it must not do | `prompts/jsa-generate.md` |
+| How the AI thinks / what it must not do (both the built-in AI and the ใช้ AI ภายนอก prompt) | `prompts/jsa-rules.md` |
+| The built-in AI's role line and exact JSON shape | `prompts/jsa-generate.md` |
 | Work procedure titles / section headings / labels | `config/procedure.yaml` (optional file — deleting it falls back to built-in defaults) |
 | Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |
-| How the AI writes the procedure | `prompts/procedure-generate.md` |
+| How the AI writes the procedure (both AIs) | `prompts/procedure-rules.md` (built-in AI's role/JSON: `prompts/procedure-generate.md`) |
 | Word (.docx) export layout | `frontend/src/lib/word/` (keep in step with the PDF builders) |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
 | History entry cap | `frontend/src/history.ts` → `MAX_ENTRIES` |

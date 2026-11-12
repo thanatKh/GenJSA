@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Copy, FileUp } from "lucide-react";
-import { Button, FieldError, Label } from "../../components/ui";
-import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, type DetailLevel } from "../../lib/personalAi";
+import { Button, FieldError, Input, Label } from "../../components/ui";
+import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, MAX_SUB_STEPS, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
 import type { JsaPromptRules } from "../../lib/api";
 
@@ -34,7 +34,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [saved] = useState(() => {
     const value = advancedDraft.load(kind, scope);
     if (!value) return null;
-    const hasEdits = value.work !== value.source || value.answer.trim() || value.instructions.trim() || value.level !== "มาตรฐาน" || value.split;
+    const hasEdits = value.work !== value.source || value.answer.trim() || value.instructions.trim() || value.level !== "มาตรฐาน" || value.split || value.target;
     return value.source === description || hasEdits ? value : null;
   });
   const [source, setSource] = useState(saved?.source ?? description);
@@ -42,11 +42,12 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [work, setWork] = useState(saved?.work ?? description);
   const [instructions, setInstructions] = useState(saved?.instructions ?? "");
   const [split, setSplit] = useState(saved?.split ?? false);
+  const [target, setTarget] = useState(saved?.target ?? "");
   const [answer, setAnswer] = useState(saved?.answer ?? "");
   const [draft, setDraft] = useState<T | null>(null);
   useEffect(() => {
-    advancedDraft.save(kind, { source, work, level, instructions, answer, split }, scope);
-  }, [kind, source, work, level, instructions, answer, split, scope]);
+    advancedDraft.save(kind, { source, work, level, instructions, answer, split, target }, scope);
+  }, [kind, source, work, level, instructions, answer, split, target, scope]);
   const [error, setError] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const promptField = useRef<HTMLTextAreaElement>(null);
@@ -54,9 +55,16 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileStatus, setFileStatus] = useState("");
   const [dragging, setDragging] = useState(false);
+  // The rough sub-step total (only with split). Main steps the user listed
+  // as "1." / "2)" — not "1.1" — cap it: each takes at most MAX_SUB_STEPS
+  const targetNumber = /^\d{1,4}$/.test(target.trim()) && Number(target) > 0 ? Number(target) : undefined;
+  const listedMainSteps = (work.match(/^\s*\d+\s*[.)](?!\d)/gm) ?? []).length;
+  const targetCap = listedMainSteps ? listedMainSteps * MAX_SUB_STEPS : undefined;
+  const overCap = !!(targetNumber && targetCap && targetNumber > targetCap);
+  const subStepTarget = targetNumber && targetCap ? Math.min(targetNumber, targetCap) : targetNumber;
   const prompt = kind === "wp"
     ? buildPersonalProcedurePrompt(work, level, instructions, jsaRules)
-    : buildPersonalPrompt(work, level, instructions, jsaRules, split);
+    : buildPersonalPrompt(work, level, instructions, jsaRules, split, split ? subStepTarget : undefined);
   const sourceChanged = source !== description;
   const subCount = draft?.steps.reduce((n, step) => n + (step.sub_steps?.length ?? 0), 0) ?? 0;
   const fileName = answerFileNames[kind];
@@ -171,6 +179,19 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             </span>
           </label>
         ) : null}
+        {kind === "jsa" && split ? (
+          <div className="-mt-1 ps-6">
+            <Label htmlFor="personal-target">จำนวนขั้นตอนย่อยรวมโดยประมาณ (ไม่บังคับ)</Label>
+            <Input id="personal-target" type="number" inputMode="numeric" min={1} max={9999} className="w-32"
+              value={target} aria-describedby="personal-target-hint"
+              onChange={(e) => { setTarget(e.target.value); setCopyStatus(""); }} />
+            <p id="personal-target-hint" className={`mt-1 text-sm ${overCap ? "text-danger-text" : "text-muted"}`}>
+              {overCap
+                ? `ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้สูงสุด ${targetCap} ขั้นตอนย่อย (ข้อละไม่เกิน ${MAX_SUB_STEPS}) จะขอ AI ไม่เกิน ${targetCap} ข้อ`
+                : "เว้นว่างไว้ ให้ AI กำหนดตามงานจริง ตัวเลขนี้เป็นค่าประมาณ AI จะกระจายตามความซับซ้อนของแต่ละขั้นตอน"}
+            </p>
+          </div>
+        ) : null}
         <div>
           <Label htmlFor="personal-instructions">คำขอเพิ่มเติม (ไม่บังคับ)</Label>
           <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); setCopyStatus(""); }} />
@@ -230,6 +251,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             <p role="status" className="font-medium">
               {draft.work_activity ?? draft.header?.work_activity ?? "ตรวจรูปแบบแล้ว"} · {draft.steps.length} ขั้นตอน
               {kind === "jsa" && subCount ? ` · ${subCount} ขั้นตอนย่อย` : ""}
+              {kind === "jsa" && split && subStepTarget ? ` (ตั้งไว้ประมาณ ${subStepTarget})` : ""}
             </p>
             <ol className="max-h-32 list-decimal overflow-y-auto ps-5">
               {draft.steps.map((step) => (

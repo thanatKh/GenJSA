@@ -165,6 +165,9 @@ export type JsaPromptRules = {
   considerWhenRelevant: string[];
   // Optional: a backend from before the word list doesn't send it
   terminology?: { use: string; insteadOf: string[] }[];
+  /** prompts/jsa-rules.md and procedure-rules.md, rendered as the built-in
+   * AI gets them — the outside-AI prompts wrap these. Optional like the above. */
+  prompts?: { jsa: string; procedure: string };
 };
 
 export async function fetchPublicConfig(): Promise<PublicConfig | null> {

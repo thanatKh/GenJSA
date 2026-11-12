@@ -81,6 +81,8 @@ type AdvancedDraft = {
   /** JSA only: ask the AI to split every main step into sub-steps. Optional
    * so drafts saved before it existed still load. */
   split?: boolean;
+  /** With split: the rough total of sub-steps asked for, as typed ("" = none) */
+  target?: string;
 };
 const ADVANCED_PREFIX = "genjsa.draft.advanced.";
 const advancedKey = (kind: AdvancedKind, scope = "single") => `${ADVANCED_PREFIX}${kind}.${scope}`;

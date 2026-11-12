@@ -9,12 +9,12 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pydantic import BaseModel, ValidationError
 
 from ..core.config import PROMPTS_DIR, Settings
 from ..core.errors import AppError, Errors
-from ..models.jsa import AiJsaPayload, GenerateRequest, JsaDocument, JsaHeader, ProjectContext
+from ..models.jsa import MAX_SUB_STEPS, AiJsaPayload, GenerateRequest, JsaDocument, JsaHeader, ProjectContext
 from ..providers.llm.base import LLMProvider
 from .json_repair import repair_and_parse
 
@@ -28,20 +28,43 @@ _RETRY_REMINDER = (
 )
 
 
-def render_prompt(filename: str, **context: object) -> str:
-    """Load a prompt from disk every time and render it as a Jinja2 template.
+# A loader rather than a bare Template so prompts can {% include %} the shared
+# rules files. auto_reload re-reads a changed file on the next render, so
+# editing a prompt still takes effect immediately during dev. StrictUndefined
+# turns a missing value into an error instead of a silent blank in the prompt.
+_PROMPTS = Environment(
+    loader=FileSystemLoader(PROMPTS_DIR),
+    auto_reload=True,
+    undefined=StrictUndefined,
+    keep_trailing_newline=True,
+)
 
-    Not cached, so editing a prompt takes effect immediately during dev
-    (the files are small, so this is cheap).
-    """
-    path = PROMPTS_DIR / filename
-    if not path.exists():
-        raise RuntimeError(f"Prompt file not found: {path}")
-    return Template(path.read_text(encoding="utf-8")).render(**context)
+
+def render_prompt(filename: str, **context: object) -> str:
+    """Render a prompt file from prompts/ as a Jinja2 template."""
+    if not (PROMPTS_DIR / filename).exists():
+        raise RuntimeError(f"Prompt file not found: {PROMPTS_DIR / filename}")
+    return _PROMPTS.get_template(filename).render(**context)
+
+
+def jsa_prompt_context(settings: Settings) -> dict[str, object]:
+    """Everything jsa-generate.md and jsa-rules.md read — one place, so the
+    built-in prompt and the outside-AI rules (public config) can't drift."""
+    return {"rules": settings.rules, "max_sub_steps": MAX_SUB_STEPS}
+
+
+def procedure_prompt_context(settings: Settings) -> dict[str, object]:
+    """Same, for procedure-generate.md and procedure-rules.md. Terminology is
+    the JSA's word list: one list for both documents."""
+    return {
+        "rules": settings.procedure,
+        "terminology": settings.rules.terminology,
+        "max_sub_steps": MAX_SUB_STEPS,
+    }
 
 
 def _load_system_prompt(settings: Settings) -> str:
-    return render_prompt("jsa-generate.md", rules=settings.rules)
+    return render_prompt("jsa-generate.md", **jsa_prompt_context(settings))
 
 
 def _build_user_prompt(request: GenerateRequest) -> str:

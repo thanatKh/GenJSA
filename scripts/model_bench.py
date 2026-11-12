@@ -156,7 +156,7 @@ def report(results: list[dict]) -> None:
     print("  JSON ok    — below 90%, increase retry.max_attempts in config/ai.yaml")
     print("  steps      — should sit in the 3-12 range per jsa-rules.yaml")
     print("  title len  — over ~60 characters usually means the AI is writing work")
-    print("               instructions instead of task-level steps — reinforce that in prompts/jsa-generate.md")
+    print("               instructions instead of task-level steps — reinforce that in prompts/jsa-rules.md")
     print("\nPick whichever model is most stable at returning JSON first, then judge content quality.")
     print("Put the chosen model into config/ai.yaml -> model:")
 

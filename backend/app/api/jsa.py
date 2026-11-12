@@ -14,7 +14,7 @@ from ..core.config import get_settings
 from ..core.ratelimit import enforce
 from ..models.jsa import GenerateRequest, JsaDocument
 from ..models.procedure import GenerateProcedureRequest, ProcedureDocument
-from ..services.ai_service import generate_jsa
+from ..services.ai_service import generate_jsa, jsa_prompt_context, procedure_prompt_context, render_prompt
 from ..services.procedure_service import generate_procedure
 
 logger = logging.getLogger("genjsa")
@@ -76,6 +76,15 @@ async def public_config() -> dict:
             "terminology": [
                 {"use": t.use, "insteadOf": t.instead_of} for t in settings.rules.terminology
             ],
+            # The drafting rules themselves, rendered exactly as the built-in
+            # AI's system prompt includes them (prompts/jsa-rules.md and
+            # procedure-rules.md). The ใช้ AI ภายนอก screen wraps them into the
+            # prompt the user copies, so both AIs follow one set of rules. Not
+            # a secret — the user sees that prompt anyway; no model name or key.
+            "prompts": {
+                "jsa": render_prompt("jsa-rules.md", **jsa_prompt_context(settings)).strip(),
+                "procedure": render_prompt("procedure-rules.md", **procedure_prompt_context(settings)).strip(),
+            },
         },
         "limits": {
             "workDescriptionMaxChars": settings.app.limits.work_description_max_chars,
