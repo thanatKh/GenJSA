@@ -209,7 +209,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
               onChange={(e) => { setTarget(e.target.value); setCopyStatus(""); }} />
             <p id="personal-target-hint" className={`mt-1 text-sm ${overCap ? "text-danger-text" : "text-muted"}`}>
               {overCap
-                ? `สูงสุด ${targetCap} ข้อ (ขั้นตอนหลักละไม่เกิน ${MAX_SUB_STEPS})`
+                ? `ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้ข้อละไม่เกิน ${MAX_SUB_STEPS} รวมสูงสุด ${targetCap} ข้อย่อย`
                 : "เว้นว่างได้ AI จะกำหนดตามงานจริง"}
             </p>
           </div>
