@@ -104,7 +104,8 @@ npm run test:e2e   # Playwright browser tests (e2e/) — about half a minute
   `src/test/fixtures.ts`.
 - **Browser (Playwright, `e2e/`, config `playwright.config.ts`)** — the four
   ways through the app (JSA / JSA + Procedure × built-in / outside AI), the
-  history row's WP button, the editor's sub-step actions, and the PDF/Word
+  history row's WP button, the ใช้ AI ภายนอก screen (folded prompt, drop
+  zone, check button), the editor's sub-step actions, and the PDF/Word
   builders, each at desktop and phone width (`desktop` / `phone` projects).
   `e2e/helpers.ts`'s `mockApi` answers every `/api` call — the generate
   endpoints with small documents, `/api/config/public` with a 503 so the app

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Copy, FileUp } from "lucide-react";
+import { ArrowLeft, ChevronDown, Copy, FileUp } from "lucide-react";
 import { Button, FieldError, Input, Label } from "../../components/ui";
 import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, MAX_SUB_STEPS, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
@@ -53,6 +53,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const promptField = useRef<HTMLTextAreaElement>(null);
   const answerField = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const promptDetails = useRef<HTMLDetailsElement>(null);
   const [fileStatus, setFileStatus] = useState("");
   const [dragging, setDragging] = useState(false);
   // The rough sub-step total (only with split). Main steps the user listed
@@ -106,6 +107,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       await navigator.clipboard.writeText(prompt);
       setCopyStatus("คัดลอกคำสั่งแล้ว");
     } catch {
+      // No clipboard access (some iOS cases): open the prompt and select it
+      // so the device's own copy menu works on it
+      if (promptDetails.current) promptDetails.current.open = true;
       promptField.current?.focus();
       promptField.current?.select();
       setCopyStatus("เลือกข้อความแล้ว กรุณาคัดลอกด้วยเมนูของอุปกรณ์");
@@ -196,14 +200,21 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <Label htmlFor="personal-instructions">คำขอเพิ่มเติม (ไม่บังคับ)</Label>
           <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); setCopyStatus(""); }} />
         </div>
-        <div>
-          <Label htmlFor="personal-prompt">คำสั่งที่จะคัดลอก</Label>
-          <textarea id="personal-prompt" ref={promptField} rows={3} readOnly className={textAreaClass} value={prompt} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => void copy()}><Copy className="size-4" aria-hidden="true" /> คัดลอกคำสั่ง</Button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button type="button" onClick={() => void copy()}><Copy className="size-4" aria-hidden="true" /> คัดลอกคำสั่ง</Button>
           <span role="status" className="text-muted">{copyStatus}</span>
         </div>
+        {/* The prompt itself, closed by default: the copy button is what most
+            people need, but the text stays one tap away so anyone can check
+            what is about to leave for an outside AI. */}
+        <details ref={promptDetails} className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+            ดูคำสั่งที่จะส่ง
+          </summary>
+          <label htmlFor="personal-prompt" className="sr-only">คำสั่งที่จะคัดลอก</label>
+          <textarea id="personal-prompt" ref={promptField} rows={8} readOnly className={textAreaClass} value={prompt} />
+        </details>
       </section>
       <form aria-labelledby="personal-import-heading"
         className={`grid gap-3 rounded-card border p-4 sm:p-5 ${dragging ? "border-navy bg-navy-soft" : "border-line"}`}
@@ -224,12 +235,19 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           void readFile(file);
         }}>
         <h2 id="personal-import-heading" className="text-lg font-semibold text-ink">2. นำคำตอบกลับมา</h2>
-        <p className="text-muted">เลือกไฟล์ที่ดาวน์โหลดจาก AI หรือลากไฟล์มาวางในกรอบนี้ หรือวางข้อความ JSON ในช่องด้านล่าง</p>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* The drop zone. The whole card takes a drop too (the form's own
+            handlers); this box is what says so. Phones can't drag files, so
+            there it's just the button. */}
+        <div className={`grid justify-items-center gap-2 rounded-field border-2 border-dashed p-5 text-center transition-colors ${
+          dragging ? "border-navy bg-navy-soft" : "border-line"
+        }`}>
+          <FileUp className="size-7 text-muted pointer-coarse:hidden" aria-hidden="true" />
+          <p className="text-ink pointer-coarse:hidden">ลากไฟล์คำตอบ ({fileName}) มาวางที่นี่</p>
+          <p className="text-sm text-muted pointer-coarse:hidden">หรือ</p>
           <Button type="button" variant="outline" disabled={sourceChanged} onClick={() => fileInput.current?.click()}>
             <FileUp className="size-4" aria-hidden="true" /> เลือกไฟล์คำตอบ
           </Button>
-          <span role="status" className="text-muted [overflow-wrap:anywhere]">{fileStatus}</span>
+          <span role="status" className="text-sm text-muted [overflow-wrap:anywhere]">{fileStatus}</span>
           <input ref={fileInput} type="file" accept=".json,.txt,application/json,text/plain" className="hidden"
             aria-label="เลือกไฟล์คำตอบจาก AI"
             onChange={(event) => {
@@ -239,13 +257,17 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             }} />
         </div>
         <div>
-          <Label htmlFor="personal-answer">หรือวางคำตอบ JSON จาก AI</Label>
+          <Label htmlFor="personal-answer">หรือวางคำตอบ JSON จาก AI (ถ้า AI ตอบเป็นข้อความ)</Label>
           <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
             aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
             onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); setFileStatus(""); }} />
           <FieldError id="personal-answer-error">{error}</FieldError>
         </div>
-        <Button type="submit" variant="outline" disabled={sourceChanged} className="justify-self-start">ตรวจรูปแบบคำตอบ</Button>
+        {/* The way forward, so it's the primary button — until the answer
+            checks out, when "เปิดร่างเพื่อตรวจทาน" below takes its place */}
+        {draft && !sourceChanged ? null : (
+          <Button type="submit" disabled={sourceChanged || !answer.trim()} className="justify-self-start">ตรวจรูปแบบคำตอบ</Button>
+        )}
         {draft && !sourceChanged ? (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-lg bg-navy-soft p-3 [overflow-wrap:anywhere]">
             <p role="status" className="font-medium">
