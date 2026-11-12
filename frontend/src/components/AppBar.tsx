@@ -68,7 +68,7 @@ export function AppBar({
       <img src={logoUrl} alt="OR" width={2453} height={999} className="h-7 w-auto shrink-0 sm:h-9" />
       <span className="hidden h-8 w-px shrink-0 bg-line sm:block" aria-hidden="true" />
       <span className="min-w-0 text-left">
-        <span className="block font-title text-lg font-semibold leading-tight tracking-tight text-navy">
+        <span className="block font-title text-[1.375rem] font-semibold leading-tight tracking-tight text-navy sm:text-lg">
           {appName}
         </span>
         {/* Hidden below sm: at phone width it only ever showed as a

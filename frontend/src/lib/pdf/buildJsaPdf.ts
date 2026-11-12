@@ -115,9 +115,13 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     // Reserve a small right inset for the bold heading, including when
     // the whole step is a heading with no separate description.
     const headingW = innerW[0] - mmToPt(1);
+    const title = wrap(step.procedure, headingW, "bold", L.font.body_pt, step.kind === "sub" ? step.no : `${step.no}.`);
+    // Details sit under the title's text, not under its number — the same
+    // hanging indent the title's own second line gets
+    const indent = title[0]?.indent ?? 0;
     const procedure: Line[] = [
-      ...wrap(step.procedure, headingW, "bold", L.font.body_pt, step.kind === "sub" ? step.no : `${step.no}.`),
-      ...wrap(step.details, innerW[0], "normal", L.font.body_pt),
+      ...title,
+      ...wrap(step.details, innerW[0] - indent, "normal", L.font.body_pt).map((line) => ({ ...line, indent: line.indent + indent })),
     ];
 
     // A heading's hazards live on its sub-steps: leave its two right cells

@@ -161,9 +161,6 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       ) : null}
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
-        <p className="text-muted">
-          ตัดข้อมูลภายในที่ไม่ควรแชร์ออกก่อนคัดลอก
-        </p>
         <div>
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
           <textarea id="personal-work" rows={3} maxLength={kind === "jsa" ? 5000 : undefined} className={textAreaClass} value={work}

@@ -20,7 +20,7 @@ import {
 } from "../pdf/layout";
 import { jsaRows, type JsaDocument } from "../schema";
 import { formatThaiDate } from "../thaidate";
-import { createWordKit, halfPt, mm, toBlob } from "./common";
+import { createWordKit, halfPt, markerIndent, mm, toBlob } from "./common";
 
 type BuildOptions = {
   layout?: PdfLayout;
@@ -130,7 +130,8 @@ function jsaBody(
     const heading = step.kind === "heading";
     const marker = step.kind === "sub" ? step.no : `${step.no}.`;
     const procedure = [K.markedParagraph(step.procedure, { marker, bold: true, keepNext: heading })];
-    if (step.details.trim()) procedure.push(K.markedParagraph(step.details, { keepNext: heading }));
+    // Details sit under the title's text, as in the PDF
+    if (step.details.trim()) procedure.push(K.markedParagraph(step.details, { keepNext: heading, left: markerIndent(marker, 0, true).left }));
     if (heading) {
       return [
         new TableRow({
