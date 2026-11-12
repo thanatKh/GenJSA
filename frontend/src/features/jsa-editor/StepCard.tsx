@@ -352,10 +352,7 @@ export function StepCard<T extends RowFields>({
         </div>
 
         {heading ? (
-          <div className="col-span-2 flex flex-col items-start justify-between gap-2 bg-raised p-3">
-            <p className="text-sm text-muted">
-              ขั้นตอนนี้เป็นหัวข้อ อันตรายและมาตรการอยู่ที่ขั้นตอนย่อยด้านล่าง
-            </p>
+          <div className="col-span-2 flex flex-col items-start justify-end bg-white p-2">
             {onAddSub ? (
               <Button type="button" variant="ghost" size="sm" onClick={onAddSub} className="text-sm">
                 <Plus className="size-4" aria-hidden="true" />
@@ -486,10 +483,9 @@ export function StepCard<T extends RowFields>({
         </div>
 
         {heading ? (
-          <div className="rounded-field bg-raised p-2.5">
-            <p className="text-sm text-muted">ขั้นตอนนี้เป็นหัวข้อ อันตรายและมาตรการอยู่ที่ขั้นตอนย่อยด้านล่าง</p>
+          <div>
             {onAddSub ? (
-              <Button type="button" variant="ghost" onClick={onAddSub} className="mt-1">
+              <Button type="button" variant="ghost" onClick={onAddSub}>
                 <Plus className="size-4" aria-hidden="true" />
                 เพิ่มขั้นตอนย่อย
               </Button>

@@ -121,8 +121,8 @@ function jsaBody(
 
   // ------------------------------------------------------------------ steps --
   const dash = () => K.markedParagraph("—");
-  // Same rows as the PDF: a step split into sub-steps is a shaded heading
-  // row (kept with the next row) followed by its 1.1, 1.2 … rows
+  // Same rows as the PDF: a step split into sub-steps is a heading row
+  // (kept with the next row) followed by its 1.1, 1.2 … rows
   // Same rule as the PDF: in a JSA with sub-steps, "1.1" is a step number,
   // so controls are bulleted instead of numbered to their hazard
   const numberControls = !jsa.steps.some((s) => s.sub_steps.length);
@@ -136,9 +136,9 @@ function jsaBody(
         new TableRow({
           cantSplit: true,
           children: [
-            K.cell(procedure, { width: colW[0], top: true, shaded: true }),
-            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[1], shaded: true }),
-            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[2], shaded: true }),
+            K.cell(procedure, { width: colW[0], top: true }),
+            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[1] }),
+            K.cell([K.markedParagraph("", { keepNext: true })], { width: colW[2] }),
           ],
         }),
       ];

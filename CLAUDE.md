@@ -150,7 +150,7 @@ document. `ProcedureDocument` does the same for its steps and sub-steps.
 **JSA sub-steps (1.1, 1.2 …).** For detailed work a JSA step can be split
 into `sub_steps` (each with its own `procedure`/`details`/`hazards`, max
 `MAX_SUB_STEPS` = 20, matching the WP's sub-step cap). A step with sub-steps is
-a **heading**: it prints as a shaded row with no hazards, and
+a **heading**: it prints as a plain row with no hazards, and
 `JsaStep.heading_has_no_hazards` clears any it's given, so hazards can't print
 twice. Old documents have no `sub_steps` and default to `[]` everywhere (zod
 `.default([])`, and `store.ts` runs session drafts through the schema).

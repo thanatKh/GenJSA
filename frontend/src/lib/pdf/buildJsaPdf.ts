@@ -29,8 +29,8 @@ import {
 type Row = {
   cells: [Line[], Line[], Line[]];
   dividers: number[];
-  /** A step split into sub-steps: a shaded heading row with no hazards,
-   * never left alone at the foot of a page without its first sub-step */
+  /** A step split into sub-steps: a heading row with no hazards, never left
+   * alone at the foot of a page without its first sub-step */
   heading?: boolean;
 };
 
@@ -311,12 +311,7 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     doc.setLineWidth(L.table.border_width_pt);
     doc.setDrawColor(...border);
     colW.forEach((w, i) => {
-      if (row.heading) {
-        doc.setFillColor(...fill);
-        doc.rect(colX[i], top, w, height, "FD");
-      } else {
-        doc.rect(colX[i], top, w, height);
-      }
+      doc.rect(colX[i], top, w, height);
       row.cells[i].slice(from, from + count).forEach((line, n) => {
         if (!line.text && !line.marker) return;
         const offset = i === 0 ? n * lineH : offsetTo(row, from, from + n);
