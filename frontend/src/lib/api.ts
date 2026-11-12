@@ -153,9 +153,14 @@ export type PublicConfig = {
   document: DocumentMeta;
   // The work procedure document (config/procedure.yaml)
   procedure: ProcedureMeta;
+  // config/jsa-rules.yaml lists the advanced mode's outside-AI prompt shares
+  // with the built-in one. Optional: an older backend doesn't send it.
+  jsaRules?: JsaPromptRules;
   // Values used to draw the PDF client-side — the full config/pdf.yaml
   pdf: PdfLayout;
 };
+
+export type JsaPromptRules = { hazardChecklist: string[]; considerWhenRelevant: string[] };
 
 export async function fetchPublicConfig(): Promise<PublicConfig | null> {
   // Config is a nice-to-have — if it fails to load, fall back to on-screen defaults, no error needed

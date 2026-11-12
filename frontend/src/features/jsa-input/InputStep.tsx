@@ -37,6 +37,7 @@ import { advancedDraft, inputDraft } from "../../store";
 import { GeneratingPanel } from "./GeneratingPanel";
 import { AdvancedDraftScreen } from "./AdvancedDraftScreen";
 import { parsePersonalDraft } from "../../lib/personalAi";
+import type { JsaPromptRules } from "../../lib/api";
 
 const EMPTY_FORM = (): InputForm => ({
   supervisor: "",
@@ -154,6 +155,7 @@ export function InputStep({
   onCancelGenerate,
   busy,
   error,
+  jsaRules,
 }: {
   /** ModeChoice's "JSA + Procedure", chosen above this form (App.tsx). Only
    * changes the wording here: this screen drafts the JSA either way, and the
@@ -178,6 +180,8 @@ export function InputStep({
   onCancelGenerate?: () => void;
   busy: boolean;
   error: string | null;
+  /** config/jsa-rules.yaml's lists, for the advanced mode's prompt. */
+  jsaRules?: JsaPromptRules;
 }) {
   const [confirmReset, setConfirmReset] = useState(false);
   // Picked once per mount (not per render/keystroke) — re-rolling while the
@@ -269,6 +273,7 @@ export function InputStep({
     return (
       <AdvancedDraftScreen
         kind="jsa"
+        jsaRules={jsaRules}
         description={getValues("work_description")}
         backLabel="กลับไปกรอกข้อมูล"
         onBack={onCloseAdvanced}

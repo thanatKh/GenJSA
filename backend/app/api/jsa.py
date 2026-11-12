@@ -67,6 +67,13 @@ async def public_config() -> dict:
             "labels": proc.labels.model_dump(),
             "sections": proc.sections.model_dump(),
         },
+        # config/jsa-rules.yaml — the advanced mode builds its prompt for
+        # outside AIs in the browser, so it needs the same drafting lists the
+        # built-in AI's prompt gets
+        "jsaRules": {
+            "hazardChecklist": settings.rules.hazard_checklist,
+            "considerWhenRelevant": settings.rules.consider_when_relevant,
+        },
         "limits": {
             "workDescriptionMaxChars": settings.app.limits.work_description_max_chars,
             "supervisorMaxChars": settings.app.limits.supervisor_max_chars,

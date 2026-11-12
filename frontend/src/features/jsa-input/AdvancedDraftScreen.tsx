@@ -3,13 +3,14 @@ import { ArrowLeft, Copy, FileUp } from "lucide-react";
 import { Button, FieldError, Label } from "../../components/ui";
 import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
+import type { JsaPromptRules } from "../../lib/api";
 
 const textAreaClass = "w-full min-w-0 resize-y rounded-lg border border-line bg-surface p-3 text-base focus-visible:outline-2 focus-visible:outline-navy";
 
 type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: unknown[] };
 type PreviewDraft = { steps: PreviewStep[]; work_activity?: string; header?: { work_activity: string } };
 
-export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description, scope, backLabel, onBack, parse, onImport }: {
+export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description, scope, backLabel, onBack, parse, onImport, jsaRules }: {
   kind: AdvancedKind;
   description: string;
   scope?: string;
@@ -17,6 +18,8 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   onBack: () => void;
   parse: (answer: string) => T;
   onImport: (draft: T) => void;
+  /** config/jsa-rules.yaml's lists, for the JSA prompt (unused for WP). */
+  jsaRules?: JsaPromptRules;
 }) {
   const [saved] = useState(() => {
     const value = advancedDraft.load(kind, scope);
@@ -40,8 +43,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileStatus, setFileStatus] = useState("");
   const [dragging, setDragging] = useState(false);
-  const buildPrompt = kind === "wp" ? buildPersonalProcedurePrompt : buildPersonalPrompt;
-  const prompt = buildPrompt(work, level, instructions);
+  const prompt = kind === "wp"
+    ? buildPersonalProcedurePrompt(work, level, instructions)
+    : buildPersonalPrompt(work, level, instructions, jsaRules);
   const sourceChanged = source !== description;
   const fileName = answerFileNames[kind];
 

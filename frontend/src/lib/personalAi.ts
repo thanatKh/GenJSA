@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { JsaPromptRules } from "./api";
 import { FALLBACK_PROCEDURE } from "./pdf/layout";
 import { jsaFingerprint, type JsaDocument, type ProcedureDocument } from "./schema";
 import { formatThaiDate } from "./thaidate";
@@ -18,13 +19,26 @@ function answerAsFile(fileName: string) {
   return `ส่งคำตอบเป็นไฟล์ให้ดาวน์โหลด ชื่อ ${fileName} เนื้อหาในไฟล์เป็น JSON ล้วน (UTF-8) ไม่มีข้อความอื่นปน และไม่ต้องแสดง JSON ซ้ำในแชต หากสร้างไฟล์ไม่ได้ ให้ตอบ JSON ทั้งชุดในกล่องโค้ดเดียวแทน`;
 }
 
-export function buildPersonalPrompt(description: string, level: DetailLevel, instructions: string) {
+/* Without config (an older backend, or it failed to load) the prompt still
+ * asks for a per-step scan, naming a few sources instead of the full list. */
+function hazardScan(rules?: JsaPromptRules) {
+  const list = rules?.hazardChecklist.length
+    ? `\n${rules.hazardChecklist.map((item) => `- ${item}`).join("\n")}`
+    : " เช่น แรงดันและพลังงานสะสม สารไวไฟ ก๊าซพิษ ไฟฟ้า เครื่องจักร ที่สูงและวัตถุตกหล่น ความร้อน การยก และสภาพแวดล้อม";
+  return `ก่อนเขียนอันตรายของแต่ละขั้นตอน ให้ไล่ตรวจแหล่งอันตรายต่อไปนี้ทีละข้อ แล้วใส่ทุกข้อที่เกิดได้จริงในขั้นตอนนั้น${list}`;
+}
+
+export function buildPersonalPrompt(description: string, level: DetailLevel, instructions: string, rules?: JsaPromptRules) {
   return [
     "ร่างการวิเคราะห์งานเพื่อความปลอดภัย (JSA) ภาษาไทยสำหรับให้ผู้รับผิดชอบตรวจทาน",
     `ระดับรายละเอียด: ${level} โดยยังคงอันตรายและมาตรการสำคัญครบถ้วน`,
     "เรียงขั้นตอนตามลำดับงาน ขั้นตอนเดียวมีอันตรายได้หลายข้อ ให้สำรวจอันตรายที่เกี่ยวข้องให้ครบก่อนเขียนมาตรการ",
+    hazardScan(rules),
     "ใน hazards ให้แยกหนึ่งอันตรายต่อหนึ่ง object พร้อม controls ของอันตรายนั้นเอง หากพบหลายข้อให้ใส่หลาย object ในขั้นตอนเดิม อย่ารวมหลายอันตรายไว้ในข้อความเดียวหรือแยกขั้นตอนเพียงเพื่อให้เหลือข้อเดียว",
-    "จำนวนอันตรายให้เป็นไปตามงานจริง ตัวอย่างด้านล่างแสดงสองข้อเพื่อสาธิตโครงสร้าง หากพบเพียงข้อเดียวให้ใส่ข้อเดียวโดยไม่เพิ่มข้อที่ไม่เกี่ยวข้อง",
+    "จำนวนอันตรายให้เป็นไปตามงานจริง ตัวอย่างด้านล่างแสดงสองข้อเพื่อสาธิตโครงสร้างเท่านั้น ใส่อันตรายเพียงข้อเดียวได้ก็ต่อเมื่อไล่ตรวจครบแล้วพบจริงเพียงข้อเดียว และห้ามเติมข้อที่ไม่เกี่ยวข้องเพื่อให้ได้จำนวน",
+    rules?.considerWhenRelevant.length
+      ? `พิจารณาหัวข้อต่อไปนี้ถ้าเกี่ยวข้องกับงาน (ถ้าไม่เกี่ยวข้องไม่ต้องใส่):\n${rules.considerWhenRelevant.map((item) => `- ${item}`).join("\n")}`
+      : "",
     "ใช้ข้อมูลที่ให้มา อย่าเดาค่าทางวิศวกรรม ข้อกำหนด หรือสภาพหน้างาน สิ่งที่ต้องยืนยันให้ใส่ใน assumptions",
     "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่เลขข้อหรือข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
     answerAsFile(answerFileNames.jsa),

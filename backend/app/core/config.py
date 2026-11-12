@@ -218,6 +218,7 @@ class JsaGeneration(BaseModel):
 class JsaRulesConfig(BaseModel):
     generation: JsaGeneration = Field(default_factory=JsaGeneration)
     consider_when_relevant: list[str] = Field(default_factory=list)
+    hazard_checklist: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #

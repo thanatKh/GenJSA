@@ -795,6 +795,7 @@ export default function App() {
                       ) : (
                         <InputStep
                           withProcedure={mode === "procedure"}
+                          jsaRules={config?.jsaRules}
                           onGenerate={handleGenerate}
                           onImportDraft={openNewDraft}
                           advanced={view.kind === "advancedInput"}
@@ -849,7 +850,7 @@ export default function App() {
             {view?.kind === "advancedPhase" ? (
               <div className="mx-auto max-w-[45rem]">
                 {view.document === "jsa" ? (
-                  <AdvancedDraftScreen kind="jsa" scope={`${projectState?.id}.${view.phase.id}`}
+                  <AdvancedDraftScreen kind="jsa" jsaRules={config?.jsaRules} scope={`${projectState?.id}.${view.phase.id}`}
                     description={`${view.phase.work}\n${view.phase.description}`}
                     backLabel="กลับไป JSA แต่ละขั้นตอน"
                     onBack={() => goto(10)} parse={parsePersonalDraft}

@@ -17,6 +17,27 @@ generation:
   hazards_per_step_min: 1
   hazards_per_step_max: 4
 
+# Hazard sources the AI must run through for EVERY step before writing that
+# step's hazards — it lists only the ones that really apply. This is what
+# stops a step from getting just its single most obvious hazard. Shared by the
+# built-in AI's prompt and the advanced mode's prompt for outside AIs.
+hazard_checklist:
+  - "แรงดันและพลังงานสะสม (ของไหลแรงดัน สปริง ไฮดรอลิก นิวแมติก)"
+  - "สารไวไฟและแหล่งจุดติดไฟ (ไอน้ำมัน ไฟฟ้าสถิต ประกายไฟ)"
+  - "ก๊าซพิษหรือออกซิเจนไม่เพียงพอ (H₂S เบนซีน ไนโตรเจน ไอระเหยสารเคมี)"
+  - "สารเคมีสัมผัสผิวหนังหรือกระเด็นเข้าตา"
+  - "ไฟฟ้า"
+  - "เครื่องจักรหมุน ชิ้นส่วนเคลื่อนที่ จุดหนีบหรือตัด"
+  - "ตกจากที่สูงหรือวัตถุตกหล่น"
+  - "งานยกและการเคลื่อนย้ายด้วยเครื่องจักร"
+  - "ความร้อนหรือความเย็น (พื้นผิวร้อน ไอน้ำ ของเหลวเย็นจัด)"
+  - "การยกของด้วยแรงคนและท่าทางการทำงาน"
+  - "เสียงดังและความสั่นสะเทือน"
+  - "สภาพแวดล้อม (อากาศร้อน ฝน ฟ้าผ่า พื้นลื่น แสงสว่างไม่พอ)"
+  - "ยานพาหนะและการจราจรในพื้นที่"
+  - "งานอื่นที่ทำพร้อมกันในพื้นที่ (SIMOPS) และบุคคลภายนอก"
+  - "การรั่วไหลสู่สิ่งแวดล้อม (ดิน ท่อระบายน้ำ)"
+
 # Topics the AI must "consider while drafting" when relevant to the work
 # Note: this is not a review system — there is no AI-based JSA review anymore
 # Verification is the job of the supervisor/reviewer, who is a human
