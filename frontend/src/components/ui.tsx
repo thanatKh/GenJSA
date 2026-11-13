@@ -15,11 +15,11 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { TriangleAlert, Undo2 } from "lucide-react";
+import { ChevronDown, TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 
-import { collapse } from "../lib/motion";
+import { collapse, EASE_OUT, FAST } from "../lib/motion";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Label as ShadcnLabel } from "./ui/label";
@@ -271,6 +271,66 @@ export function Reveal({ show, children, className }: { show: boolean; children:
         </motion.div>
       ) : null}
     </AnimatePresence>
+  );
+}
+
+/* -------------------------------------------------------------- Disclosure */
+
+/**
+ * A fold-out: a trigger line with a chevron, and a panel that opens and
+ * closes by height and opacity. Animated with Motion rather than a native
+ * <details> + CSS (::details-content with interpolate-size), because that
+ * CSS only animates in Chrome and Edge — Safari and Firefox open it
+ * instantly, and most of GenJSA's users are on a phone.
+ *
+ * The panel stays mounted while closed (callers may read or select its
+ * contents), but is inert and visibility:hidden — out of the tab order, the
+ * accessibility tree and find-in-page — once the close animation ends.
+ * Controlled, so the caller can also open it from code.
+ */
+export function Disclosure({
+  open,
+  onOpenChange,
+  label,
+  children,
+  className,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  label: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  const panelId = useId();
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => onOpenChange(!open)}
+        className="flex min-h-11 cursor-pointer items-center gap-1 rounded-md text-sm text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: FAST, ease: EASE_OUT }} className="flex">
+          <ChevronDown className="size-4" aria-hidden="true" />
+        </motion.span>
+        {label}
+      </button>
+      <motion.div
+        id={panelId}
+        initial={false}
+        inert={!open}
+        animate={
+          open
+            ? { height: "auto", opacity: 1, visibility: "visible" }
+            : { height: 0, opacity: 0, transitionEnd: { visibility: "hidden" } }
+        }
+        transition={{ duration: FAST, ease: EASE_OUT }}
+        className="overflow-hidden"
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 }
 

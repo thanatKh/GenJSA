@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, Copy, ExternalLink, FileUp } from "lucide-react";
-import { Button, FieldError, Input, Label } from "../../components/ui";
+import { flushSync } from "react-dom";
+import { ArrowLeft, Copy, ExternalLink, FileUp } from "lucide-react";
+import { Button, Disclosure, FieldError, Input, Label, Reveal } from "../../components/ui";
+import { useFlash } from "../../lib/useFlash";
 import { answerFileNames, buildPersonalProcedurePrompt, buildPersonalPrompt, detailLevels, MAX_ANSWER_FILE_BYTES, MAX_SUB_STEPS, type DetailLevel } from "../../lib/personalAi";
 import { advancedDraft, type AdvancedKind } from "../../store";
 import type { JsaPromptRules } from "../../lib/api";
@@ -69,19 +71,24 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [copyStatus, setCopyStatus] = useState("");
   // The copy button itself confirms: its icon turns into a tick and its label
   // to "คัดลอกแล้ว" for a moment, then it goes back (Button's status="success")
-  const [copied, setCopied] = useState(false);
-  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
+  const [copied, flashCopied, clearCopied] = useFlash();
   /** The prompt changed (or the copy was only a selection): forget the last copy */
   const clearCopy = () => {
     setCopyStatus("");
-    setCopied(false);
-    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    clearCopied();
   };
+  // Same beat on the file button once an answer file has been read
+  const [imported, flashImported] = useFlash();
+  const [promptOpen, setPromptOpen] = useState(false);
+  // Blocks that leave (an error, the checked-answer card) keep their last
+  // content while they animate out, instead of emptying first
+  const lastError = useRef("");
+  if (error) lastError.current = error;
+  const lastDraft = useRef<T | null>(null);
+  if (draft) lastDraft.current = draft;
   const promptField = useRef<HTMLTextAreaElement>(null);
   const answerField = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const promptDetails = useRef<HTMLDetailsElement>(null);
   const [fileStatus, setFileStatus] = useState("");
   const [dragging, setDragging] = useState(false);
   // The rough sub-step total (only with split). Main steps the user listed
@@ -95,7 +102,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
     ? buildPersonalProcedurePrompt(work, level, instructions, jsaRules)
     : buildPersonalPrompt(work, level, instructions, jsaRules, split, split ? subStepTarget : undefined);
   const sourceChanged = source !== description;
-  const subCount = draft?.steps.reduce((n, step) => n + (step.sub_steps?.length ?? 0), 0) ?? 0;
+  const subCount = lastDraft.current?.steps.reduce((n, step) => n + (step.sub_steps?.length ?? 0), 0) ?? 0;
   const fileName = answerFileNames[kind];
 
   const check = (text: string) => {
@@ -127,6 +134,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
     }
     setAnswer(text);
     setFileStatus(`นำเข้าไฟล์ ${file.name} แล้ว`);
+    flashImported();
     check(text);
   };
 
@@ -134,12 +142,12 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
     try {
       await navigator.clipboard.writeText(prompt);
       clearCopy();
-      setCopied(true);
-      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+      flashCopied();
     } catch {
       // No clipboard access (some iOS cases): open the prompt and select it
       // so the device's own copy menu works on it
-      if (promptDetails.current) promptDetails.current.open = true;
+      // flushSync: the field has to be open and laid out before it can be selected
+      flushSync(() => setPromptOpen(true));
       promptField.current?.focus();
       promptField.current?.select();
       setCopyStatus("เลือกข้อความแล้ว กรุณาคัดลอกด้วยเมนูของอุปกรณ์");
@@ -156,7 +164,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         <h1 className="text-2xl font-semibold text-navy sm:text-[1.75rem]">ใช้ AI ภายนอก</h1>
         <p className="mt-1.5 text-muted">{kind === "wp" ? "ร่างขั้นตอนปฏิบัติงานจาก JSA" : "ร่าง JSA"}</p>
       </header>
-      {sourceChanged ? (
+      <Reveal show={sourceChanged} className="-m-1 p-1">
         <section className="grid min-w-0 gap-2 rounded-card border border-line bg-raised p-4">
           <p role="status" className="text-sm text-ink">รายละเอียดงานเปลี่ยนจากครั้งก่อน จะใช้คำสั่งและคำตอบเดิม หรือเริ่มใหม่?</p>
           <div className="flex flex-wrap gap-2">
@@ -171,7 +179,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             }}>เริ่มใหม่</Button>
           </div>
         </section>
-      ) : null}
+      </Reveal>
       <section aria-labelledby="personal-prompt-heading" className="grid gap-3 rounded-card border border-line p-4 sm:p-5">
         <h2 id="personal-prompt-heading" className="text-lg font-semibold text-ink">1. เตรียมคำสั่ง</h2>
         <div>
@@ -205,19 +213,19 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             </span>
           </label>
         ) : null}
-        {kind === "jsa" && split ? (
-          <div className="-mt-1 ps-6">
+        <Reveal show={kind === "jsa" && split} className="-m-1 p-1">
+          <div className="ps-6">
             <Label htmlFor="personal-target">จำนวนขั้นตอนย่อยรวมโดยประมาณ (ไม่บังคับ)</Label>
             <Input id="personal-target" type="number" inputMode="numeric" min={1} max={9999} className="w-32"
               value={target} aria-describedby={overCap ? "personal-target-hint" : undefined}
               onChange={(e) => { setTarget(e.target.value); clearCopy(); }} />
-            {overCap ? (
+            <Reveal show={overCap}>
               <p id="personal-target-hint" className="mt-1 text-sm text-danger-text">
                 {`ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้ข้อละไม่เกิน ${MAX_SUB_STEPS} รวมสูงสุด ${targetCap} ข้อย่อย`}
               </p>
-            ) : null}
+            </Reveal>
           </div>
-        ) : null}
+        </Reveal>
         <div>
           <Label htmlFor="personal-instructions">คำขอเพิ่มเติม (ไม่บังคับ)</Label>
           <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); clearCopy(); }} />
@@ -246,14 +254,10 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         {/* The prompt itself, closed by default: the copy button is what most
             people need, but the text stays one tap away so anyone can check
             what is about to leave for an outside AI. */}
-        <details ref={promptDetails} className="group">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
-            ดูคำสั่งที่จะส่ง
-          </summary>
+        <Disclosure open={promptOpen} onOpenChange={setPromptOpen} label="ดูคำสั่งที่จะส่ง">
           <label htmlFor="personal-prompt" className="sr-only">คำสั่งที่จะคัดลอก</label>
-          <textarea id="personal-prompt" ref={promptField} rows={8} readOnly className={textAreaClass} value={prompt} />
-        </details>
+          <textarea id="personal-prompt" ref={promptField} rows={8} readOnly className={`${textAreaClass} mt-1`} value={prompt} />
+        </Disclosure>
       </section>
       <form aria-labelledby="personal-import-heading"
         className={`grid gap-3 rounded-card border p-4 sm:p-5 ${dragging ? "border-navy bg-navy-soft" : "border-line"}`}
@@ -283,10 +287,21 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <FileUp className="size-7 text-muted pointer-coarse:hidden" aria-hidden="true" />
           <p className="text-ink pointer-coarse:hidden">ลากไฟล์คำตอบ ({fileName}) มาวางที่นี่</p>
           <p className="text-sm text-muted pointer-coarse:hidden">หรือ</p>
-          <Button type="button" variant="outline" disabled={sourceChanged} onClick={() => fileInput.current?.click()}>
-            <FileUp className="size-4" aria-hidden="true" /> เลือกไฟล์คำตอบ
+          <Button
+            type="button"
+            variant="outline"
+            disabled={sourceChanged}
+            onClick={() => fileInput.current?.click()}
+            status={imported ? "success" : undefined}
+            successText="นำเข้าแล้ว"
+            className={imported ? "border-[var(--success)] text-[var(--success)]" : undefined}
+          >
+            {/* Button puts its own tick in front while status is success */}
+            {imported ? null : <FileUp className="size-4" aria-hidden="true" />}
+            {imported ? null : " "}เลือกไฟล์คำตอบ
           </Button>
-          <span role="status" className="text-sm text-muted [overflow-wrap:anywhere]">{fileStatus}</span>
+          {/* Which file, for screen readers — the button itself shows that it worked */}
+          <span role="status" className="sr-only">{fileStatus}</span>
           <input ref={fileInput} type="file" accept=".json,.txt,application/json,text/plain" className="hidden"
             aria-label="เลือกไฟล์คำตอบจาก AI"
             onChange={(event) => {
@@ -300,30 +315,34 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
             aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
             onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); setFileStatus(""); }} />
-          <FieldError id="personal-answer-error">{error}</FieldError>
+          <Reveal show={!!error}>
+            <FieldError id="personal-answer-error">{error || lastError.current}</FieldError>
+          </Reveal>
         </div>
         {/* The way forward, so it's the primary button — until the answer
             checks out, when "เปิดร่างเพื่อตรวจทาน" below takes its place */}
-        {draft && !sourceChanged ? null : (
+        <Reveal show={!(draft && !sourceChanged)} className="-m-1 p-1">
           <Button type="submit" disabled={sourceChanged || !answer.trim()} className="justify-self-start">ตรวจคำตอบ</Button>
-        )}
-        {draft && !sourceChanged ? (
+        </Reveal>
+        <Reveal show={!!draft && !sourceChanged} className="-m-1 p-1">
+          {lastDraft.current ? (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-lg bg-navy-soft p-3 [overflow-wrap:anywhere]">
             <p role="status" className="font-medium">
-              {draft.work_activity ?? draft.header?.work_activity ?? "ตรวจรูปแบบแล้ว"} · {draft.steps.length} ขั้นตอน
+              {lastDraft.current.work_activity ?? lastDraft.current.header?.work_activity ?? "ตรวจรูปแบบแล้ว"} · {lastDraft.current.steps.length} ขั้นตอน
               {kind === "jsa" && subCount ? ` · ${subCount} ขั้นตอนย่อย` : ""}
               {kind === "jsa" && split && subStepTarget ? ` (ตั้งไว้ประมาณ ${subStepTarget})` : ""}
             </p>
             <ol className="max-h-32 list-decimal overflow-y-auto ps-5">
-              {draft.steps.map((step) => (
+              {lastDraft.current.steps.map((step) => (
                 <li key={step.no}>
                   {step.procedure} <span className="text-muted">{previewDetail(kind, step)}</span>
                 </li>
               ))}
             </ol>
-            <Button type="button" className="justify-self-start" onClick={() => onImport(draft)}>เปิดร่างเพื่อตรวจทาน</Button>
+            <Button type="button" className="justify-self-start" onClick={() => { if (draft) onImport(draft); }}>เปิดร่างเพื่อตรวจทาน</Button>
           </div>
-        ) : null}
+          ) : null}
+        </Reveal>
       </form>
     </section>
   );

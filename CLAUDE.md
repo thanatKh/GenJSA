@@ -347,6 +347,18 @@ directly from `components/ui/*`. Brand colors live in
 same colors as hand-rolled ones — never re-run `shadcn init` or accept its
 font/color defaults without diffing first.
 
+**Making the UI answer back (so it doesn't feel stiff).** Three pieces, all
+Motion-driven and all honouring reduce-motion (`<MotionConfig reducedMotion="user">`):
+a button that finishes something says so on itself —
+`<Button status={flash ? "success" : undefined} successText="…">` with
+`lib/useFlash.ts`'s two-second flash (the copy, file-import, backup and PDF
+save buttons); a block that appears or goes away eases in and out through
+`Reveal`, keeping its last content while it leaves (a `useRef` of the last
+value, so it doesn't empty first); a fold-out is `Disclosure`. Don't use a
+native `<details>` with `::details-content` for an animated fold: that CSS
+(`interpolate-size`) animates only in Chrome and Edge, so on a phone — most of
+the users — it would open instantly.
+
 **Updating a generated component**: several files here are already
 hand-patched (`button.tsx`'s sizes/`loading` prop, `input.tsx`/`textarea.tsx`'s
 `text-base` iOS-zoom fix, `card.tsx`/`dialog.tsx`/`alert-dialog.tsx`'s

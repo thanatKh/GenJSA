@@ -32,7 +32,29 @@ export function Elapsed({ since }: { since: number }) {
   );
 }
 
-function StatusChip({ phase, drafting, waiting }: { phase: ProjectPhase; drafting: boolean; waiting: boolean }) {
+/** The chip crossfades when a phase moves on (queued → drafting → drafted →
+ * reviewed) instead of changing text in place — the one place where the
+ * progress of a long job shows, so the change should be noticed. */
+function StatusChip(props: { phase: ProjectPhase; drafting: boolean; waiting: boolean }) {
+  const { phase, drafting, waiting } = props;
+  const state = drafting ? "drafting" : waiting ? "waiting" : !phase.jsa ? "empty" : !phase.reviewed ? "drafted" : "reviewed";
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      <motion.span
+        key={state}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.2 }}
+        className="inline-flex"
+      >
+        <StatusChipBody {...props} />
+      </motion.span>
+    </AnimatePresence>
+  );
+}
+
+function StatusChipBody({ phase, drafting, waiting }: { phase: ProjectPhase; drafting: boolean; waiting: boolean }) {
   const base = "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium";
   if (drafting) return <span className={`${base} border-navy/30 bg-navy-soft text-navy`}>กำลังร่าง…</span>;
   if (waiting) return <span className={`${base} border-line bg-raised text-muted`}>รอคิว</span>;
