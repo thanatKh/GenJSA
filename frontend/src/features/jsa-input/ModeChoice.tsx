@@ -73,7 +73,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
                 select(index - 1);
               }
             }}
-            className={`relative flex min-h-11 items-center justify-center rounded-full px-1.5 text-sm font-medium
+            className={`press relative flex min-h-11 items-center justify-center rounded-full px-1.5 text-sm font-medium
                         transition-colors focus-visible:outline-none focus-visible:ring-2
                         focus-visible:ring-ring/50 ${checked ? "text-navy" : "text-muted hover:text-ink"}`}
           >

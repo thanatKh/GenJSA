@@ -23,7 +23,7 @@ const OUTSIDE_AIS = [
 
 function AiLink({ name, href, className = "" }: { name: string; href: string; className?: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`font-medium text-navy underline underline-offset-2 hover:text-ink ${className}`}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`press inline-block font-medium text-navy underline underline-offset-2 hover:text-ink pointer-coarse:py-2.5 ${className}`}>
       {name}
     </a>
   );

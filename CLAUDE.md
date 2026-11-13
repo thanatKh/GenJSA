@@ -354,7 +354,7 @@ a button that finishes something says so on itself —
 `lib/useFlash.ts`'s two-second flash (the copy, file-import, backup and PDF
 save buttons); a block that appears or goes away eases in and out through
 `Reveal`, keeping its last content while it leaves (a `useRef` of the last
-value, so it doesn't empty first); a fold-out is `Disclosure`. Don't use a
+value, so it doesn't empty first); a fold-out is `Disclosure`; a plain `<button>`/`<a>` that doesn't go through `Button` gets the `press` class (index.css `@utility`, CSS-only, off under reduce-motion; add `inline-block` on an inline link). Don't use a
 native `<details>` with `::details-content` for an animated fold: that CSS
 (`interpolate-size`) animates only in Chrome and Edge, so on a phone — most of
 the users — it would open instantly.

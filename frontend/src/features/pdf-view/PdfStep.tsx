@@ -172,7 +172,7 @@ export function PdfStep({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+          className="press flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy pointer-coarse:min-h-11"
         >
           <ArrowLeft className="size-3.5" aria-hidden="true" />
           กลับไปแก้ไข
@@ -183,7 +183,7 @@ export function PdfStep({
         <button
           type="button"
           onClick={onNewJsa}
-          className="flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy"
+          className="press flex items-center gap-1 text-muted underline decoration-dotted underline-offset-4 hover:text-navy pointer-coarse:min-h-11"
         >
           <FilePlus2 className="size-3.5" aria-hidden="true" />
           สร้าง JSA ใหม่

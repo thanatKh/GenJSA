@@ -309,7 +309,7 @@ export function Disclosure({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => onOpenChange(!open)}
-        className="flex min-h-11 cursor-pointer items-center gap-1 rounded-md text-sm text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="press flex min-h-11 cursor-pointer items-center gap-1 rounded-md text-sm text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: FAST, ease: EASE_OUT }} className="flex">
           <ChevronDown className="size-4" aria-hidden="true" />

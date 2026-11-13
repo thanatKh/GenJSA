@@ -6,6 +6,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Press feedback for plain <button>/<a> that don't go through components/ui's
+   Button (which does the same with Motion): shrink a touch while held, spring
+   back on release. A CSS transition, so it stays interruptible and runs off the
+   main thread; skipped entirely under reduced motion. Inline elements need
+   inline-block for the transform to apply — add it where the element is a link. */
+@utility press {
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform var(--duration-quick) var(--ease-smooth-out);
+    &:active {
+      transform: scale(var(--scale-large));
+    }
+  }
+}
+
 /* map tokens -> Tailwind theme (Tailwind v4 uses @theme, not tailwind.config.js) */
 @theme inline {
   --color-navy: var(--brand-navy);

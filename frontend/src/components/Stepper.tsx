@@ -170,7 +170,7 @@ export function Stepper({
                   type="button"
                   onClick={() => onNavigate(index)}
                   aria-label={`กลับไปขั้นตอน ${label}`}
-                  className={`${nodeClass} group rounded-md focus-visible:outline-none
+                  className={`${nodeClass} press group rounded-md focus-visible:outline-none
                               focus-visible:ring-2 focus-visible:ring-ring/50`}
                 >
                   {circle}

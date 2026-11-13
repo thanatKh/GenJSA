@@ -305,7 +305,7 @@ export function InputStep({
         <button
           type="button"
           onClick={onCancel}
-          className="mb-3 flex items-center gap-1 text-sm text-muted hover:text-navy"
+          className="press mb-3 flex items-center gap-1 text-sm text-muted hover:text-navy pointer-coarse:min-h-11"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           กลับไปหน้าตรวจทาน
@@ -451,14 +451,14 @@ export function InputStep({
             <button
               type="button"
               onClick={skipToManual}
-              className="min-w-0 text-start text-muted underline decoration-dotted underline-offset-4 hover:text-navy pointer-coarse:min-h-12"
+              className="press min-w-0 text-start text-muted underline decoration-dotted underline-offset-4 hover:text-navy pointer-coarse:min-h-12"
             >
               ข้ามขั้นตอนนี้ กรอกแบบฟอร์ม JSA เองทั้งหมด
             </button>
             <span aria-hidden="true" className="text-muted">·</span>
             <button
               type="button"
-              className="shrink-0 px-1 text-navy underline decoration-dotted underline-offset-4 pointer-coarse:min-h-12"
+              className="press shrink-0 px-1 text-navy underline decoration-dotted underline-offset-4 pointer-coarse:min-h-12"
               onClick={async () => {
                 if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) onOpenAdvanced();
               }}

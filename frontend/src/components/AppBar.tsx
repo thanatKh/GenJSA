@@ -111,7 +111,7 @@ export function AppBar({
             type="button"
             onClick={onHome}
             aria-label={`${appName} — กลับไปเริ่มต้นใหม่`}
-            className={`${brandRow} rounded-md
+            className={`${brandRow} press rounded-md
                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50`}
           >
             {brand}

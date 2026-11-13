@@ -42,7 +42,7 @@ const UNTITLED = "JSA ไม่มีชื่องาน";
 
 // Both document actions stay beside the job details, in one compact row.
 const docButton =
-  "inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-xs " +
+  "press inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-xs " +
   "font-medium text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ";
 
 function entryTitle(entry: HistoryEntry): string {
