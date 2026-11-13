@@ -5,6 +5,29 @@ import { expect, test } from "@playwright/test";
 import { fillInput, fixture, mockApi } from "./helpers";
 import { readFileSync } from "node:fs";
 
+test("the copy button confirms on itself, then goes back", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await mockApi(page);
+  await fillInput(page);
+  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+
+  const copy = page.getByRole("button", { name: "คัดลอกคำสั่ง" });
+  await copy.click();
+  // The button itself says it worked …
+  const done = page.getByRole("button", { name: "คัดลอกแล้ว" });
+  await expect(done).toBeVisible();
+  // … and what was copied is the prompt
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("genjsa-jsa.json");
+  // … then it returns to "คัดลอกคำสั่ง" by itself
+  await expect(copy).toBeVisible({ timeout: 4000 });
+
+  // Changing the prompt after copying never leaves a stale "copied"
+  await copy.click();
+  await expect(done).toBeVisible();
+  await page.locator("#personal-instructions").fill("เพิ่มเติม");
+  await expect(copy).toBeVisible();
+});
+
 test("prompt folded, drop a file, check button leads", async ({ page }, info) => {
   await mockApi(page);
   await fillInput(page);

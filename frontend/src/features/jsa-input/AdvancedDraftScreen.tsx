@@ -67,6 +67,17 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   }, [kind, source, work, level, instructions, answer, split, target, scope]);
   const [error, setError] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
+  // The copy button itself confirms: its icon turns into a tick and its label
+  // to "คัดลอกแล้ว" for a moment, then it goes back (Button's status="success")
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
+  /** The prompt changed (or the copy was only a selection): forget the last copy */
+  const clearCopy = () => {
+    setCopyStatus("");
+    setCopied(false);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+  };
   const promptField = useRef<HTMLTextAreaElement>(null);
   const answerField = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -122,7 +133,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
-      setCopyStatus("คัดลอกคำสั่งแล้ว");
+      clearCopy();
+      setCopied(true);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // No clipboard access (some iOS cases): open the prompt and select it
       // so the device's own copy menu works on it
@@ -154,7 +167,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
               setAnswer("");
               setDraft(null);
               setError("");
-              setCopyStatus("");
+              clearCopy();
             }}>เริ่มใหม่</Button>
           </div>
         </section>
@@ -165,7 +178,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <Label htmlFor="personal-work">รายละเอียดงานที่จะส่ง</Label>
           <textarea id="personal-work" rows={3} maxLength={kind === "jsa" ? 5000 : undefined} className={textAreaClass} value={work}
             aria-describedby={kind === "jsa" ? "personal-work-hint" : undefined}
-            onChange={(e) => { setWork(e.target.value); setCopyStatus(""); }} />
+            onChange={(e) => { setWork(e.target.value); clearCopy(); }} />
           {kind === "jsa" ? (
             <p id="personal-work-hint" className="mt-1.5 text-sm text-muted">
               มีขั้นตอนอยู่แล้ว พิมพ์เป็นรายการ 1. 2. 3. ไว้ที่นี่ AI จะยึดลำดับนั้น
@@ -177,7 +190,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           <div className="flex flex-wrap gap-x-4">
             {detailLevels.map((option) => (
               <label key={option} className="flex min-h-12 items-center gap-2">
-                <input type="radio" name="personal-detail" checked={level === option} className="accent-navy" onChange={() => { setLevel(option); setCopyStatus(""); }} />
+                <input type="radio" name="personal-detail" checked={level === option} className="accent-navy" onChange={() => { setLevel(option); clearCopy(); }} />
                 {option}
               </label>
             ))}
@@ -186,7 +199,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         {kind === "jsa" ? (
           <label className="flex min-h-12 items-start gap-2 py-2">
             <input type="checkbox" checked={split} className="mt-1 size-4 shrink-0 accent-navy"
-              onChange={(e) => { setSplit(e.target.checked); setCopyStatus(""); }} />
+              onChange={(e) => { setSplit(e.target.checked); clearCopy(); }} />
             <span>
               <span className="font-medium text-ink">แตกขั้นตอนหลักเป็นขั้นตอนย่อย (1.1, 1.2 …)</span>
             </span>
@@ -197,7 +210,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             <Label htmlFor="personal-target">จำนวนขั้นตอนย่อยรวมโดยประมาณ (ไม่บังคับ)</Label>
             <Input id="personal-target" type="number" inputMode="numeric" min={1} max={9999} className="w-32"
               value={target} aria-describedby={overCap ? "personal-target-hint" : undefined}
-              onChange={(e) => { setTarget(e.target.value); setCopyStatus(""); }} />
+              onChange={(e) => { setTarget(e.target.value); clearCopy(); }} />
             {overCap ? (
               <p id="personal-target-hint" className="mt-1 text-sm text-danger-text">
                 {`ขั้นตอนหลัก ${listedMainSteps} ข้อ แตกได้ข้อละไม่เกิน ${MAX_SUB_STEPS} รวมสูงสุด ${targetCap} ข้อย่อย`}
@@ -207,11 +220,23 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         ) : null}
         <div>
           <Label htmlFor="personal-instructions">คำขอเพิ่มเติม (ไม่บังคับ)</Label>
-          <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); setCopyStatus(""); }} />
+          <textarea id="personal-instructions" rows={2} maxLength={2000} className={textAreaClass} value={instructions} onChange={(e) => { setInstructions(e.target.value); clearCopy(); }} />
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button type="button" onClick={() => void copy()}><Copy className="size-4" aria-hidden="true" /> คัดลอกคำสั่ง</Button>
-          <span role="status" className="text-muted">{copyStatus}</span>
+          <Button
+            type="button"
+            onClick={() => void copy()}
+            status={copied ? "success" : undefined}
+            successText="คัดลอกแล้ว"
+            // Green while it says "copied", then back to the brand blue
+            className={copied ? "bg-[var(--success)] text-white hover:bg-[var(--success)]" : undefined}
+          >
+            {/* Button puts its own tick in front while status is success */}
+            {copied ? null : <Copy className="size-4" aria-hidden="true" />}
+            {copied ? null : " "}คัดลอกคำสั่ง
+          </Button>
+          {/* Said aloud for screen readers; shown only for the select-instead fallback */}
+          <span role="status" className={copied ? "sr-only" : "text-muted"}>{copied ? "คัดลอกคำสั่งแล้ว" : copyStatus}</span>
         </div>
         {/* Copy, then straight on to an AI — no scrolling back up for the links */}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
