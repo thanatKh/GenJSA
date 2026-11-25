@@ -15,7 +15,7 @@ export function step(procedure: string, hazards: Hazard[], subs: { procedure: st
 
 export function jsa(steps: JsaStep[]): JsaDocument {
   return {
-    header: { work_activity: "เปลี่ยนวาล์ว", supervisor: "สมชาย", analysis_date: "2026-11-12", analyst: "", company: "", project: "" },
+    header: { work_activity: "เปลี่ยนวาล์ว", supervisor: "สมชาย", analysis_date: "2026-11-12", analyst: "", company: "" },
     steps: steps.map((s, i) => ({ ...s, no: i + 1 })),
     assumptions: [],
   };

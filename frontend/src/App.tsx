@@ -21,15 +21,6 @@ import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
 import { usePhotos } from "./features/procedure/usePhotos";
 import { useCompanyLogo } from "./features/company/useCompanyLogo";
-import { ProjectHub } from "./features/project/ProjectHub";
-import { ProjectList } from "./features/project/ProjectList";
-import { ProjectProcedureStep } from "./features/project/ProjectProcedureStep";
-import { ProjectFilesStep } from "./features/project/ProjectFilesStep";
-import { ProjectSetup } from "./features/project/ProjectSetup";
-import { blankPhaseJsa, blankProject, withPhaseJsa, withPhaseProcedure } from "./features/project/projectModel";
-import { usePhaseDrafting } from "./features/project/usePhaseDrafting";
-import * as projectStore from "./projects";
-import type { ProjectEntry } from "./projects";
 import * as historyStore from "./history";
 import type { HistoryEntry } from "./history";
 import {
@@ -40,22 +31,18 @@ import {
   generateProcedure,
   type PublicConfig,
 } from "./lib/api";
-import { loadCompanyProfile, type CompanyLogo } from "./lib/companyLogo";
+import { type CompanyLogo } from "./lib/companyLogo";
 import { photoKey } from "./lib/pdf/layout";
-import { parsePersonalDraft, parsePersonalProcedure, procedureSourceText } from "./lib/personalAi";
+import { parsePersonalProcedure, procedureSourceText } from "./lib/personalAi";
 import {
-  projectDocumentSchema,
   procedureIsStale,
   type InputForm,
   type JsaDocument,
   type ProcedureDocument,
-  type ProjectDocument,
-  type ProjectPhase,
 } from "./lib/schema";
-import { fadeSwap, screenFade, tabSlide } from "./lib/motion";
+import { fadeSwap, screenFade } from "./lib/motion";
 import { todayIso } from "./lib/thaidate";
 import { useStageHistory } from "./useStageHistory";
-import { saveNames } from "./lib/rememberedNames";
 import {
   clearAllDrafts,
   currentHistoryId,
@@ -63,26 +50,12 @@ import {
   jsaSourceDraft,
   modeDraft,
   procedureDraft,
-  projectDraft,
   type Mode,
-  type ProjectDraft,
 } from "./store";
 
-// Project Mode's track — its own four steps instead of the JSA wizard's three
-const PROJECT_STEPS = ["ข้อมูลโครงการ", "JSA แต่ละขั้นตอน", "ขั้นตอนปฏิบัติงาน", "เอกสาร PDF"] as const;
-// JSA + Procedure — same last step as the other two tracks, so every mode
-// ends on "เอกสาร PDF" with every file of the job on it
 const PROCEDURE_STEPS = ["กรอกข้อมูล", "ตรวจทาน JSA", "ขั้นตอนปฏิบัติงาน", "เอกสาร PDF"] as const;
 /** JSA + Procedure's stages, by stepper index */
 const PROCEDURE_TRACK = [0, 1, 3, 4] as const;
-
-/** The session's project draft, if it still parses — sessionStorage outlives
- * code changes within a tab just like history does */
-function loadProjectDraft(): ProjectDraft | null {
-  const draft = projectDraft.load();
-  const project = projectDocumentSchema.safeParse(draft?.project);
-  return draft && project.success ? { ...draft, project: project.data } : null;
-}
 
 // How long to wait after the last edit before rewriting the history entry.
 // The editor changes `doc` on every keystroke; localStorage writes serialize
@@ -96,7 +69,7 @@ function buildBlankDocument(
   values: Pick<InputForm, "supervisor" | "analyst" | "company">,
 ): JsaDocument {
   return {
-    header: { work_activity: "", analysis_date: todayIso(), project: "", ...values },
+    header: { work_activity: "", analysis_date: todayIso(), ...values },
     steps: [{ no: 1, procedure: "", details: "", hazards: [{ hazard: "", controls: [""] }], sub_steps: [] }],
     assumptions: [],
   };
@@ -107,10 +80,7 @@ function buildBlankDocument(
 // procedure is drafted from the JSA once it has been reviewed, and 4 delivers
 // both documents). Stage 2 is the JSA track's last page only; its procedure
 // card moves a job onto the other track.
-// 10+ are Project Mode: 10 the project's JSA list, 11 one phase's JSA in the
-// editor, 12 the project's work procedure, 13 its two files. Its first step,
-// ข้อมูลโครงการ, is stage 0 on the โครงการ tab.
-type Stage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 10 | 11 | 12 | 13;
+type Stage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /** What <main> actually renders, computed once from (stage, doc, procedure,
  * busy, procedureBusy) instead of re-derived at each of 7 separate JSX
@@ -135,46 +105,21 @@ type View =
   | { kind: "input" }
   | { kind: "advancedInput" }
   | { kind: "advancedProcedure"; doc: JsaDocument }
-  | { kind: "advancedPhase"; project: ProjectDocument; phase: ProjectPhase; document: "jsa" | "wp" }
   | { kind: "editing"; doc: JsaDocument }
   | { kind: "procedureGenerating"; doc: JsaDocument; heading: string }
   | { kind: "pdf"; doc: JsaDocument }
   | { kind: "procedureEditing"; doc: JsaDocument; procedure: ProcedureDocument }
-  | { kind: "procedurePdf"; doc: JsaDocument; procedure: ProcedureDocument }
-  | { kind: "projectHub"; project: ProjectDocument }
-  | { kind: "projectProcedure"; project: ProjectDocument }
-  | { kind: "projectFiles"; project: ProjectDocument }
-  | { kind: "projectEditing"; project: ProjectDocument; phase: ProjectPhase; jsa: JsaDocument; index: number };
+  | { kind: "procedurePdf"; doc: JsaDocument; procedure: ProcedureDocument };
 
 function computeView(
   stage: Stage,
   doc: JsaDocument | null,
   procedure: ProcedureDocument | null,
   procedureBusy: boolean,
-  project: ProjectDraft | null,
 ): View | null {
-  // Both tabs: the tabs themselves stay put while the form under them swaps
   if (stage === 0) return { kind: "input" };
   if (stage === 5) return { kind: "advancedInput" };
   if (stage === 6) return doc && !procedure ? { kind: "advancedProcedure", doc } : null;
-  if (stage === 7 || stage === 8) {
-    const phase = project?.project.phases[project.openPhase];
-    if (!project?.id || !phase) return null;
-    if (stage === 7 && !phase.jsa) return { kind: "advancedPhase", project: project.project, phase, document: "jsa" };
-    if (stage === 8 && phase.jsa && phase.reviewed && !phase.procedure) {
-      return { kind: "advancedPhase", project: project.project, phase, document: "wp" };
-    }
-    return null;
-  }
-  if (stage === 10) return project?.id ? { kind: "projectHub", project: project.project } : null;
-  if (stage === 12) return project?.id ? { kind: "projectProcedure", project: project.project } : null;
-  if (stage === 13) return project?.id ? { kind: "projectFiles", project: project.project } : null;
-  if (stage === 11) {
-    const phase = project?.id ? project.project.phases[project.openPhase] : undefined;
-    return project && phase?.jsa
-      ? { kind: "projectEditing", project: project.project, phase, jsa: phase.jsa, index: project.openPhase }
-      : null;
-  }
   if (stage === 1) {
     if (!doc) return null;
     // JSA + Procedure's first draft, started by the editor's ถัดไป
@@ -262,7 +207,7 @@ export default function App() {
     setLogoFor: setCompanyLogoFor,
   } = useCompanyLogo(historyId);
 
-  // ---- Project Mode -------------------------------------------------------
+  // ---- Document type ------------------------------------------------------
   // Which tab the first screen is on. Remembered for the tab's session, so a
   // refresh doesn't drop someone back onto the other mode.
   const [mode, setModeState] = useState<Mode>(() => modeDraft.load());
@@ -270,70 +215,9 @@ export default function App() {
     setModeState(next);
     modeDraft.save(next);
   };
-  // The open project — its projects.ts id (null until first saved), the
-  // project itself, and which phase's JSA the editor has open
-  const [projectState, setProjectState] = useState<ProjectDraft | null>(loadProjectDraft);
-  const setProject = (update: (current: ProjectDocument) => ProjectDocument) =>
-    setProjectState((state) => (state ? { ...state, project: update(state.project) } : state));
-  const drafting = usePhaseDrafting(projectState?.project ?? null, setProject, "jsa");
-  // The project's company logo: in IndexedDB under the project's id once it
-  // has one, held here until then (a new project isn't saved yet)
-  const projectLogo = useCompanyLogo(projectState?.id ?? null);
-  // The project procedure's sub-step photos — same store as Single Mode's,
-  // under the project's id (keys: ProjectProcedureStep's projectPhotoKey)
-  const projectPhotos = usePhotos(projectState?.id ?? null, null);
-  const procedureDrafting = usePhaseDrafting(projectState?.project ?? null, setProject, "procedure", (phaseId) => projectPhotos.quarantine(`${phaseId}:`));
-  const [pendingProjectLogo, setPendingProjectLogo] = useState<CompanyLogo | null>(
-    () => loadCompanyProfile()?.logo ?? null,
-  );
-  const [projectSave, setProjectSave] = useState<SaveState>("idle");
-
-  // The โครงการ tab always has a project to fill in
   useEffect(() => {
-    if (mode === "project" && !projectState) {
-      setProjectState({ id: null, project: blankProject(), openPhase: 0 });
-    }
-  }, [mode, projectState]);
-
-  useEffect(() => {
-    if (projectState) projectDraft.save(projectState);
-  }, [projectState]);
-
-  // Saved projects follow every edit, like history does for single jobs
-  const savedProjectId = projectState?.id ?? null;
-  const savedProject = projectState?.project;
-  useEffect(() => {
-    if (!savedProjectId || !savedProject) return;
-    setProjectSave("saving");
-    const timer = setTimeout(
-      () => setProjectSave(projectStore.upsert(savedProjectId, savedProject) ? "saved" : "failed"),
-      HISTORY_SAVE_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [savedProjectId, savedProject]);
-
-  // If a draft is left over (refresh mid-flow), jump straight back into it —
-  // the project's JSA list on the โครงการ tab, the JSA editor otherwise
-  useEffect(() => {
-    if (mode === "project" && projectState?.id) {
-      // The guard below bounces anything that can't be shown back to the list
-      const screen = projectState.screen;
-      setStage(screen === 11 || screen === 12 || screen === 13 ? screen : 10);
-    }
-    else if (doc) setStage(1);
+    if (doc) setStage(1);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Remember which project screen is open, for a refresh (see ProjectDraft.screen)
-  useEffect(() => {
-    if (stage < 10) return;
-    setProjectState((state) => (state && state.screen !== stage ? { ...state, screen: stage } : state));
-  }, [stage]);
-
-  // Project Mode's screens need a saved project, and the editor a JSA to edit
-  useEffect(() => {
-    if (stage >= 10 && !projectState?.id) setStage(0);
-    else if (stage === 11 && !projectState?.project.phases[projectState.openPhase]?.jsa) setStage(10);
-  }, [stage, projectState]);
 
   // Guard against a blank screen: if the draft disappears (cleared elsewhere), never stay stuck on step 2/3
   useEffect(() => {
@@ -515,15 +399,10 @@ export default function App() {
     setProcedureBusy(false);
     if (historyId && doc?.header.work_activity.trim()) historyStore.upsertDoc(historyId, doc);
     if (historyId && procedure) historyStore.upsertProcedure(historyId, procedure);
-    if (projectState?.id) projectStore.upsert(projectState.id, projectState.project);
     setDoc(null);
     discardProcedure();
     setError(null);
     setHistoryId(null);
-    // The project stays in projects.ts; this only closes it
-    drafting.cancel();
-    procedureDrafting.cancel();
-    setProjectState(null);
     // Drafts only — past work in historyStore.ts deliberately survives "เริ่มใหม่"
     clearAllDrafts();
     setStage(0);
@@ -551,7 +430,7 @@ export default function App() {
   };
 
   /* A first WP draft asks which AI writes it (ChoiceDialog below): the
-   * built-in one drafts it now, an outside one opens ใช้ AI ภายนอก for the
+   * built-in one drafts it now, an outside one opens ใช้โมเดลภายนอก for the
    * WP. Asked rather than assumed — before this, ถัดไป always used the
    * built-in AI, even for a JSA the user had drafted with an outside one. */
   const [wpChoiceFor, setWpChoiceFor] = useState<JsaDocument | null>(null);
@@ -642,60 +521,6 @@ export default function App() {
     setStage(next);
   };
 
-  /** ข้อมูลโครงการ -> the JSA list. Saving the project for the first time
-   * (getting its id) happens here, not on the first keystroke, so a project
-   * started and abandoned on the form never lands in the saved list. */
-  const continueFromProjectSetup = () => {
-    if (!projectState) return;
-    if (!projectState.id) {
-      const id = projectStore.newId();
-      setProjectState({ ...projectState, id });
-      projectLogo.setLogoFor(id, pendingProjectLogo);
-    }
-    saveNames({ supervisor: projectState.project.supervisor, analyst: projectState.project.analyst });
-    goto(10);
-  };
-
-  const startNewProject = () => {
-    drafting.cancel();
-    procedureDrafting.cancel();
-    setProjectState({ id: null, project: blankProject(), openPhase: 0 });
-    setPendingProjectLogo(loadCompanyProfile()?.logo ?? null);
-  };
-
-  const openSavedProject = (entry: ProjectEntry) => {
-    drafting.cancel();
-    procedureDrafting.cancel();
-    setProjectState({ id: entry.id, project: entry.project, openPhase: 0 });
-    goto(10);
-  };
-
-  const openPhase = (phaseId: string) => {
-    setProjectState((state) =>
-      state
-        ? { ...state, openPhase: Math.max(0, state.project.phases.findIndex((p) => p.id === phaseId)) }
-        : state,
-    );
-    goto(11);
-  };
-
-  const openAdvancedPhase = (phaseId: string, next: 7 | 8) => {
-    if (!projectState?.id) return;
-    const index = projectState.project.phases.findIndex((phase) => phase.id === phaseId);
-    if (index < 0) return;
-    setProjectState({ ...projectState, openPhase: index });
-    goto(next);
-  };
-
-  /** "กรอกเอง" — a blank JSA for this phase, straight into the editor */
-  const fillPhaseByHand = (phaseId: string) => {
-    setProject((project) => {
-      const phase = project.phases.find((p) => p.id === phaseId);
-      return phase ? withPhaseJsa(project, phaseId, blankPhaseJsa(project, phase), false) : project;
-    });
-    openPhase(phaseId);
-  };
-
   // The procedure mirrors the JSA's step list, so edits to those steps leave
   // it describing work that no longer matches — warn rather than silently
   // resync, which would throw away the user's own edits to the procedure
@@ -709,19 +534,14 @@ export default function App() {
   // stage on the next render, so <main> just renders nothing that one frame,
   // the same "briefly blank, never wrong" behavior the old JSX had by
   // falling through every condition.
-  const view = computeView(stage, doc, procedure, procedureBusy, projectState);
+  const view = computeView(stage, doc, procedure, procedureBusy);
   const hasView = view !== null;
   useEffect(() => {
-    if (stage === 5 && mode === "project") setStage(0);
     if (stage === 6 && !hasView) setStage(doc ? 1 : 0);
-    if ((stage === 7 || stage === 8) && !hasView) setStage(projectState?.id ? (stage === 7 ? 10 : 12) : 0);
-  }, [stage, mode, hasView, doc, projectState?.id]);
-  // 7/8: a project phase's ใช้ AI ภายนอก screens, shown under the project's stepper
-  const inProject = stage >= 10 || stage === 7 || stage === 8;
-  // Single Mode's track (see the note on Stage)
+  }, [stage, hasView, doc]);
   const withProcedure = mode === "procedure";
 
-  const hasSavedItems = view?.kind === "input" && (mode === "project" ? projectStore.list().length > 0 : historyStore.list().length > 0);
+  const hasSavedItems = view?.kind === "input" && historyStore.list().length > 0;
   const showHistory = hasSavedItems && !busy;
   const mainRef = useRef<HTMLElement>(null);
   usePageHeading(mainRef, appName);
@@ -735,7 +555,7 @@ export default function App() {
         developer={config?.about?.developer}
         contactEmail={config?.about?.contactEmail}
         visitStats={!!config?.analytics?.cloudflareToken}
-        onHome={stage >= 5 && stage <= 8 ? () => goto(0) : startOver}
+        onHome={stage >= 5 ? () => goto(0) : startOver}
       />
 
       {/* max-w-[var(--page-max-w)] — shared with AppBar.tsx's title-bar row
@@ -750,16 +570,10 @@ export default function App() {
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={view?.kind === "advancedInput" ? "input" : view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
             {stage !== 0 && stage !== 5 && view ? (
-              <div className={stage === 1 || stage === 11 ? undefined : "mx-auto max-w-[45rem]"}>
+              <div className={stage === 1 ? undefined : "mx-auto max-w-[45rem]"}>
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={inProject ? "project" : withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
-                    {inProject ? (
-                      <Stepper
-                        steps={PROJECT_STEPS}
-                        current={stage === 12 || stage === 8 ? 2 : stage === 13 ? 3 : 1}
-                        onNavigate={(index) => goto(([0, 10, 12, 13] as const)[index])}
-                      />
-                    ) : withProcedure ? (
+                  <motion.div key={withProcedure ? "procedure" : "jsa"} {...fadeSwap}>
+                    {withProcedure ? (
                       <Stepper
                         steps={PROCEDURE_STEPS}
                         current={stage === 1 ? 1 : stage === 3 || stage === 6 ? 2 : 3}
@@ -784,82 +598,38 @@ export default function App() {
               // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
               // list), instead of sizing to its own short content and floating
               // next to a much taller form.
-              <div className={`mx-auto grid max-w-[45rem] gap-y-10 ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-x-8 xl:gap-y-0" : ""}`}>
-                {/* overflow-x-clip: the sideways slide must not widen the page
-                    for its 250ms (a phone would get a horizontal scrollbar).
-                    The clip would also cut off the focus ring of every
-                    full-width field — so it sits 8px outside the content
-                    (px-2) with a matching -mx-2: the ring (3px) lands in that
-                    padding, the content doesn't move. Not overflow-clip-margin,
-                    which iOS Safari doesn't support. */}
-                <div className="-mx-2 min-w-0 overflow-x-clip px-2">
-                  {/* Gone while a JSA is generating: the mode can't change mid-draft */}
+              <div className={`mx-auto grid gap-y-10 ${view.kind === "advancedInput" ? "max-w-none" : "max-w-[45rem]"} ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-x-8 xl:gap-y-0" : ""}`}>
+                <div className="min-w-0">
                   {busy || view.kind === "advancedInput" ? null : <ModeChoice mode={mode} onChange={setMode} />}
-                  {/* The switch stays put; only the form under it swaps, sliding
-                      in from the side of the option that was picked. JSA and
-                      JSA + Procedure share one form, so they don't swap. */}
-                  <AnimatePresence mode="wait" initial={false} custom={mode === "project" ? 1 : -1}>
-                    <motion.div
-                      key={mode === "project" ? "project" : "single"}
-                      custom={mode === "project" ? 1 : -1}
-                      variants={tabSlide}
-                      initial="enter"
-                      animate="center"
-                      exit="exit"
-                    >
-                      {mode === "project" ? (
-                        projectState ? (
-                          <ProjectSetup
-                            project={projectState.project}
-                            onChange={(next) => setProject(() => next)}
-                            onContinue={continueFromProjectSetup}
-                            onStartNew={startNewProject}
-                            started={!!projectState.id}
-                            logo={projectState.id ? projectLogo.logo : pendingProjectLogo}
-                            onLogoChange={projectState.id ? projectLogo.setLogo : setPendingProjectLogo}
-                          />
-                        ) : null
-                      ) : (
-                        <InputStep
-                          jsaRules={config?.jsaRules}
-                          onGenerate={handleGenerate}
-                          onImportDraft={(draft, logo) => openNewDraft(draft, logo, "outside")}
-                          advanced={view.kind === "advancedInput"}
-                          onOpenAdvanced={() => goto(5)}
-                          onCloseAdvanced={() => goto(0)}
-                          onSkipToManual={handleSkipToManual}
-                          // Only set when reached via the stepper's back-navigation
-                          // (doc already exists then — see the effect above that jumps
-                          // stage to 1 whenever a fresh mount finds a doc) — never on a
-                          // genuinely fresh session, where there's nothing to cancel back to
-                          onCancel={doc ? () => goto(1) : undefined}
-                          onCancelGenerate={cancelGenerate}
-                          busy={busy}
-                          error={error}
-                        />
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                  <InputStep
+                    jsaRules={config?.jsaRules}
+                    onGenerate={handleGenerate}
+                    onImportDraft={(draft, logo) => openNewDraft(draft, logo, "outside")}
+                    advanced={view.kind === "advancedInput"}
+                    onOpenAdvanced={() => goto(5)}
+                    onCloseAdvanced={() => goto(0)}
+                    onSkipToManual={handleSkipToManual}
+                    onCancel={doc ? () => goto(1) : undefined}
+                    onCancelGenerate={cancelGenerate}
+                    busy={busy}
+                    error={error}
+                  />
                 </div>
-                {/* Each tab lists its own kind of saved work. Hidden while
-                    generating so it doesn't compete with GeneratingPanel. */}
                 <AnimatePresence initial={false} mode="wait">
-                  {busy || view.kind === "advancedInput" ? null : mode === "project" ? (
-                    <ProjectList key={`projects-${libraryVersion}`} onOpen={openSavedProject} />
-                  ) : (
+                  {!busy && view.kind === "input" ? (
                     <HistoryList
                       key={`history-${libraryVersion}`}
                       onOpen={handleOpenHistory}
                       onOpenProcedure={handleOpenHistoryProcedure}
                       onCreateProcedure={handleCreateHistoryProcedure}
                     />
-                  )}
+                  ) : null}
                 </AnimatePresence>
               </div>
             ) : null}
 
             {view?.kind === "advancedProcedure" ? (
-              <div className="mx-auto max-w-[45rem]">
+              <div className="min-w-0">
                 <AdvancedDraftScreen kind="wp" jsaRules={config?.jsaRules} scope={historyId ?? undefined} description={procedureSourceText(view.doc)}
                   backLabel="กลับไปตรวจทาน JSA"
                   onBack={() => goto(1)}
@@ -873,35 +643,6 @@ export default function App() {
               </div>
             ) : null}
 
-            {view?.kind === "advancedPhase" ? (
-              <div className="mx-auto max-w-[45rem]">
-                {view.document === "jsa" ? (
-                  <AdvancedDraftScreen kind="jsa" jsaRules={config?.jsaRules} scope={`${projectState?.id}.${view.phase.id}`}
-                    description={`${view.phase.work}\n${view.phase.description}`}
-                    backLabel="กลับไป JSA แต่ละขั้นตอน"
-                    onBack={() => goto(10)} parse={parsePersonalDraft}
-                    onImport={({ steps, assumptions }) => {
-                      const draft = blankPhaseJsa(view.project, view.phase);
-                      setProject((project) => withPhaseJsa(project, view.phase.id, { ...draft, steps, assumptions }, false));
-                      openPhase(view.phase.id);
-                    }} />
-                ) : view.phase.jsa ? (
-                  <AdvancedDraftScreen kind="wp" jsaRules={config?.jsaRules} scope={`${projectState?.id}.${view.phase.id}`} description={procedureSourceText(view.phase.jsa)}
-                    backLabel="กลับไปขั้นตอนปฏิบัติงานโครงการ"
-                    onBack={() => goto(12)}
-                    parse={(answer) => parsePersonalProcedure(answer, view.phase.jsa!, config?.procedure?.jsaReferenceLabel)}
-                    onImport={(next) => {
-                      setProject((project) => withPhaseProcedure(project, view.phase.id, next));
-                      goto(12);
-                    }} />
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* No inner max-w wrapper — the table benefits from the room, and it
-                keeps this stage's body flush with AppBar's edges (both share
-                <main>'s max-w-[var(--page-max-w)]) instead of sitting narrower
-                and off-center under a wider title bar. */}
             {view?.kind === "editing" ? (
               <EditorStep
                 doc={view.doc}
@@ -979,77 +720,6 @@ export default function App() {
               </div>
             ) : null}
 
-            {view?.kind === "projectHub" ? (
-              <div className="mx-auto max-w-[45rem]">
-                <ProjectHub
-                  onDuplicate={async () => {
-                    if (!projectState?.id) return;
-                    const { duplicateProject } = await import("./lib/backup");
-                    const copy = await duplicateProject({ id: projectState.id, savedAt: Date.now(), project: projectState.project });
-                    openSavedProject(copy);
-                  }}
-                  project={view.project}
-                  drafting={drafting}
-                  saveState={projectSave}
-                  onOpen={openPhase}
-                  onManual={fillPhaseByHand}
-                  onAdvanced={(phaseId) => openAdvancedPhase(phaseId, 7)}
-                  onEditProject={() => goto(0)}
-                  onProcedure={() => goto(12)}
-                />
-              </div>
-            ) : null}
-
-            {view?.kind === "projectProcedure" ? (
-              <div className="mx-auto max-w-[45rem]">
-                <ProjectProcedureStep
-                  project={view.project}
-                  onChange={setProject}
-                  drafting={procedureDrafting}
-                  saveState={projectSave}
-                  onBack={() => goto(10)}
-                  onContinue={() => goto(13)}
-                  photos={projectPhotos.photos}
-                  onPhotoChange={projectPhotos.setPhoto}
-                  onAdvanced={(phaseId) => openAdvancedPhase(phaseId, 8)}
-                />
-              </div>
-            ) : null}
-
-            {view?.kind === "projectFiles" ? (
-              <div className="mx-auto max-w-[45rem]">
-                <ProjectFilesStep
-                  project={view.project}
-                  config={config}
-                  companyLogo={projectLogo.logo}
-                  photos={projectPhotos.photos}
-                  onBack={() => goto(12)}
-                />
-              </div>
-            ) : null}
-
-            {/* The same JSA editor as Single Mode, on one phase's JSA */}
-            {view?.kind === "projectEditing" ? (
-              <EditorStep
-                doc={view.jsa}
-                onChange={(next) => setProject((project) => withPhaseJsa(project, view.phase.id, next))}
-                companyLogo={projectLogo.logo}
-                onCompanyLogoChange={projectLogo.setLogo}
-                saveState={projectSave}
-                onContinue={() => {
-                  setProject((project) => withPhaseJsa(project, view.phase.id, view.jsa, true));
-                  goto(10);
-                }}
-                onStartOver={() => goto(10)}
-                error={null}
-                project={{
-                  name: view.project.name,
-                  position: `JSA ${view.index + 1} จาก ${view.project.phases.length}`,
-                  onBack: () => goto(10),
-                }}
-              />
-            ) : null}
-
             {view?.kind === "procedurePdf" ? (
               <div className="mx-auto max-w-[45rem]">
                 <ProcedurePdfStep
@@ -1070,9 +740,7 @@ export default function App() {
       <footer
         className={`mx-auto w-full max-w-[var(--page-max-w)] px-4 text-xs text-muted ${
           view?.kind === "editing" ||
-          view?.kind === "procedureEditing" ||
-          view?.kind === "projectEditing" ||
-          view?.kind === "projectProcedure"
+          view?.kind === "procedureEditing"
             ? "pb-24"
             : "pb-3"
         }`}
@@ -1094,7 +762,7 @@ export default function App() {
             onSelect: () => chooseWpAi("builtin"),
           },
           {
-            label: "ใช้ AI ภายนอก",
+            label: "ใช้โมเดลภายนอก",
             description: "ChatGPT, Claude หรือ Gemini",
             icon: <ExternalLink className="size-4" aria-hidden="true" />,
             recommended: jsaSourceDraft.load() === "outside",

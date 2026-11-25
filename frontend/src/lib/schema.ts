@@ -40,9 +40,6 @@ export const jsaHeaderSchema = z.object({
   // vendor) — printed as an extra header row only when filled in. Defaulted
   // for the same reason as `analyst`.
   company: z.string().default(""),
-  // Project Mode: the project this JSA is one phase of, printed as a row
-  // above งาน/กิจกรรม. Blank on a Single Mode JSA. Defaulted like the above.
-  project: z.string().default(""),
 });
 
 export const jsaDocumentSchema = z.object({
@@ -104,54 +101,6 @@ export const inputFormSchema = z.object({
     .max(5000, "รายละเอียดยาวเกิน 5,000 ตัวอักษร กรุณาย่อหรือแยกเป็นหลาย JSA"),
 });
 
-/* Project Mode — a big job split into phases, one JSA per phase. Browser-only
- * (projects.ts); the backend only ever sees one phase's request at a time, as
- * GenerateRequest.project (backend/app/models/jsa.py's ProjectContext). */
-
-/** One row of the shared tag list — a valve, blind or tag and what's done with it */
-export const projectReferenceSchema = z.object({
-  tag: z.string(),
-  note: z.string().default(""),
-});
-
-export const projectPhaseSchema = z.object({
-  /** Stable on-screen identity — phases can be reordered */
-  id: z.string(),
-  /** This phase's work name. Becomes its JSA's งาน/กิจกรรม, and the two are kept in step */
-  work: z.string(),
-  /** What's done in this phase — the prompt for its JSA */
-  description: z.string(),
-  jsa: jsaDocumentSchema.nullable().default(null),
-  /** Ticked when the user finishes reviewing this JSA ("ตรวจแล้ว") */
-  reviewed: z.boolean().default(false),
-  /** This phase's section of the project's work procedure, drafted from its
-   * JSA. Only its steps are used; the project-level sections live in
-   * ProjectDocument.procedureIntro. */
-  procedure: procedureDocumentSchema.nullable().default(null),
-});
-
-/** The project procedure's own opening sections, written once for the whole
- * project (the first drafted section supplies them; tools grow as sections
- * are drafted) */
-export const projectProcedureIntroSchema = z.object({
-  purpose: z.string().default(""),
-  scope: z.string().default(""),
-  tools: z.array(z.string()).default([]),
-  ppe: z.array(z.string()).default([]),
-});
-
-export const projectDocumentSchema = z.object({
-  name: z.string(),
-  supervisor: z.string(),
-  analyst: z.string().default(""),
-  company: z.string().default(""),
-  /** ข้อจำกัด / หมายเหตุ — sent to the system as background for every phase */
-  notes: z.string().default(""),
-  references: z.array(projectReferenceSchema).default([]),
-  phases: z.array(projectPhaseSchema),
-  procedureIntro: projectProcedureIntroSchema.nullable().default(null),
-});
-
 export type Hazard = z.infer<typeof hazardSchema>;
 export type JsaStep = z.infer<typeof stepSchema>;
 export type JsaSubStep = z.infer<typeof jsaSubStepSchema>;
@@ -160,10 +109,6 @@ export type InputForm = z.infer<typeof inputFormSchema>;
 export type SubStep = z.infer<typeof subStepSchema>;
 export type ProcedureStep = z.infer<typeof procedureStepSchema>;
 export type ProcedureDocument = z.infer<typeof procedureDocumentSchema>;
-export type ProjectReference = z.infer<typeof projectReferenceSchema>;
-export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
-export type ProjectDocument = z.infer<typeof projectDocumentSchema>;
-export type ProjectProcedureIntro = z.infer<typeof projectProcedureIntroSchema>;
 
 /** Identifies the JSA step list a procedure was generated from.
  *
@@ -178,7 +123,7 @@ export function stepFingerprint(doc: JsaDocument | ProcedureDocument): string {
 export function jsaFingerprint(doc: JsaDocument): string {
   // Sub-steps join the fingerprint only when a step has them, so a procedure
   // drafted before sub-steps existed doesn't suddenly read as out of date
-  return JSON.stringify([doc.header, doc.steps.map((s) => {
+  return JSON.stringify([jsaHeaderSchema.parse(doc.header), doc.steps.map((s) => {
     const own = [s.procedure.trim(), s.details.trim()];
     return s.sub_steps.length ? [...own, s.sub_steps.map((sub) => [sub.procedure.trim(), sub.details.trim()])] : own;
   })]);
@@ -197,16 +142,29 @@ export type JsaRow = {
   hazards: Hazard[];
 };
 
+/** Some AI answers repeat the structural step number in the title. Match
+ * only that step's own number, and keep a decimal with an engineering unit. */
+export function jsaStepTitle(title: string, number: string): string {
+  const match = /^(\d+(?:\.\d+)?)([.):])?[^\S\r\n]+(\S[\s\S]*)$/u.exec(title.trimStart());
+  if (!match) return title;
+  const [, prefix, punctuation, text] = match;
+  if (prefix !== number || (!punctuation && !number.includes("."))) return title;
+  if (!punctuation && /^(?:mm|cm|m|km|in|ft|kg|g|t|l|ml|bar|psi|kpa|mpa|rpm|v|a|kw|°c|%|มม\.|ซม\.|เมตร|นิ้ว|ฟุต|กก\.|บาร์)(?=$|[^\p{L}\p{N}])/iu.test(text)) return title;
+  return text;
+}
+
 export function jsaRows(doc: JsaDocument): JsaRow[] {
   return doc.steps.flatMap((step, i): JsaRow[] => {
     const no = `${i + 1}`;
-    const { procedure, details } = step;
+    const procedure = jsaStepTitle(step.procedure, no);
+    const { details } = step;
     if (!step.sub_steps.length) return [{ kind: "step", no, procedure, details, hazards: step.hazards }];
     return [
       { kind: "heading", no, procedure, details, hazards: [] },
-      ...step.sub_steps.map((sub, j): JsaRow => ({
-        kind: "sub", no: `${no}.${j + 1}`, procedure: sub.procedure, details: sub.details, hazards: sub.hazards,
-      })),
+      ...step.sub_steps.map((sub, j): JsaRow => {
+        const subNo = `${no}.${j + 1}`;
+        return { kind: "sub", no: subNo, procedure: jsaStepTitle(sub.procedure, subNo), details: sub.details, hazards: sub.hazards };
+      }),
     ];
   });
 }
@@ -232,7 +190,19 @@ export function hazardCount(doc: JsaDocument): number {
 }
 
 export function procedureIsStale(jsa: JsaDocument, procedure: ProcedureDocument): boolean {
-  if (procedure.sourceFingerprint) return procedure.sourceFingerprint !== jsaFingerprint(jsa);
+  if (procedure.sourceFingerprint) {
+    const current = jsaFingerprint(jsa);
+    if (procedure.sourceFingerprint === current) return false;
+    try {
+      const saved: unknown = JSON.parse(procedure.sourceFingerprint);
+      if (!Array.isArray(saved) || saved.length !== 2) return true;
+      // Backups may predate the removal of the project field from JSA headers.
+      const header = jsaHeaderSchema.safeParse(saved[0]);
+      return !header.success || JSON.stringify([header.data, saved[1]]) !== current;
+    } catch {
+      return true;
+    }
+  }
   // Old entries have no source details snapshot. Do not imply we verified it.
   return stepFingerprint(jsa) !== stepFingerprint(procedure) || jsa.steps.some((s) => s.details.trim());
 }

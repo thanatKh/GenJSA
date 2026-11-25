@@ -63,7 +63,7 @@ test("controls are bulleted, not numbered 1.1, in a JSA with sub-steps", async (
   test.skip(info.project.name !== "desktop", "the bullet sits in the desktop table's control cell");
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
   await importAnswer(page, "jsa-answer.json");
   // Step 1.2 has two hazards — numbered controls would read 1.1, 1.2, 2.1
   const row = page.locator("#jsa-step-0-s1");

@@ -31,7 +31,7 @@ export async function mockApi(page: Page): Promise<Calls> {
     await new Promise((r) => setTimeout(r, 300));
     await route.fulfill({
       json: {
-        header: { work_activity: "เปลี่ยนวาล์ว 6 นิ้ว", supervisor: body.supervisor, analysis_date: body.analysis_date, analyst: body.analyst ?? "", company: "", project: "" },
+        header: { work_activity: "เปลี่ยนวาล์ว 6 นิ้ว", supervisor: body.supervisor, analysis_date: body.analysis_date, analyst: body.analyst ?? "", company: "" },
         steps: [1, 2, 3].map((no) => ({ no, procedure: `ขั้นตอนหลัก ${no}`, details: "", hazards: [{ hazard: `อันตราย ${no}`, controls: ["มาตรการ"] }], sub_steps: [] })),
         assumptions: [],
       },
@@ -62,15 +62,15 @@ export function field(page: Page, id: string): Locator {
   return page.locator(`[id="${id}"]:visible, [id="${phone}"]:visible`);
 }
 
-/** Fill the first screen. `mode` picks the tab first. */
+/** Fill the first screen, selecting the document type if needed. */
 export async function fillInput(page: Page, mode: "JSA" | "JSA + Procedure" = "JSA") {
   await page.goto("/");
-  if (mode !== "JSA") await page.getByText(mode, { exact: true }).first().click();
+  if (mode !== "JSA") await page.getByRole("radio", { name: "JSA + ขั้นตอนปฏิบัติงาน" }).click();
   await page.locator("textarea").first().fill(DESCRIPTION);
   await page.getByLabel("ชื่อหัวหน้างาน").fill("สมชาย ใจดี");
 }
 
-/** On the ใช้ AI ภายนอก screen: hand it an answer file and open the draft */
+/** On the ใช้โมเดลภายนอก screen: hand it an answer file and open the draft */
 export async function importAnswer(page: Page, fixtureName: string) {
   await page.getByLabel("เลือกไฟล์คำตอบจาก AI").setInputFiles(fixture(fixtureName));
   await page.getByRole("button", { name: "เปิดร่างเพื่อตรวจทาน" }).click();

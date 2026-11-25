@@ -27,8 +27,8 @@ test.describe("JSA", () => {
   test("outside AI: import an answer with sub-steps → review → PDF page", async ({ page }) => {
     const calls = await mockApi(page);
     await fillInput(page);
-    await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
-    await expect(page.getByRole("heading", { name: "ใช้ AI ภายนอก" })).toBeVisible();
+    await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
+    await expect(page.getByRole("heading", { name: "ใช้โมเดลภายนอก" })).toBeVisible();
     await importAnswer(page, "jsa-answer.json");
 
     await expect(field(page, "procedure-0-s1")).toHaveValue("กั้นเขตพื้นที่");
@@ -36,7 +36,7 @@ test.describe("JSA", () => {
     await expect(page.getByText("3 ขั้นตอน · 5 ขั้นตอนย่อย · 8 รายการอันตราย")).toBeVisible();
 
     await page.getByRole("button", { name: "สร้างขั้นตอนปฏิบัติงาน" }).click();
-    await expect(page.getByRole("alertdialog").getByRole("button", { name: /ใช้ AI ภายนอก.*แนะนำ/ })).toBeVisible();
+    await expect(page.getByRole("alertdialog").getByRole("button", { name: /ใช้โมเดลภายนอก.*แนะนำ/ })).toBeVisible();
     expect(calls).toEqual({ jsa: 0, procedure: 0 });
   });
 });
@@ -67,16 +67,18 @@ test.describe("JSA + Procedure", () => {
   test("outside AI for both: never calls the built-in AI, WP locked to JSA sub-steps", async ({ page }) => {
     const calls = await mockApi(page);
     await fillInput(page, "JSA + Procedure");
-    await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+    await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
     await importAnswer(page, "jsa-answer.json");
     await expect(field(page, "procedure-0")).toBeVisible();
 
     await forward(page, "ถัดไป").click();
     const dialog = page.getByRole("alertdialog");
-    await expect(dialog.getByRole("button", { name: /ใช้ AI ภายนอก.*แนะนำ/ })).toBeVisible();
-    await dialog.getByRole("button", { name: /ใช้ AI ภายนอก/ }).click();
+    await expect(dialog.getByRole("button", { name: /ใช้โมเดลภายนอก.*แนะนำ/ })).toBeVisible();
+    await dialog.getByRole("button", { name: /ใช้โมเดลภายนอก/ }).click();
 
-    await expect(page.getByRole("heading", { name: "ใช้ AI ภายนอก" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ใช้โมเดลภายนอก" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "ละเอียด", exact: true })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /แตกขั้นตอน/ })).toHaveCount(0);
     await expect(page.locator("#personal-prompt")).toHaveValue(/1\.1 ขอ Work Permit/);
     await importAnswer(page, "wp-answer.json");
 

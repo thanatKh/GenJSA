@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hz, jsa, splitJsa, step } from "../test/fixtures";
-import { hazardCount, jsaDocumentSchema, jsaFingerprint, jsaRows, linkedSubSteps, subStepCount } from "./schema";
+import { hazardCount, jsaDocumentSchema, jsaFingerprint, jsaRows, linkedSubSteps, procedureDocumentSchema, procedureIsStale, subStepCount } from "./schema";
 
 describe("jsaRows — the printed numbering", () => {
   it("numbers a heading step, its sub-steps and a plain step", () => {
@@ -17,6 +17,16 @@ describe("jsaRows — the printed numbering", () => {
     const doc = splitJsa();
     doc.steps[0].hazards = [hz("ไม่ควรพิมพ์")];
     expect(jsaRows(doc)[0].hazards).toEqual([]);
+  });
+
+  it("prints old numbered titles once without changing a measurement or the saved title", () => {
+    const doc = splitJsa();
+    doc.steps[0].sub_steps[0].procedure = "1.1 กั้นเขต";
+    doc.steps[0].sub_steps[1].procedure = "1.2 bar เป็นค่าที่อ่านได้";
+    expect(jsaRows(doc).slice(1, 3).map((r) => [r.no, r.procedure])).toEqual([
+      ["1.1", "กั้นเขต"], ["1.2", "1.2 bar เป็นค่าที่อ่านได้"],
+    ]);
+    expect(doc.steps[0].sub_steps[0].procedure).toBe("1.1 กั้นเขต");
   });
 
   it("counts hazards across sub-steps, and sub-steps", () => {
@@ -66,5 +76,15 @@ describe("older documents", () => {
     const b = splitJsa();
     b.steps[0].sub_steps[1].procedure = "Check Gas ซ้ำ";
     expect(jsaFingerprint(a)).not.toBe(jsaFingerprint(b));
+  });
+
+  it("still matches a WP saved with the former project field", () => {
+    const doc = splitJsa();
+    const [, steps] = JSON.parse(jsaFingerprint(doc));
+    const sourceFingerprint = JSON.stringify([{ ...doc.header, project: "" }, steps]);
+    const wp = procedureDocumentSchema.parse({ header: doc.header, steps: [], sourceFingerprint });
+    expect(procedureIsStale(doc, wp)).toBe(false);
+    doc.header.supervisor = "ผู้ทดสอบ";
+    expect(procedureIsStale(doc, wp)).toBe(true);
   });
 });

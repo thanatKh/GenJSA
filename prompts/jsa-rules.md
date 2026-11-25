@@ -1,6 +1,6 @@
 {# GenJSA — the JSA drafting rules, shared by both AIs
    Included by jsa-generate.md (the built-in AI's system prompt) and served,
-   rendered, through GET /api/config/public to the ใช้ AI ภายนอก screen, which
+   rendered, through GET /api/config/public to the ใช้โมเดลภายนอก screen, which
    wraps it into the prompt the user copies to ChatGPT / Claude / Gemini.
    Keep it free of anything only one of them needs (the JSON-only rule, file
    output, the example) — those live in jsa-generate.md and personalAi.ts.

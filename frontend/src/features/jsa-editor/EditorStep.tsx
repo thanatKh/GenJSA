@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowRight, Check, Info, Plus, RotateCcw } from "lucide-react";
+import { ArrowRight, Info, Plus, RotateCcw } from "lucide-react";
 
 import {
   Alert,
@@ -89,7 +89,6 @@ export function EditorStep({
   companyLogo,
   onCompanyLogoChange,
   saveState,
-  project,
   onDuplicate,
 }: {
   onDuplicate?: () => Promise<void>;
@@ -106,10 +105,6 @@ export function EditorStep({
   continueLabel?: string;
   onStartOver: () => void;
   error: string | null;
-  /** Project Mode: this JSA is one phase of a project. The page is the same
-   * editor, but it isn't the session's draft (the project owns it), and its
-   * bar goes back to the project's JSA list instead of starting over. */
-  project?: { name: string; position: string; onBack: () => void };
 }) {
   const [checked, setChecked] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
@@ -118,10 +113,8 @@ export function EditorStep({
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // A project's JSA is saved with its project — writing it here would
-    // overwrite the Single Mode draft
-    if (!project) docDraft.save(doc);
-  }, [doc, project]);
+    docDraft.save(doc);
+  }, [doc]);
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -338,19 +331,13 @@ export function EditorStep({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">
-          {project ? `ตรวจทาน ${project.position}` : "ตรวจทานและแก้ไข"}
+          ตรวจทานและแก้ไข
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           {onDuplicate ? <DuplicateButton action={onDuplicate} /> : null}
 
         </div>
       </div>
-      {project ? (
-        <p className="mt-1 text-sm font-medium text-ink">
-          {/* The project name, shown not edited here — it's set on the project's own page */}
-          โครงการ: {project.name}
-        </p>
-      ) : null}
       <p className="mt-1.5 text-muted">
         ตรวจทุกช่องให้ตรงกับงานจริง{" "}
         <strong className="font-semibold text-ink">ผู้ปฏิบัติงานและหัวหน้างานเป็นผู้รับผิดชอบเนื้อหา</strong>
@@ -618,31 +605,14 @@ export function EditorStep({
             above them; this bar is `fixed`, so it sits outside <main>'s own
             width entirely and needs the token again rather than inheriting it. */}
         <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
-          {project ? (
-            // Nothing to lose by leaving: every edit is already saved with the project
-            <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={project.onBack}>
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              กลับ
-            </Button>
-          ) : (
-            <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={() => setConfirmRestart(true)}>
-              <RotateCcw className="size-4" aria-hidden="true" />
-              เริ่มใหม่
-            </Button>
-          )}
+          <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={() => setConfirmRestart(true)}>
+            <RotateCcw className="size-4" aria-hidden="true" />
+            เริ่มใหม่
+          </Button>
           <SaveStatus state={saveState} compact />
           <Button size="lg" onClick={() => continueReviewed(onContinue)} className="max-sm:px-3">
-            {project ? (
-              <>
-                <Check className="size-5" aria-hidden="true" />
-                ตรวจแล้ว
-              </>
-            ) : (
-              <>
-                {continueLabel ?? "สร้าง PDF"}
-                <ArrowRight className="size-5" aria-hidden="true" />
-              </>
-            )}
+            {continueLabel ?? "สร้าง PDF"}
+            <ArrowRight className="size-5" aria-hidden="true" />
           </Button>
         </div>
       </div>

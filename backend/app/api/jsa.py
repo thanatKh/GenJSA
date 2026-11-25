@@ -81,7 +81,7 @@ async def public_config() -> dict:
             ],
             # The drafting rules themselves, rendered exactly as the built-in
             # AI's system prompt includes them (prompts/jsa-rules.md and
-            # procedure-rules.md). The ใช้ AI ภายนอก screen wraps them into the
+            # procedure-rules.md). The ใช้โมเดลภายนอก screen wraps them into the
             # prompt the user copies, so both AIs follow one set of rules. Not
             # a secret — the user sees that prompt anyway; no model name or key.
             "prompts": {

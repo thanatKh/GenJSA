@@ -2,7 +2,7 @@
    This file is a Jinja2 template; values are injected from config/jsa-rules.yaml
    Only the built-in AI's own parts live here: who it is and the exact JSON to
    answer with. The drafting rules themselves are in jsa-rules.md, shared word
-   for word with the prompt the ใช้ AI ภายนอก screen hands to an outside AI —
+   for word with the prompt the ใช้โมเดลภายนอก screen hands to an outside AI —
    change a rule there and both change.
    The prompt body below is intentionally written in Thai, since it instructs
    the AI to generate Thai-language JSA documents.

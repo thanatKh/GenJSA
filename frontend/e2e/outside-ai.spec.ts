@@ -1,4 +1,4 @@
-/* The ใช้ AI ภายนอก screen itself: copy is the main action and the prompt
+/* The ใช้โมเดลภายนอก screen itself: copy is the main action and the prompt
  * stays folded away, a file can be dropped on the drop zone, and the check
  * button leads until the answer passes. */
 import { expect, test } from "@playwright/test";
@@ -9,7 +9,7 @@ test("the copy button confirms on itself, then goes back", async ({ page, contex
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
 
   const copy = page.getByRole("button", { name: "คัดลอกคำสั่ง" });
   await copy.click();
@@ -24,19 +24,46 @@ test("the copy button confirms on itself, then goes back", async ({ page, contex
   // Changing the prompt after copying never leaves a stale "copied"
   await copy.click();
   await expect(done).toBeVisible();
-  await page.locator("#personal-instructions").fill("เพิ่มเติม");
+  const instructions = page.locator("#personal-instructions");
+  await expect(instructions).toBeHidden();
+  await page.getByRole("button", { name: "คำขอเพิ่มเติม (ไม่บังคับ)" }).click();
+  await instructions.fill("เพิ่มเติม");
   await expect(copy).toBeVisible();
+  await page.getByRole("button", { name: "คำขอเพิ่มเติม (มีข้อความแล้ว)" }).click();
+  await expect(instructions).toBeHidden();
+  await copy.click();
+  await expect(done).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("เพิ่มเติม");
 });
 
 test("prompt folded, drop a file, check button leads", async ({ page }, info) => {
+  if (info.project.name === "phone") await page.setViewportSize({ width: 320, height: 720 });
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
+
+  const prepare = page.getByRole("region", { name: "1. เตรียมคำสั่ง" });
+  const receive = page.getByRole("form", { name: "2. นำคำตอบกลับมา" });
+  await expect(prepare).toBeVisible();
+  await expect(receive).toBeVisible();
+  await expect(receive.getByLabel("วางคำตอบจาก AI")).toBeVisible();
+  await expect(receive.getByRole("button", { name: "เลือกไฟล์คำตอบ" })).toBeVisible();
+  const left = (await prepare.boundingBox())!;
+  const right = (await receive.boundingBox())!;
+  if (info.project.name === "desktop") {
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+    expect(Math.abs(right.y - left.y)).toBeLessThan(2);
+  } else {
+    expect(right.y).toBeGreaterThan(left.y + left.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+    await page.getByRole("button", { name: "ไปที่ช่องคำตอบ", exact: true }).click();
+    await expect(receive.getByRole("heading")).toBeFocused();
+  }
 
   // The prompt is there but folded; the copy button is the main action
   await expect(page.locator("#personal-prompt")).toBeHidden();
   await expect(page.locator("#personal-prompt")).toHaveValue(/# หลักการร่าง JSA|ไล่ตรวจแหล่งอันตราย/);
-  await page.getByText("ดูคำสั่งที่จะส่ง").click();
+  await page.getByRole("button", { name: "ดูคำสั่งที่จะคัดลอก" }).click();
   await expect(page.locator("#personal-prompt")).toBeVisible();
 
   // Each outside AI is a link that opens in a new tab, keeping this page as it is
@@ -58,7 +85,7 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
       data.items.add(new File([content], "genjsa-jsa.json", { type: "application/json" }));
       return data;
     }, text);
-    const zone = page.getByText(/ลากไฟล์คำตอบ .* มาวางที่นี่/);
+    const zone = page.getByText(/ลากไฟล์คำตอบมาวางในส่วนนี้/);
     await zone.dispatchEvent("dragover", { dataTransfer });
     await zone.dispatchEvent("drop", { dataTransfer });
     await expect(page.getByText("นำเข้าไฟล์ genjsa-jsa.json แล้ว")).toBeVisible();

@@ -111,7 +111,7 @@ npm run test:e2e   # Playwright browser tests (e2e/) — about half a minute
   `src/test/fixtures.ts`.
 - **Browser (Playwright, `e2e/`, config `playwright.config.ts`)** — the four
   ways through the app (JSA / JSA + Procedure × built-in / outside AI), the
-  history row's WP button, the ใช้ AI ภายนอก screen (folded prompt, drop
+  history row's WP button, the ใช้โมเดลภายนอก screen (folded prompt, drop
   zone, check button), the editor's sub-step actions, and the PDF/Word
   builders, each at desktop and phone width (`desktop` / `phone` projects).
   `e2e/helpers.ts`'s `mockApi` answers every `/api` call — the generate
@@ -168,7 +168,7 @@ it, so retry behaviour can only ever be fixed (or broken) in one place:
    built-in AI's role and exact JSON, and `{% include %}` the drafting rules
    from `jsa-rules.md` / `procedure-rules.md`. Those rules files are also
    served, rendered, as `/api/config/public`'s `jsaRules.prompts`, and the
-   ใช้ AI ภายนอก screen (`lib/personalAi.ts`) wraps them with its own parts
+   ใช้โมเดลภายนอก screen (`lib/personalAi.ts`) wraps them with its own parts
    (detail level, the split box and its rough sub-step total, file output,
    the example). **One set of rules for both AIs** — edit the rules files,
    never re-type a rule in `personalAi.ts`. `jsa_prompt_context()` /
@@ -225,45 +225,6 @@ Hazards and controls are deliberately **not** sent in the prompt: they aren't
 needed to write how-to steps, and it keeps safety text a human already
 approved from being reworded.
 
-### Project Mode (`frontend/src/features/project/`)
-
-The first screen opens on one three-way switch (`features/jsa-input/ModeChoice.tsx`):
-**JSA**, **JSA + Procedure** (Single Mode — everything above, with or without
-the work procedure) and **โครงการ** (Project Mode) for a big job split into
-phases. JSA and JSA + Procedure share one form; only โครงการ swaps it. A project is
-submitted as two files: one work procedure for the whole project, and every
-phase's JSA in one file (cover + contents, then one JSA per page).
-
-- **Stages 10–13** in `App.tsx` (10 JSA list, 11 a phase's JSA in the normal
-  `EditorStep`, 12 the procedure, 13 the files); step 1, ข้อมูลโครงการ, is
-  stage 0 on the โครงการ tab. Its own 4-step Stepper.
-- **One phase = one JSA.** Each phase is drafted with the normal
-  `/api/jsa/generate`, plus a `project` context (name, notes, tag list, every
-  phase's name, which one this is) — `ai_service._project_context`. The
-  phase's work name becomes its JSA's งาน/กิจกรรม; `projectModel.ts`'s
-  `withProject`/`withPhaseJsa` keep the two (and the printed project name) in step.
-- **The procedure is drafted one phase's section at a time** with
-  `/api/procedure/generate` plus a `project` context listing the earlier
-  phases' steps, so a section builds on what came before instead of
-  repeating it (`procedure_service._project_context`). Same structural rules
-  as Single Mode: step titles from the phase's JSA, references built in code.
-  Numbered by phase everywhere — 2.1, 2.1.1 — via the builders' `project`
-  option (`ProjectProcedureLayout`), in PDF and Word alike.
-- **Drafting is one request at a time** (`usePhaseDrafting.ts`), queued for
-  "ร่างทั้งหมด"; results apply against the latest project so the user can
-  keep reviewing meanwhile.
-- **Stored like history, but separately**: `projects.ts` (localStorage,
-  `MAX_PROJECTS`), session draft in `store.ts`'s `projectDraft`. Never sent
-  anywhere except one phase's context per request.
-- `buildJsaPdf.ts`'s `drawJsa` and `buildJsaDocx.ts`'s `jsaBody` draw one JSA
-  and are shared by the single file and the project's combined file — a
-  change to the JSA layout lands in both.
-- Sub-step photos work as in Single Mode (same `usePhotos`/IndexedDB store,
-  under the project's id), keyed `"<phase id>:<step>.<sub>"`
-  (`projectModel.ts`'s `projectPhotoKey`) — the phase's id, not its number,
-  so reordering phases never moves a photo to another phase. The builders
-  find them through `ProjectProcedureLayout.photoPrefix`.
-
 ### Provider abstraction (`backend/app/providers/llm/`)
 
 `base.py` defines the `LLMProvider` interface; `thaillm.py` implements it for
@@ -289,17 +250,17 @@ drafts the procedure from the reviewed JSA, and stage 4 delivers both files.
 Having a procedure puts a job on the second track: `generateProcedureFrom`
 and `openHistoryEntry` set `mode` to match, which is how the JSA PDF page's
 procedure card and the history list's procedure button move a JSA-only job
-onto it. Every track, Project Mode's included, ends on "เอกสาร PDF".
+onto it. Both tracks end on "เอกสาร PDF".
 
 **A first WP draft asks which AI writes it.** The JSA editor's ถัดไป, the JSA
 PDF page's card and the history row's WP button all open one `ChoiceDialog`
 (`wpChoiceFor`/`chooseWpAi` in `App.tsx`): **AI ในระบบ** drafts it now
-(`generateProcedureFrom`), **ใช้ AI ภายนอก** opens stage 6 (the outside-AI
+(`generateProcedureFrom`), **ใช้โมเดลภายนอก** opens stage 6 (the outside-AI
 screen for the WP). The option matching how the JSA was made is suggested —
 `store.ts`'s `jsaSourceDraft`, "outside" when the JSA was imported from an
 outside AI. Before this, ถัดไป always used the built-in AI, even for a JSA
 drafted elsewhere. The procedure editor's ร่างใหม่ still redrafts with the
-built-in AI. "ใช้ AI ภายนอก" is the user-facing name of the screens the code
+built-in AI. "ใช้โมเดลภายนอก" is the user-facing name of the screens the code
 calls "advanced" (`AdvancedDraftScreen`, stages 5–8).
 
 - `features/jsa-input/InputStep.tsx` — work description form → triggers generate.
@@ -307,8 +268,8 @@ calls "advanced" (`AdvancedDraftScreen`, stages 5–8).
 - `features/jsa-editor/EditorStep.tsx` — edit the generated `JsaDocument` before export.
 - `features/pdf-view/PdfStep.tsx` — the JSA track's last page: the JSA PDF, plus the card that adds a work procedure (moving the job onto the JSA + Procedure track).
 - `features/pdf-view/usePdfDelivery.ts` — **shared by both PDF pages**: builds the blob and routes save/share by browser capability. Its header documents the popup-blocking, iOS-viewer and user-activation constraints behind every rule in it; each one is a fix for something that actually broke. Read it before changing how those buttons behave, and don't reimplement it inline for a third document.
-- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA). Under a JSA step that has sub-steps, each WP line shows its JSA sub-step ("JSA 1.1 · …") and the list is locked to them — no add/delete there, they're changed on the JSA (`linkedSubSteps` in `lib/schema.ts`; Project Mode's section does the same). A warning appears if the JSA's steps changed after the procedure was generated (going back to the JSA and editing it; ถัดไป then reopens the existing procedure rather than redrafting). Photos come in three ways (`SubStepPhoto.tsx`'s header) — the button, drag-and-drop, Ctrl+V — and `PhotoHint` says so, since the last two have nothing on screen of their own.
-- `features/procedure/ProcedurePdfStep.tsx` — JSA + Procedure's last page, "เอกสาร PDF": both files (procedure, then JSA), numbered like Project Mode's page, same delivery hook.
+- `features/procedure/ProcedureEditorStep.tsx` — review the drafted procedure. Step titles are read-only here (they belong to the JSA). Under a JSA step that has sub-steps, each WP line shows its JSA sub-step ("JSA 1.1 · …") and the list is locked to them — no add/delete there, they're changed on the JSA (`linkedSubSteps` in `lib/schema.ts`). A warning appears if the JSA's steps changed after the procedure was generated (going back to the JSA and editing it; ถัดไป then reopens the existing procedure rather than redrafting). Photos come in three ways (`SubStepPhoto.tsx`'s header) — the button, drag-and-drop, Ctrl+V — and `PhotoHint` says so, since the last two have nothing on screen of their own.
+- `features/procedure/ProcedurePdfStep.tsx` — JSA + Procedure's last page, "เอกสาร PDF": both files (procedure, then JSA), same delivery hook.
 - `lib/schema.ts` — TS types/zod schema mirroring `backend/app/models/*.py` by hand (keep both in sync when the shape changes). Also `stepFingerprint()`, which drives the stale-procedure warning.
 - `lib/api.ts` — typed fetch wrapper for `/api/*`.
 - `lib/pdf/` — the PDF layout engines (jsPDF). `engine.ts` holds what both documents share: fonts, geometry, text wrapping, the title bar, header fields, the signature line, the per-page frame pass and the footer. `buildJsaPdf.ts` draws the bordered 3-column F-ปธบ.-1202 table (its pagination loop, orphan/widow guard and row-splitting stay there — they're table-specific). `buildProcedurePdf.ts` draws a flowing numbered document with no grid at all. Thai lines break between words via `engine.ts`'s `splitLines` (the browser's built-in `Intl.Segmenter` — no dictionary shipped); only a single word wider than its column is cut mid-word, and browsers without `Intl.Segmenter` fall back to jsPDF's space-only breaking.
@@ -385,7 +346,7 @@ first, then hand-merge.
 | JSA drafting rules (step count, etc.) | `config/jsa-rules.yaml` |
 | Hazard sources the AI must check for every step (both the built-in AI and the advanced mode's outside-AI prompt) | `config/jsa-rules.yaml` → `hazard_checklist` |
 | Site wording the AI must use (e.g. "Check Gas" not "Gas Test") — every JSA and procedure prompt, built-in and outside-AI | `config/jsa-rules.yaml` → `terminology` |
-| How the AI thinks / what it must not do (both the built-in AI and the ใช้ AI ภายนอก prompt) | `prompts/jsa-rules.md` |
+| How the AI thinks / what it must not do (both the built-in AI and the ใช้โมเดลภายนอก prompt) | `prompts/jsa-rules.md` |
 | The built-in AI's role line and exact JSON shape | `prompts/jsa-generate.md` |
 | Work procedure titles / section headings / labels | `config/procedure.yaml` (optional file — deleting it falls back to built-in defaults) |
 | Work procedure drafting rules (sub-steps per step) | `config/procedure.yaml` → `generation` |
@@ -393,9 +354,6 @@ first, then hand-merge.
 | Word (.docx) export layout | `frontend/src/lib/word/` (keep in step with the PDF builders) |
 | PDF layout logic | `frontend/src/lib/pdf/buildJsaPdf.ts` (JSA table), `buildProcedurePdf.ts` (procedure), `engine.ts` (shared drawing primitives) |
 | History entry cap | `frontend/src/history.ts` → `MAX_ENTRIES` |
-| Saved projects cap (Project Mode) | `frontend/src/projects.ts` → `MAX_PROJECTS` |
-| "โครงการ" header-row wording | `config/document.yaml` → `labels.project` |
-| Project procedure's notes / tag-list headings | `config/procedure.yaml` → `sections.notes` / `sections.tags` |
 | Request size / rate limit / CORS | `config/app.yaml` |
 | Visit statistics (Cloudflare Web Analytics token; blank = off) | `config/app.yaml` → `analytics.cloudflare_token` |
 

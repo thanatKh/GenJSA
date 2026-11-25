@@ -7,9 +7,9 @@ import { fillInput, fixture, mockApi } from "./helpers";
 test("the prompt fold-out opens, closes and is out of reach while closed", async ({ page }) => {
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
 
-  const toggle = page.getByRole("button", { name: "ดูคำสั่งที่จะส่ง" });
+  const toggle = page.getByRole("button", { name: "ดูคำสั่งที่จะคัดลอก" });
   const prompt = page.locator("#personal-prompt");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(prompt).toBeHidden();
@@ -26,7 +26,7 @@ test("the prompt fold-out opens, closes and is out of reach while closed", async
 test("the file button says it worked, and the checked answer eases in and out", async ({ page }) => {
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
 
   const pick = page.getByRole("button", { name: "เลือกไฟล์คำตอบ" });
   await page.getByLabel("เลือกไฟล์คำตอบจาก AI").setInputFiles(fixture("jsa-answer.json"));
@@ -43,16 +43,26 @@ test("the file button says it worked, and the checked answer eases in and out", 
   await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeVisible();
 });
 
-test("the sub-step total field eases in with its checkbox", async ({ page }) => {
+test("JSA defaults to detailed with sub-steps and remembers changes to both", async ({ page }) => {
   await mockApi(page);
   await fillInput(page);
-  await page.getByRole("button", { name: "ใช้ AI ภายนอก" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
   const target = page.locator("#personal-target");
-  await expect(target).toBeHidden();
-  await page.getByLabel(/แตกขั้นตอนหลักเป็นขั้นตอนย่อย/).check();
+  const split = page.getByLabel(/แตกขั้นตอนหลักเป็นขั้นตอนย่อย/);
+  const detailed = page.getByRole("radio", { name: "ละเอียด", exact: true });
+  await expect(detailed).toBeChecked();
+  await expect(split).toBeChecked();
   await expect(target).toBeVisible();
-  await page.getByLabel(/แตกขั้นตอนหลักเป็นขั้นตอนย่อย/).uncheck();
+  await split.uncheck();
   await expect(target).toBeHidden();
+  await split.check();
+  await expect(target).toBeVisible();
+  await split.uncheck();
+  await page.getByRole("radio", { name: "กระชับ", exact: true }).check();
+  await page.getByRole("button", { name: "กลับไปกรอกข้อมูล" }).click();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
+  await expect(page.getByRole("radio", { name: "กระชับ", exact: true })).toBeChecked();
+  await expect(split).not.toBeChecked();
 });
 
 test("the backup button says it worked, then goes back", async ({ page }) => {

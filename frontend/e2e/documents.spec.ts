@@ -13,7 +13,7 @@ test("JSA with sub-steps and its WP build as PDF and Word", async ({ page }, inf
 
   const built = await page.evaluate(async (a) => {
     const doc = {
-      header: { work_activity: a.work_activity, supervisor: "สมชาย", analysis_date: "2026-11-12", analyst: "", company: "", project: "" },
+      header: { work_activity: a.work_activity, supervisor: "สมชาย", analysis_date: "2026-11-12", analyst: "", company: "" },
       steps: a.steps.map((s, i) => ({ ...s, no: i + 1, sub_steps: s.sub_steps.map((x, j) => ({ ...x, no: j + 1 })) })),
       assumptions: [],
     };

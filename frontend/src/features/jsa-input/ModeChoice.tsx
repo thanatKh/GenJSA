@@ -1,35 +1,13 @@
-/* What to make — JSA / JSA + Procedure / โครงการ, at the top of step 1
- *
- * One three-way switch (radiogroup) instead of the two controls this
- * replaced — a pill for "JSA only / JSA + procedure" inside the form, and
- * tabs above it for "single job / project" — so the first screen asks one
- * question, "what am I submitting?", once.
- *
- * - JSA and JSA + Procedure share the same form; only the submit button and
- *   what gets drafted change, so nothing swaps.
- * - โครงการ swaps the whole form and flow (App.tsx slides it in from the
- *   right, the side this option sits on).
- * "JSA + Procedure" in English: the document itself is titled
- * "(Work Procedure)", and on its own "ขั้นตอน" is ambiguous with the JSA's
- * own steps. The headings and buttons elsewhere keep the full Thai name.
- *
- * The highlight slides between options (motion layoutId, the transitions.dev
- * tabs-sliding pattern) on the app's --duration-fast / --ease-smooth-out
- * values; with "reduce motion" on it just moves. Only on the first screen:
- * once a job is under way its mode is fixed.
- */
-
 import { useRef } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { FileText, FolderKanban, ListOrdered } from "lucide-react";
+import { FileText, ListOrdered } from "lucide-react";
 import type { ComponentType } from "react";
 
 import type { Mode } from "../../store";
 
 const OPTIONS: { mode: Mode; label: string; Icon: ComponentType<{ className?: string }> }[] = [
   { mode: "jsa", label: "JSA", Icon: FileText },
-  { mode: "procedure", label: "JSA + Procedure", Icon: ListOrdered },
-  { mode: "project", label: "โครงการ", Icon: FolderKanban },
+  { mode: "procedure", label: "JSA + ขั้นตอนปฏิบัติงาน", Icon: ListOrdered },
 ];
 
 export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
@@ -37,7 +15,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Radiogroup keyboard pattern: one tab stop, arrow keys move the choice
-  // (and focus) around the three options
+  // (and focus) between the two options
   const select = (index: number) => {
     const next = (index + OPTIONS.length) % OPTIONS.length;
     onChange(OPTIONS[next].mode);
@@ -48,8 +26,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
     <div
       role="radiogroup"
       aria-label="เอกสารที่ต้องการสร้าง"
-      // The middle option is the longest label, so it gets a wider column
-      className="mb-4 grid grid-cols-[1fr_1.4fr_1fr] gap-1 rounded-full border border-line bg-raised p-1"
+      className="mb-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-1 rounded-full border border-line bg-raised p-1"
     >
       {OPTIONS.map((option, index) => {
         const checked = option.mode === mode;
@@ -85,8 +62,6 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
                 aria-hidden="true"
               />
             ) : null}
-            {/* Wraps onto two lines when a phone is too narrow for
-                "JSA + Procedure" on one, rather than cutting it off */}
             <span className="relative flex items-center justify-center gap-1.5 text-center leading-tight">
               <option.Icon className="size-4 shrink-0 max-sm:hidden" />
               {option.label}

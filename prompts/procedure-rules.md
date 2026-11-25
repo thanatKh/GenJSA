@@ -1,6 +1,6 @@
 {# GenJSA — the work procedure writing rules, shared by both AIs
    Included by procedure-generate.md (the built-in AI's system prompt) and
-   served, rendered, through GET /api/config/public to the ใช้ AI ภายนอก
+   served, rendered, through GET /api/config/public to the ใช้โมเดลภายนอก
    screen's WP prompt. Values come from config/procedure.yaml; terminology
    from config/jsa-rules.yaml.
 #}

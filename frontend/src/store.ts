@@ -16,11 +16,9 @@
 import type { z } from "zod";
 import {
   jsaDocumentSchema,
-  projectDocumentSchema,
   type InputForm,
   type JsaDocument,
   type ProcedureDocument,
-  type ProjectDocument,
 } from "./lib/schema";
 import type { DetailLevel } from "./lib/personalAi";
 
@@ -28,7 +26,6 @@ const INPUT_KEY = "genjsa.draft.input";
 const DOC_KEY = "genjsa.draft.doc";
 const PROCEDURE_KEY = "genjsa.draft.procedure";
 const HISTORY_ID_KEY = "genjsa.draft.historyId";
-const PROJECT_KEY = "genjsa.draft.project";
 const MODE_KEY = "genjsa.draft.mode";
 const JSA_SOURCE_KEY = "genjsa.draft.jsaSource";
 
@@ -114,45 +111,20 @@ export const currentHistoryId = {
   clear: () => remove(HISTORY_ID_KEY),
 };
 
-/* Project Mode's in-progress project, with the id of its projects.ts entry
- * (null until the project is first saved) and which phase's JSA is open. */
-export type ProjectDraft = {
-  id: string | null;
-  project: ProjectDocument;
-  openPhase: number;
-  /** Which project screen was open (App.tsx's stage 10-12), so a refresh
-   * comes back to it rather than to the JSA list every time */
-  screen?: number;
-};
-export const projectDraft = {
-  load: (): ProjectDraft | null => {
-    const draft = read<ProjectDraft>(PROJECT_KEY);
-    if (!draft) return null;
-    const project = projectDocumentSchema.safeParse(draft.project);
-    return project.success ? { ...draft, project: project.data } : draft;
-  },
-  save: (value: ProjectDraft) => write(PROJECT_KEY, value),
-  clear: () => remove(PROJECT_KEY),
-};
-
-/** What the first screen is set to make: a JSA, a JSA with its work
- * procedure, or a project (ModeChoice.tsx). Remembered for the tab's session;
+/** What the first screen is set to make: a JSA or a JSA with its work
+ * procedure (ModeChoice.tsx). Remembered for the tab's session;
  * a fresh visit starts on "jsa", so nobody gets the doubled wait of
  * "procedure" without picking it. */
-export type Mode = "jsa" | "procedure" | "project";
+export type Mode = "jsa" | "procedure";
 export const modeDraft = {
-  // Anything else — including "single", what this held before the three-way switch — is "jsa"
-  load: (): Mode => {
-    const saved = read<string>(MODE_KEY);
-    return saved === "procedure" || saved === "project" ? saved : "jsa";
-  },
+  load: (): Mode => read<string>(MODE_KEY) === "procedure" ? "procedure" : "jsa",
   save: (value: Mode) => write(MODE_KEY, value),
 };
 
 /** Clears the in-progress draft only. History (history.ts) is untouched by
- * design, and so are saved projects (projects.ts). */
+ * design. */
 /** Where the current JSA came from: "outside" when it was imported from an
- * outside AI (ใช้ AI ภายนอก), else "builtin". Only steers which way the WP
+ * outside AI (ใช้โมเดลภายนอก), else "builtin". Only steers which way the WP
  * choice dialog suggests — the user still picks. */
 export type JsaSource = "builtin" | "outside";
 export const jsaSourceDraft = {
@@ -173,5 +145,4 @@ export function clearAllDrafts(): void {
   docDraft.clear();
   procedureDraft.clear();
   currentHistoryId.clear();
-  projectDraft.clear();
 }

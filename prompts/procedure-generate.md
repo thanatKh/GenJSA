@@ -1,7 +1,7 @@
 {# GenJSA — system prompt for generating a work procedure (ขั้นตอนปฏิบัติงาน)
    This file is a Jinja2 template; values are injected from config/procedure.yaml
    Only the built-in AI's own parts live here (who it is, the exact JSON); the
-   writing rules are in procedure-rules.md, shared with the ใช้ AI ภายนอก
+   writing rules are in procedure-rules.md, shared with the ใช้โมเดลภายนอก
    screen's prompt — change a rule there and both change.
 
    This prompt is the INVERSE of prompts/jsa-generate.md on one axis only:

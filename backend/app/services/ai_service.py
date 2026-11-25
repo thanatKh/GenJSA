@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..core.config import PROMPTS_DIR, Settings
 from ..core.errors import AppError, Errors
-from ..models.jsa import MAX_SUB_STEPS, AiJsaPayload, GenerateRequest, JsaDocument, JsaHeader, ProjectContext
+from ..models.jsa import MAX_SUB_STEPS, AiJsaPayload, GenerateRequest, JsaDocument, JsaHeader
 from ..providers.llm.base import LLMProvider
 from .json_repair import repair_and_parse
 
@@ -68,35 +68,7 @@ def _load_system_prompt(settings: Settings) -> str:
 
 
 def _build_user_prompt(request: GenerateRequest) -> str:
-    description = f"รายละเอียดงานที่จะปฏิบัติ:\n\n{request.work_description.strip()}"
-    if request.project is None:
-        return description
-    return f"{_project_context(request.project)}\n\n{description}"
-
-
-def _project_context(project: ProjectContext) -> str:
-    """Project Mode: tell the model this JSA is one phase of a bigger job.
-
-    The phase list keeps other phases' work out of this JSA (each phase gets
-    its own), and the reference list is the one source of tag numbers —
-    the system prompt already forbids inventing equipment numbers, so these
-    are the ones it may use.
-    """
-    lines = [f"งานนี้เป็นขั้นตอนหนึ่งของโครงการ: {project.name.strip()}", "", "ขั้นตอนทั้งหมดของโครงการ:"]
-    for index, phase in enumerate(project.phases):
-        marker = "  ← ร่าง JSA เฉพาะขั้นตอนนี้" if index == project.phase_index else ""
-        lines.append(f"{index + 1}. {phase.strip()}{marker}")
-    lines.append("ห้ามรวมงานของขั้นตอนอื่นไว้ใน JSA นี้ แต่ละขั้นตอนมี JSA ของตัวเอง")
-
-    if project.notes.strip():
-        lines += ["", f"ข้อจำกัด/หมายเหตุของโครงการ: {project.notes.strip()}"]
-
-    if project.references:
-        lines += ["", "รายการอ้างอิงของโครงการ (วาล์ว/Blind/Tag) — ใช้เลขตามรายการนี้เท่านั้น ห้ามคิดเลขขึ้นเอง:"]
-        for ref in project.references:
-            note = f": {ref.note.strip()}" if ref.note.strip() else ""
-            lines.append(f"- {ref.tag.strip()}{note}")
-    return "\n".join(lines)
+    return f"รายละเอียดงานที่จะปฏิบัติ:\n\n{request.work_description.strip()}"
 
 
 async def generate_validated[T: BaseModel](
@@ -180,17 +152,9 @@ async def generate_jsa(
         fallback_models=settings.ai.fallback_models,
     )
 
-    project = request.project
-    # In Project Mode the user already named this phase — that name is the
-    # one the project uses everywhere, so it wins over the model's summary
-    work_activity = (
-        project.phases[project.phase_index].strip() if project else ""
-    ) or payload.work_activity.strip()
-
     return JsaDocument(
         header=JsaHeader(
-            work_activity=work_activity,
-            project=project.name.strip() if project else "",
+            work_activity=payload.work_activity.strip(),
             supervisor=request.supervisor.strip(),
             analysis_date=request.analysis_date,
             analyst=request.analyst.strip(),

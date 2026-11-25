@@ -502,7 +502,6 @@ export function ProcedureEditorStep({
 export function SubStepItem({
   label,
   jsaTitle,
-  jsaLabel = label,
   locked = false,
   sub,
   photo,
@@ -514,9 +513,6 @@ export function SubStepItem({
   label: string;
   /** The JSA sub-step this line writes up, when the JSA step has sub-steps */
   jsaTitle?: string;
-  /** That sub-step's number in its JSA — differs from `label` in Project
-   * Mode, where the WP is numbered by phase (2.1.1) and each JSA from 1 (1.1) */
-  jsaLabel?: string;
   /** Tied one-to-one to the JSA's sub-steps: added or removed on the JSA, not here */
   locked?: boolean;
   sub: SubStep;
@@ -541,7 +537,7 @@ export function SubStepItem({
       <div className="min-w-0">
         {jsaTitle ? (
           <p className="mb-1 text-sm font-medium text-ink [overflow-wrap:anywhere]">
-            <span className="text-muted">JSA {jsaLabel} ·</span> {jsaTitle || "(ไม่มีชื่อ)"}
+            <span className="text-muted">JSA {label} ·</span> {jsaTitle || "(ไม่มีชื่อ)"}
           </p>
         ) : null}
         <AutoGrowTextarea

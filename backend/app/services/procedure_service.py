@@ -17,7 +17,6 @@ from ..models.procedure import (
     AiProcedurePayload,
     GenerateProcedureRequest,
     ProcedureDocument,
-    ProjectProcedureContext,
     ProcedureStep,
     SubStep,
 )
@@ -28,44 +27,7 @@ from .ai_service import generate_validated, procedure_prompt_context, render_pro
 logger = logging.getLogger("genjsa")
 
 
-def _project_context(project: ProjectProcedureContext) -> str:
-    """Project Mode: where this section sits in the project's one procedure.
-
-    Earlier phases are listed with their steps so the section can build on
-    what they left in place ("Blind ที่ใส่ในขั้นตอนที่ 2") — the continuity
-    that pasting separately drafted procedures together loses. Later phases
-    are listed so their work stays out of this section.
-    """
-    current = project.phase_index
-    lines = [
-        f"เอกสารนี้เป็นขั้นตอนปฏิบัติงานฉบับเดียวของทั้งโครงการ: {project.name.strip()}",
-        f"ครั้งนี้ให้ร่างเฉพาะส่วนของขั้นตอนที่ {current + 1} ของโครงการ",
-        "",
-        "ขั้นตอนทั้งหมดของโครงการ:",
-    ]
-    for index, phase in enumerate(project.phases):
-        marker = "  ← ส่วนที่ต้องร่างครั้งนี้" if index == current else ""
-        lines.append(f"{index + 1}. {phase.work.strip()}{marker}")
-        # Earlier phases' steps: what's already been done by the time this one starts
-        if index < current:
-            lines += [f"   - {step.strip()}" for step in phase.steps if step.strip()]
-    lines += [
-        "",
-        "ให้เขียนต่อเนื่องจากขั้นตอนก่อนหน้า: อ้างถึงสิ่งที่ทำไว้แล้วได้ (เช่น วาล์วที่ปิด หรือ Blind ที่ใส่ไว้ในขั้นตอนก่อน)",
-        "ห้ามทำซ้ำงานของขั้นตอนอื่น และห้ามรวมงานของขั้นตอนถัดไปไว้ในส่วนนี้",
-        "purpose และ scope ให้เขียนสำหรับทั้งโครงการ ไม่ใช่เฉพาะขั้นตอนนี้",
-    ]
-    if project.notes.strip():
-        lines += ["", f"ข้อจำกัด/หมายเหตุของโครงการ: {project.notes.strip()}"]
-    if project.references:
-        lines += ["", "รายการอ้างอิงของโครงการ (วาล์ว/Blind/Tag) — ใช้เลขตามรายการนี้เท่านั้น ห้ามคิดเลขขึ้นเอง:"]
-        for ref in project.references:
-            note = f": {ref.note.strip()}" if ref.note.strip() else ""
-            lines.append(f"- {ref.tag.strip()}{note}")
-    return "\n".join(lines)
-
-
-def _build_user_prompt(jsa: JsaDocument, project: ProjectProcedureContext | None = None) -> str:
+def _build_user_prompt(jsa: JsaDocument) -> str:
     """Hand the model the work and the step skeleton — nothing else.
 
     Hazards and controls are deliberately left out: the model doesn't need them
@@ -84,8 +46,7 @@ def _build_user_prompt(jsa: JsaDocument, project: ProjectProcedureContext | None
             lines.append(f"   {step.no}.{sub.no} {sub.procedure.strip()}")
             if sub.details.strip():
                 lines.append(f"      รายละเอียด: {sub.details.strip()}")
-    body = "\n".join(lines)
-    return body if project is None else f"{_project_context(project)}\n\n{body}"
+    return "\n".join(lines)
 
 
 def _sub_steps(step: JsaStep, ai_subs: list[SubStep]) -> list[SubStep]:
@@ -170,7 +131,7 @@ async def generate_procedure(
 
     payload = await generate_validated(
         system_prompt=render_prompt("procedure-generate.md", **procedure_prompt_context(settings)),
-        user_prompt=_build_user_prompt(request.jsa, request.project),
+        user_prompt=_build_user_prompt(request.jsa),
         model=model,
         payload_model=AiProcedurePayload,
         provider=provider,

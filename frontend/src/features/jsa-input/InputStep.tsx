@@ -285,7 +285,6 @@ export function InputStep({
             supervisor: supervisor.trim(),
             analyst: analyst.trim(),
             company: company.trim(),
-            project: "",
             analysis_date: todayIso(),
           };
           rememberForNextTime(header);
@@ -463,7 +462,7 @@ export function InputStep({
                 if (await trigger(["supervisor", "analyst", "company"], { shouldFocus: true })) onOpenAdvanced();
               }}
             >
-              ใช้ AI ภายนอก
+              ใช้โมเดลภายนอก
             </button>
           </div>
         </form>
@@ -474,7 +473,7 @@ export function InputStep({
       <ConfirmDialog
         open={confirmReset}
         title="ล้างฟอร์ม?"
-        description="ข้อมูลที่กรอกและร่างใน “ใช้ AI ภายนอก” จะถูกล้าง ชื่อและบริษัทที่จำไว้จะถูกเติมกลับมา"
+        description="ข้อมูลที่กรอกและร่างใน “ใช้โมเดลภายนอก” จะถูกล้าง ชื่อและบริษัทที่จำไว้จะถูกเติมกลับมา"
         confirmLabel="ล้างฟอร์ม"
         onConfirm={applyReset}
         onCancel={() => setConfirmReset(false)}

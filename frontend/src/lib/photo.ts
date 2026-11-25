@@ -93,28 +93,23 @@ async function resizePhoto(
   }
 }
 
-type PhotoSteps = {
-  steps: readonly { no: number; sub_steps: readonly { no: number }[] }[];
-  photoPrefix: string;
-};
+type PhotoSteps = readonly { no: number; sub_steps: readonly { no: number }[] }[];
 
 /** Prepare only the photos used by this export, one at a time to bound decoded
  * image memory on phones. The saved photos stay at their editing resolution. */
 export async function prepareExportPhotos(
   photos: PhotoMap | undefined,
-  groups: readonly PhotoSteps[],
+  steps: PhotoSteps,
 ): Promise<PhotoMap> {
   const output: PhotoMap = {};
   if (!photos) return output;
-  for (const { steps, photoPrefix } of groups) {
-    for (const step of steps) {
-      for (const no of [0, ...step.sub_steps.map((sub) => sub.no)]) {
-        const key = photoPrefix + photoKey(step.no, no);
-        const photo = photos[key];
-        if (!photo || output[key]) continue;
-        const source = await (await fetch(photo.data)).blob();
-        output[key] = await resizePhoto(source, EXPORT_MAX_EDGE_PX, EXPORT_JPEG_QUALITY, photo);
-      }
+  for (const step of steps) {
+    for (const no of [0, ...step.sub_steps.map((sub) => sub.no)]) {
+      const key = photoKey(step.no, no);
+      const photo = photos[key];
+      if (!photo || output[key]) continue;
+      const source = await (await fetch(photo.data)).blob();
+      output[key] = await resizePhoto(source, EXPORT_MAX_EDGE_PX, EXPORT_JPEG_QUALITY, photo);
     }
   }
   return output;

@@ -35,25 +35,7 @@ import {
   type StepPhoto,
 } from "./layout";
 
-/** Project Mode: one procedure for the whole project. Its steps are printed
- * as one section per phase, numbered by phase — phase 2's steps 2.1, 2.2…
- * and their sub-steps 2.1.1… — followed the project's notes and tag list
- * as their own sections. The ProcedureDocument passed alongside supplies the
- * header and the opening sections only; its own `steps` are not printed. */
-export type ProjectProcedureLayout = {
-  phases: {
-    title: string;
-    steps: ProcedureStep[];
-    /** Prepended to photoKey(step, sub) — a project's photos are keyed per phase */
-    photoPrefix: string;
-  }[];
-  notes: string;
-  references: { tag: string; note: string }[];
-};
-
 type BuildProcedureOptions = {
-  /** Project Mode — see ProjectProcedureLayout */
-  project?: ProjectProcedureLayout;
   layout?: PdfLayout;
   document?: DocumentMeta;
   procedure?: ProcedureMeta;
@@ -79,10 +61,7 @@ export async function buildProcedurePdf(
   const P = options.procedure ?? FALLBACK_PROCEDURE;
   const C = options.company;
   const authorName = procedure.header.analyst?.trim() || procedure.header.supervisor.trim();
-  const photos = await prepareExportPhotos(
-    options.photos,
-    options.project?.phases ?? [{ steps: procedure.steps, photoPrefix: "" }],
-  );
+  const photos = await prepareExportPhotos(options.photos, procedure.steps);
 
   const E = await createEngine(L, { companyLogo: options.companyLogo });
   const { doc, pageW, mL, mT, contentW, bodyBottom, lineH, wrap, drawLines, logo, border } = E;
@@ -506,15 +485,6 @@ export async function buildProcedurePdf(
   listSection(P.sections.tools, procedure.tools, true);
   // `?? []`: a procedure from before PPE existed that skipped the schema
   listSection(P.sections.ppe ?? FALLBACK_PROCEDURE.sections.ppe!, procedure.ppe ?? [], true);
-  const project = options.project;
-  if (project) {
-    textSection(P.sections.notes ?? "ข้อจำกัด / หมายเหตุ", project.notes);
-    listSection(
-      P.sections.tags ?? "รายการวาล์ว / Blind / Tag",
-      project.references.map((ref) => (ref.note.trim() ? `${ref.tag}: ${ref.note}` : ref.tag)),
-    );
-  }
-
   // ------------------------------------------------- the procedure itself --
   // Steps are numbered on their own — "1.", sub-steps "1.1" — exactly as the
   // editor and its photo slots show them. They used to carry this section's
@@ -522,13 +492,10 @@ export async function buildProcedurePdf(
   // section existed (4.x.x in one document, 5.x.x in another), so "check
   // step 1.2" said on screen pointed at nothing on paper.
 
-  /** One run of steps and their sub-steps. Single Mode: "1." / "1.1".
-   * Project Mode passes the phase's number as `prefix` ("2.") for "2.1" /
-   * "2.1.1", indented one level further under the phase's own heading. */
-  const measureStep = (step: ProcedureStep, prefix: string, extraIndent: number, photoPrefix: string) => {
-    const stepX = stepIndent + extraIndent;
-    const subX = subIndent + extraIndent;
-    const titleLines = wrap(step.procedure, contentW - stepX, "bold", stepPt, prefix ? `${prefix}${step.no}` : `${step.no}.`);
+  const measureStep = (step: ProcedureStep) => {
+    const stepX = stepIndent;
+    const subX = subIndent;
+    const titleLines = wrap(step.procedure, contentW - stepX, "bold", stepPt, `${step.no}.`);
 
     const subLines = step.sub_steps.map((sub) =>
       wrap(
@@ -536,10 +503,10 @@ export async function buildProcedurePdf(
         contentW - subX,
         "normal",
         L.font.body_pt,
-        `${prefix}${step.no}.${sub.no}`,
+        `${step.no}.${sub.no}`,
       ),
     );
-    const subPhotos = step.sub_steps.map((sub) => photos[photoPrefix + photoKey(step.no, sub.no)]);
+    const subPhotos = step.sub_steps.map((sub) => photos[photoKey(step.no, sub.no)]);
 
     // Keep a step title with its first sub-step — a heading alone at the foot
     // of a page is the one pagination problem a flowing layout still has.
@@ -555,7 +522,7 @@ export async function buildProcedurePdf(
 
     // The step's own photo ("1.0"): under the title, before its sub-steps,
     // aligned with the title text
-    const stepPhoto = photos[photoPrefix + photoKey(step.no, 0)];
+    const stepPhoto = photos[photoKey(step.no, 0)];
     const stepPhotoMaxW = contentW - stepX - (titleLines[0]?.indent ?? 0);
 
     let keepTogether = Math.min(titleLines.length, 1) * stepLineH;
@@ -577,72 +544,58 @@ export async function buildProcedurePdf(
     return { stepX, subX, titleLines, subLines, subPhotos, photoMaxW, stepPhoto, stepPhotoMaxW, keepTogether };
   };
 
-  const drawSteps = (steps: ProcedureStep[], prefix: string, extraIndent: number, photoPrefix: string) => {
-  steps.forEach((step, stepIndex) => {
-    if (stepIndex > 0) y += stepGap;
-    const { stepX, subX, titleLines, subLines, subPhotos, photoMaxW, stepPhoto, stepPhotoMaxW, keepTogether } =
-      measureStep(step, prefix, extraIndent, photoPrefix);
-    need(keepTogether);
+  const drawSteps = () => {
+    procedure.steps.forEach((step, stepIndex) => {
+      if (stepIndex > 0) y += stepGap;
+      const { stepX, subX, titleLines, subLines, subPhotos, photoMaxW, stepPhoto, stepPhotoMaxW, keepTogether } =
+        measureStep(step);
+      need(keepTogether);
 
-    drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
-    if (stepPhoto) {
-      drawPhoto(stepPhoto, stepPhotoMaxW, `ภาพประกอบขั้นตอน ${prefix}${step.no}`);
-    }
-
-    step.sub_steps.forEach((_, subIndex) => {
-      const actionLines = subLines[subIndex];
-      const photo = subPhotos[subIndex];
-
-      // A photo belongs to the sub-step it shows, so keep the two together
-      // when they fit one page — otherwise the photo lands alone at the top
-      // of the next page while its text stays behind, which reads as an
-      // unrelated image. A sub-step too long for that is going to break
-      // across pages regardless, so nothing is reserved for it.
-      if (photo) {
-        const blockH = actionLines.length * lineH + photoBlockH(photo, photoMaxW(actionLines));
-        if (blockH <= usableBodyH) need(blockH);
+      drawFlowing(titleLines, mL + stepX, contentW - stepX, stepLineH, stepPt);
+      if (stepPhoto) {
+        drawPhoto(stepPhoto, stepPhotoMaxW, `ภาพประกอบขั้นตอน ${step.no}`);
       }
 
-      drawFlowing(actionLines, mL + subX, contentW - subX);
+      step.sub_steps.forEach((_, subIndex) => {
+        const actionLines = subLines[subIndex];
+        const photo = subPhotos[subIndex];
 
-      // Right under its own line, so it reads as "this is what that action
-      // looks like" rather than a picture of the step as a whole.
-      if (photo) {
-        drawPhoto(
-          photo,
-          photoMaxW(actionLines),
-          `ภาพประกอบขั้นตอน ${prefix}${step.no}.${step.sub_steps[subIndex].no}`,
-        );
-      }
+        // A photo belongs to the sub-step it shows, so keep the two together
+        // when they fit one page — otherwise the photo lands alone at the top
+        // of the next page while its text stays behind, which reads as an
+        // unrelated image. A sub-step too long for that is going to break
+        // across pages regardless, so nothing is reserved for it.
+        if (photo) {
+          const blockH = actionLines.length * lineH + photoBlockH(photo, photoMaxW(actionLines));
+          if (blockH <= usableBodyH) need(blockH);
+        }
+
+        drawFlowing(actionLines, mL + subX, contentW - subX);
+
+        // Right under its own line, so it reads as "this is what that action
+        // looks like" rather than a picture of the step as a whole.
+        if (photo) {
+          drawPhoto(
+            photo,
+            photoMaxW(actionLines),
+            `ภาพประกอบขั้นตอน ${step.no}.${step.sub_steps[subIndex].no}`,
+          );
+        }
+      });
     });
-  });
   };
 
   // The section heading reserves what its first step will itself keep
   // together — a title with its photo included. Reserving only a line or two
   // left the heading alone at the foot of a page whenever step 1 had a photo:
   // the step then moved on to the next page and the heading stayed behind.
-  // (Project Mode's phase headings reserve their own first step below.)
-  const firstStep = project ? undefined : procedure.steps[0];
-  const firstReserve = firstStep ? measureStep(firstStep, "", 0, "").keepTogether : stepLineH + lineH;
+  const firstStep = procedure.steps[0];
+  const firstReserve = firstStep ? measureStep(firstStep).keepTogether : stepLineH + lineH;
   need(headingLineH + blockGap + Math.min(firstReserve, usableBodyH - headingLineH - blockGap));
   drawHeading(P.sections.procedure);
   y += blockGap;
 
-  if (project) {
-    project.phases.forEach((phase, phaseIndex) => {
-      if (phaseIndex > 0) y += sectionGap;
-      const titleLines = wrap(phase.title, contentW - stepIndent, "bold", headingPt, `${phaseIndex + 1}.`);
-      // The phase heading with its first step title and sub-step line, so a
-      // phase never opens on the last line of a page
-      need(titleLines.length * headingLineH + stepLineH + lineH);
-      drawFlowing(titleLines, mL + stepIndent, contentW - stepIndent, headingLineH, headingPt);
-      y += blockGap;
-      drawSteps(phase.steps, `${phaseIndex + 1}.`, mmToPt(6), phase.photoPrefix);
-    });
-  } else {
-    drawSteps(procedure.steps, "", 0, "");
-  }
+  drawSteps();
 
   // ผู้จัดทำ used to be printed here as a sign-off after the last step —
   // moved to the cover page's info summary instead (drawCoverPage above),

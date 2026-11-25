@@ -2,7 +2,7 @@
  *
  * By the time a user reaches this page they've reviewed both, so this is the
  * one place they get their files — the procedure and the JSA it was drafted
- * from, as two numbered files like Project Mode's own เอกสาร PDF page. Each
+ * from, as two numbered files. Each
  * card is independent: two separate usePdfDelivery() calls, two separate
  * blobs, built in parallel as soon as this page mounts.
  *
@@ -139,8 +139,7 @@ export function ProcedurePdfStep({
     <section>
       <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">เอกสาร PDF</h1>
 
-      {/* Two equal files, numbered — the same as Project Mode's page. The
-          kicker is what tells them apart: both titles are the same job. */}
+      {/* The kicker distinguishes the two files for the same job. */}
       <PdfDeliveryCard
         className="mt-4"
         kicker="ไฟล์ 1 · ขั้นตอนปฏิบัติงาน (Work Procedure)"

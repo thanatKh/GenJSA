@@ -57,7 +57,7 @@ export function BackupControls() {
     <Reveal show={!!message}><p role="status" className="mt-2 text-center text-sm text-muted sm:text-end">{message || lastMessage.current}</p></Reveal>
     <Reveal show={!!error}><div className="mt-2"><Alert>{error || lastError.current}</Alert></div></Reveal>
     <ConfirmDialog open={!!pending} title="นำเข้าข้อมูลเป็นสำเนา?"
-      description={pending ? `${pending.entries.length} งาน · ${pending.projects.length} โครงการ · ${pending.assets.length} รูป/โลโก้ ข้อมูลเดิมจะยังอยู่ครบ` : ""}
+      description={pending ? `${pending.entries.length} งาน · ${pending.assets.length} รูป/โลโก้ ข้อมูลเดิมจะยังอยู่ครบ` : ""}
       confirmLabel="นำเข้า" onCancel={() => setPending(null)}
       onConfirm={() => { const data = pending; setPending(null); if (data) void run("import", async () => {
         const { restoreBackup } = await import("../../lib/backup"); await restoreBackup(data); flashRestored();

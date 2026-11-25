@@ -22,13 +22,15 @@ describe("parsePersonalDraft — reading an outside AI's JSA", () => {
 
   it("numbers sub-steps and drops a heading's own hazards", () => {
     const draft = parsePersonalDraft(answer([
-      { procedure: "เตรียมพื้นที่", hazards: [hazard], sub_steps: [
-        { procedure: "กั้นเขต", hazards: [hazard] },
-        { procedure: "Check Gas", hazards: [hazard] },
+      { procedure: "1. เตรียมพื้นที่", hazards: [hazard], sub_steps: [
+        { procedure: "1.1 กั้นเขต", hazards: [hazard] },
+        { procedure: "1.2 Check Gas", hazards: [hazard] },
       ] },
     ]));
     expect(draft.steps[0].hazards).toEqual([]);
+    expect(draft.steps[0].procedure).toBe("เตรียมพื้นที่");
     expect(draft.steps[0].sub_steps.map((s) => s.no)).toEqual([1, 2]);
+    expect(draft.steps[0].sub_steps.map((s) => s.procedure)).toEqual(["กั้นเขต", "Check Gas"]);
   });
 
   it("rejects a plain step with no hazards, naming the field", () => {

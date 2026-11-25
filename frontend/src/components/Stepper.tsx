@@ -138,8 +138,7 @@ export function Stepper({
   // isn't offered. Preserves whatever's in progress; callers should never
   // wire this to anything that clears the document.
   onNavigate?: (index: number) => void;
-  /** The track's labels. Defaults to the JSA track's three; JSA + Procedure
-   * and Project Mode pass their own four. */
+  /** The track's labels. Defaults to the JSA track's three. */
   steps?: readonly string[];
 }) {
   // Symmetric layout: every node gets an equal-width column (3 or 4), its circle centered at the top and its title centered

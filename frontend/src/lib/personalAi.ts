@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { JsaPromptRules } from "./api";
 import { FALLBACK_PROCEDURE } from "./pdf/layout";
-import { jsaFingerprint, type JsaDocument, type ProcedureDocument } from "./schema";
+import { jsaFingerprint, jsaStepTitle, type JsaDocument, type ProcedureDocument } from "./schema";
 import { formatThaiDate } from "./thaidate";
 
 export const detailLevels = ["กระชับ", "มาตรฐาน", "ละเอียด"] as const;
@@ -79,7 +79,8 @@ export function buildPersonalPrompt(
     // The same rules the built-in AI follows (prompts/jsa-rules.md)
     rules?.prompts?.jsa || fallbackJsaRules(rules),
     "# สิ่งที่ต้องตอบ",
-    "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่เลขข้อหรือข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
+    "ตอบเป็น JSON หนึ่ง object เท่านั้น ไม่ต้องใส่ข้อมูลหัวเอกสาร ใช้โครงสร้างนี้",
+    "ในฟิลด์ procedure ให้ใส่เฉพาะชื่อขั้นตอน ทั้งขั้นตอนหลักและขั้นตอนย่อยไม่ต้องขึ้นต้นด้วยเลขข้อ เช่น 1. หรือ 1.1 ระบบใส่เลขจากลำดับให้อัตโนมัติ",
     answerAsFile(answerFileNames.jsa),
     '{"work_activity":"ชื่องาน","steps":[{"procedure":"ขั้นตอนที่ไม่แบ่งย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายข้อแรก","controls":["มาตรการของข้อแรก"]},{"hazard":"อันตรายอีกข้อ","controls":["มาตรการของอีกข้อ"]}],"sub_steps":[]},{"procedure":"ขั้นตอนหลักที่แบ่งย่อย","details":"","hazards":[],"sub_steps":[{"procedure":"ขั้นตอนย่อย","details":"รายละเอียดงาน","hazards":[{"hazard":"อันตรายของขั้นตอนย่อย","controls":["มาตรการ"]}]}]}],"assumptions":["ข้อมูลที่ต้องยืนยัน"]}',
     `# รายละเอียดงาน\n${description.trim()}`,
@@ -171,9 +172,14 @@ export function parsePersonalDraft(answer: string) {
     steps: draft.steps.map((step, index) => ({
       ...step,
       no: index + 1,
+      procedure: jsaStepTitle(step.procedure, String(index + 1)),
       // A heading's own hazards never print, so drop them here (as the backend does)
       hazards: step.sub_steps.length ? [] : step.hazards,
-      sub_steps: step.sub_steps.map((sub, subIndex) => ({ ...sub, no: subIndex + 1 })),
+      sub_steps: step.sub_steps.map((sub, subIndex) => ({
+        ...sub,
+        no: subIndex + 1,
+        procedure: jsaStepTitle(sub.procedure, `${index + 1}.${subIndex + 1}`),
+      })),
     })),
   };
 }

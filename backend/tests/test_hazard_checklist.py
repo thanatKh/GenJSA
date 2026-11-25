@@ -52,7 +52,7 @@ def test_public_config_exposes_terminology():
 
 def test_both_ais_get_the_same_rules():
     """The built-in AI's system prompt carries exactly the rules the
-    ใช้ AI ภายนอก screen is given — one source, so the two can't drift."""
+    ใช้โมเดลภายนอก screen is given — one source, so the two can't drift."""
     settings = get_settings()
     body = TestClient(app).get("/api/config/public").json()["jsaRules"]["prompts"]
     jsa_prompt = render_prompt("jsa-generate.md", **jsa_prompt_context(settings))
