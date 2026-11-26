@@ -41,6 +41,7 @@ export type Line = {
   weight: Weight;
   marker?: string;
   indent: number;
+  justify?: boolean;
 };
 
 /** Thai word boundaries for splitLines, built once per page load. Null where
@@ -57,6 +58,8 @@ const thaiWords =
 const NO_LINE_START = /^[%)\]}、。,.:;!?ๆฯ’”]/;
 /** …and never end a line with these: "(" sticks to the piece after it. */
 const NO_LINE_END = /[([{‘“]$/;
+const THAI_START = /^\p{Script=Thai}/u;
+const THAI_END = /\p{Script=Thai}$/u;
 
 /** The segmenter's words, regrouped so a line break can only fall where a
  * reader expects one (see NO_LINE_START / NO_LINE_END). */
@@ -209,21 +212,53 @@ export async function createEngine(
     weight: Weight,
     size: number,
     marker?: string,
+    justifyWrapped = false,
   ): Line[] => {
     const clean = (text ?? "").trim();
     if (!clean) return [];
 
     setFont(weight, size);
     const markerW = marker ? doc.getTextWidth(marker) + mmToPt(1.4) : 0;
-    const parts = splitLines(clean, Math.max(width - markerW, 10));
+    const paragraphs = justifyWrapped ? clean.split(/\r?\n/) : [clean];
+    return paragraphs.flatMap((paragraph, paragraphIndex) => {
+      const parts = splitLines(paragraph, Math.max(width - markerW, 10));
+      return parts.map((part, index) => ({
+        text: part,
+        weight,
+        marker: paragraphIndex === 0 && index === 0 ? marker : undefined,
+        indent: markerW,
+        justify: justifyWrapped && index < parts.length - 1,
+      }));
+    });
+  };
 
-    return parts.map((part: string, index: number) => ({
-      text: part,
-      weight,
-      // Marker only appears on the first line — later lines indent to align with the text (hanging indent)
-      marker: index === 0 ? marker : undefined,
-      indent: markerW,
-    }));
+  /** Stretch gaps at Thai word boundaries or existing spaces, keeping
+   * punctuation and unspaced identifiers together. */
+  const drawJustifiedLine = (text: string, x: number, baseline: number, width: number, size: number) => {
+    const units = thaiWords ? breakUnits(text, thaiWords) : text.match(/\s+|\S+/gu) ?? [];
+    const runs: string[] = [];
+    let run = "";
+    units.forEach((unit, index) => {
+      run += unit;
+      const next = units[index + 1];
+      if (!next || /\s$/u.test(unit) || (THAI_END.test(unit) && THAI_START.test(next))) {
+        runs.push(run);
+        run = "";
+      }
+    });
+    if (runs.length < 2) return false;
+
+    const widths = runs.map((part) => doc.getTextWidth(part));
+    const extraGap = (width - widths.reduce((sum, part) => sum + part, 0)) / (runs.length - 1);
+    // A line forced short by an unusually long word still reads better left-aligned.
+    if (extraGap <= 0 || extraGap > size * 0.45) return false;
+
+    let cursor = x;
+    runs.forEach((part, index) => {
+      doc.text(part.trimEnd(), cursor, baseline);
+      cursor += widths[index] + extraGap;
+    });
+    return true;
   };
 
   /** Draw wrapped lines at `size` (defaults to body text), one per lineHeight step */
@@ -246,9 +281,11 @@ export async function createEngine(
       if (line.marker) {
         doc.text(line.marker, x, baseline);
       }
-      doc.text(line.text, x + line.indent, baseline, {
-        maxWidth: cellW - line.indent,
-      });
+      const textX = x + line.indent;
+      const textWidth = cellW - line.indent;
+      if (!line.justify || !drawJustifiedLine(line.text, textX, baseline, textWidth, size)) {
+        doc.text(line.text, textX, baseline, { maxWidth: textWidth });
+      }
     });
   };
 

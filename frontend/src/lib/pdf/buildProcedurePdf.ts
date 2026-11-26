@@ -169,7 +169,7 @@ export async function buildProcedurePdf(
   };
 
   /** Draw a wrapped block line-by-line, breaking to a new page mid-block if
-   * it runs out of room — instead of drawParagraph's old one-shot drawLines,
+   * it runs out of room — instead of a one-shot drawLines,
    * which just drew straight past bodyBottom and off the visible page for
    * any block taller than the space left. A single block that's taller than
    * one whole page (a long purpose/scope, or one long sub-step) needs this
@@ -422,21 +422,14 @@ export async function buildProcedurePdf(
     y += lines.length * headingLineH;
   };
 
-  const drawParagraph = (text: string, indent: number) => {
-    const lines = wrap(text, contentW - indent, "normal", L.font.body_pt);
-    drawFlowing(lines, mL + indent, contentW - indent);
-  };
-
   /** A section whose body is one paragraph (วัตถุประสงค์, ขอบเขต). */
   const textSection = (title: string, body: string) => {
     if (!body.trim()) return; // empty section prints nothing, not a bare heading
-    const bodyLines = wrap(body, contentW - stepIndent, "normal", L.font.body_pt);
-    // Only reserve room for the heading plus the first line here — the rest
-    // of the paragraph flows and paginates itself via drawParagraph below,
-    // same reasoning as the step/sub-step loop further down.
+    const bodyLines = wrap(body, contentW - stepIndent, "normal", L.font.body_pt, undefined, true);
+    // Reserve the heading plus the first line. The rest can flow onto the next page.
     need(headingLineH + Math.min(bodyLines.length, 1) * lineH);
     drawHeading(title);
-    drawParagraph(body, stepIndent);
+    drawFlowing(bodyLines, mL + stepIndent, contentW - stepIndent);
     y += sectionGap;
   };
 
@@ -504,6 +497,7 @@ export async function buildProcedurePdf(
         "normal",
         L.font.body_pt,
         `${step.no}.${sub.no}`,
+        true,
       ),
     );
     const subPhotos = step.sub_steps.map((sub) => photos[photoKey(step.no, sub.no)]);

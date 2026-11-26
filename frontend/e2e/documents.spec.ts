@@ -78,3 +78,40 @@ test("the final JSA page includes table content alongside the analyst line", asy
   // The signature and footer are only text. A table slice draws rectangles.
   expect(lastPage).toMatch(/\bre\s+S\b/);
 });
+
+test("WP justification aligns wrapped Thai text and leaves paragraph endings natural", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "document layout does not depend on screen size");
+  await page.route("**/api/config/public", (route) => route.fulfill({ status: 503, body: "" }));
+  await page.goto("/");
+
+  const lines = await page.evaluate(async () => {
+    const { createEngine } = await import("/src/lib/pdf/engine.ts");
+    const { FALLBACK_LAYOUT } = await import("/src/lib/pdf/layout.ts");
+    const engine = await createEngine(FALLBACK_LAYOUT);
+    const width = 250;
+    const text = "ตรวจสอบความเรียบร้อยของอุปกรณ์ก่อนเริ่มดำเนินงานตามแบบที่อนุมัติ".repeat(4) +
+      "\nบันทึกผล WP-204.5";
+    const wrapped = engine.wrap(text, width, "normal", FALLBACK_LAYOUT.font.body_pt, "1.1", true);
+    const output: { text: string; justify?: boolean; right: number; runs: number }[] = [];
+    const drawText = engine.doc.text.bind(engine.doc);
+    let runs: { right: number }[] = [];
+    engine.doc.text = (...args) => {
+      const [content, x] = args;
+      if (typeof content === "string") runs.push({ right: x + engine.doc.getTextWidth(content) });
+      return drawText(...args);
+    };
+
+    for (const line of wrapped) {
+      runs = [];
+      engine.drawLines([line], 0, 24, width);
+      output.push({ text: line.text, justify: line.justify, right: runs.at(-1)!.right, runs: runs.length });
+    }
+    return output;
+  });
+
+  expect(lines[0].runs).toBeGreaterThan(2);
+  expect(lines[0].right).toBeCloseTo(250, 2);
+  expect(lines.at(-2)?.justify).toBe(false);
+  expect(lines.at(-1)).toMatchObject({ text: "บันทึกผล WP-204.5", justify: false, runs: 1 });
+  expect(lines.at(-1)!.right).toBeLessThan(250);
+});
