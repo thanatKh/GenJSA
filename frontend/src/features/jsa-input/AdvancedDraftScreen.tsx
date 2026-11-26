@@ -8,7 +8,7 @@ import { advancedDraft, type AdvancedKind } from "../../store";
 import type { JsaPromptRules } from "../../lib/api";
 
 const textAreaClass = "block w-full min-w-0 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-navy";
-const panelClass = "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-card border border-line p-3.5 sm:p-4";
+const panelClass = "work-panel grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 p-3.5 sm:p-4";
 const DEFAULT_DETAIL: DetailLevel = "ละเอียด";
 
 type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: { hazards?: unknown[]; action?: string }[] };

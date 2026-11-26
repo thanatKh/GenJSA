@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { mockApi } from "./helpers";
 
-test("home offers two document types and accepts a legacy job backup", async ({ page }) => {
+test("home offers two document types and accepts a legacy job backup", async ({ page, isMobile }) => {
   await mockApi(page);
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/");
   const modes = page.getByRole("radiogroup", { name: "เอกสารที่ต้องการสร้าง" });
   await expect(modes.getByRole("radio")).toHaveCount(2);
@@ -30,4 +31,21 @@ test("home offers two document types and accepts a legacy job backup", async ({ 
   await upload([]);
   await page.getByRole("button", { name: "นำเข้า", exact: true }).click();
   await expect(page.getByText(doc.header.work_activity, { exact: true })).toBeVisible();
+
+  const formPanel = page.locator(".work-panel").filter({ has: modes });
+  const historyPanel = page.locator(".work-panel").filter({
+    has: page.getByRole("heading", { name: /งานที่เคยวิเคราะห์/ }),
+  });
+  await expect(formPanel).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(historyPanel).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(243, 246, 250)");
+  const formBox = (await formPanel.boundingBox())!;
+  const historyBox = (await historyPanel.boundingBox())!;
+  if (isMobile) {
+    expect(historyBox.y).toBeGreaterThan(formBox.y + formBox.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  } else {
+    expect(historyBox.x).toBeGreaterThan(formBox.x + formBox.width);
+    expect(historyBox.height).toBeLessThan(formBox.height / 2);
+  }
 });

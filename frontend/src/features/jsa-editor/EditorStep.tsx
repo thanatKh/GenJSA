@@ -493,7 +493,7 @@ export function EditorStep({
           this element's own bottom corners too would curve them away right
           at that seam, leaving a gap in the add-step row's side borders
           exactly where they're supposed to line up straight. */}
-      <ul className="mt-2 grid list-none gap-2 p-0 lg:mt-0 lg:gap-0 lg:overflow-hidden lg:border lg:border-line">
+      <ul className="mt-2 grid list-none gap-2 p-0 lg:mt-0 lg:gap-0 lg:overflow-hidden lg:border lg:border-line lg:bg-card">
         <AnimatePresence initial={false}>
           {doc.steps.flatMap((step, index, all) => {
             const numberControls = !all.some((s) => s.sub_steps.length);
@@ -553,7 +553,7 @@ export function EditorStep({
           corners: frame padding 8px (lg:p-2), so the button is rounded-xl
           (14px = 22 - 8). As a full-width pill it ran straight into those
           curves, with the "+" sitting inside the curve. */}
-      <div className="mt-3 lg:mt-0 lg:-translate-y-px lg:rounded-b-card lg:border lg:border-t-0 lg:border-line lg:p-2">
+      <div className="mt-3 lg:mt-0 lg:-translate-y-px lg:rounded-b-card lg:border lg:border-t-0 lg:border-line lg:bg-card lg:p-2">
         <Button
           variant="outline"
           className="lg:h-9 lg:w-full lg:justify-start lg:rounded-xl lg:border-0 lg:px-3 lg:text-sm lg:font-normal lg:text-muted lg:hover:bg-raised lg:hover:text-ink"

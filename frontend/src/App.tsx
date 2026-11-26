@@ -547,7 +547,7 @@ export default function App() {
   usePageHeading(mainRef, appName);
 
   return (
-    <div className="min-h-dvh flex flex-col bg-surface">
+    <div className="min-h-dvh flex flex-col bg-workspace">
       <AppBar
         appName={appName}
         documentMeta={config?.document}
@@ -588,18 +588,10 @@ export default function App() {
             ) : null}
 
             {view?.kind === "input" || view?.kind === "advancedInput" ? (
-              // Below xl: single column with history below the form. From xl,
-              // share the available width equally so history has room for job
-              // titles plus both document buttons. minmax(0, 1fr) allows long
-              // Thai titles to truncate without widening either column.
-              //
-              // Grid's default stretch (no xl:items-start override) — the history
-              // column now matches the form's full height so its own scroll area
-              // can grow into it (see HistoryList.tsx's h-full + flex-1 scroll
-              // list), instead of sizing to its own short content and floating
-              // next to a much taller form.
-              <div className={`mx-auto grid gap-y-10 ${view.kind === "advancedInput" ? "max-w-none" : "max-w-[45rem]"} ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-x-8 xl:gap-y-0" : ""}`}>
-                <div className="min-w-0">
+              // Keep a short history card at its content height. On wide screens,
+              // give job titles and their two document buttons a little more room.
+              <div className={`mx-auto grid items-start gap-4 sm:gap-6 ${view.kind === "advancedInput" ? "max-w-none" : "max-w-[45rem]"} ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,48fr)_minmax(0,52fr)]" : ""}`}>
+                <div className={view.kind === "input" ? "work-panel min-w-0 p-3 sm:p-4" : "min-w-0"}>
                   {busy || view.kind === "advancedInput" ? null : <ModeChoice mode={mode} onChange={setMode} />}
                   <InputStep
                     jsaRules={config?.jsaRules}

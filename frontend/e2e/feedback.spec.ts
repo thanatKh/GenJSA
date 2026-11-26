@@ -4,6 +4,27 @@
 import { expect, test } from "@playwright/test";
 import { fillInput, fixture, mockApi } from "./helpers";
 
+test("closing the company fields leaves both form actions free of dotted underlines", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/");
+  const company = page.getByRole("button", { name: /บริษัท \(ไม่บังคับ\)/ });
+  const name = page.getByRole("textbox", { name: "ชื่อบริษัท" });
+  await company.click();
+  await name.fill("บริษัทตัวอย่าง");
+  await company.click();
+  await expect(company).toHaveAttribute("aria-expanded", "false");
+  await expect(name).toBeHidden();
+  await expect(company).toContainText("บริษัทตัวอย่าง");
+
+  await expect(page.getByRole("button", { name: /กรอกแบบฟอร์ม JSA เองทั้งหมด/ }))
+    .toHaveCSS("text-decoration-line", "none");
+  await expect(page.getByRole("button", { name: "ใช้โมเดลภายนอก" }))
+    .toHaveCSS("text-decoration-line", "none");
+
+  await company.click();
+  await expect(name).toHaveValue("บริษัทตัวอย่าง");
+});
+
 test("the prompt fold-out opens, closes and is out of reach while closed", async ({ page }) => {
   await mockApi(page);
   await fillInput(page);
