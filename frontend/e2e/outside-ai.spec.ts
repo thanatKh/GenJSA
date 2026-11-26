@@ -29,10 +29,12 @@ test("the copy button confirms on itself, then goes back", async ({ page, contex
   await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
 
   const copy = page.getByRole("button", { name: "คัดลอกคำสั่ง" });
+  const initialWidth = await copy.evaluate((button: HTMLElement) => button.offsetWidth);
   await copy.click();
   // The button itself says it worked …
   const done = page.getByRole("button", { name: "คัดลอกแล้ว" });
   await expect(done).toBeVisible();
+  expect(await done.evaluate((button: HTMLElement) => button.offsetWidth)).toBe(initialWidth);
   // … and what was copied is the prompt
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("genjsa-jsa.json");
   // … then it returns to "คัดลอกคำสั่ง" by itself

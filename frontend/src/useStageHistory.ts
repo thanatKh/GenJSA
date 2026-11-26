@@ -3,8 +3,7 @@
  * that Back throws you out of.
  *
  * App.tsx keeps "which screen" in one `stage` value; this hook just mirrors
- * it into the browser's history. The mirroring is deliberately the only
- * thing it does — App.tsx's own navigation code is unchanged.
+ * it into the browser's history and routes in-app Back through that same trail.
  *
  * - Going to a screen you haven't been to yet adds a history entry.
  * - Going to a screen already earlier in the trail (กลับไปแก้ไข, the stepper,
@@ -20,7 +19,7 @@
  * one, and this hook follows that move like any other.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type StageState = { genjsa: 1; trail: number[] };
 
@@ -29,8 +28,18 @@ function trailOf(state: unknown): number[] | null {
   return s?.genjsa === 1 && Array.isArray(s.trail) && s.trail.length > 0 ? s.trail : null;
 }
 
-export function useStageHistory<S extends number>(stage: S, setStage: (stage: S) => void) {
+export function useStageHistory<S extends number>(stage: S, setStage: (stage: S) => void, beforeNavigate: () => void) {
   const started = useRef(false);
+  const awaitingBack = useRef(false);
+  const goBackTo = useCallback((next: S) => {
+    if (awaitingBack.current) return true;
+    const trail = trailOf(window.history.state);
+    const index = trail?.lastIndexOf(next) ?? -1;
+    if (!trail || index < 0 || index >= trail.length - 1) return false;
+    awaitingBack.current = true;
+    window.history.go(index - (trail.length - 1));
+    return true;
+  }, []);
 
   // Stage -> history
   useEffect(() => {
@@ -43,23 +52,21 @@ export function useStageHistory<S extends number>(stage: S, setStage: (stage: S)
     const trail = trailOf(window.history.state);
     if (trail && trail[trail.length - 1] === stage) return; // already in step (e.g. we got here via Back)
 
-    const seen = trail ? trail.lastIndexOf(stage) : -1;
-    if (trail && seen >= 0) {
-      // Been there already: walk back to it rather than stacking a new entry
-      window.history.go(seen - (trail.length - 1));
-    } else {
+    if (!goBackTo(stage)) {
       window.history.pushState({ genjsa: 1, trail: [...(trail ?? []), stage] } satisfies StageState, "");
     }
-  }, [stage]);
+  }, [stage, goBackTo]);
 
   // history -> stage
   useEffect(() => {
     const scrollRestoration = window.history.scrollRestoration;
-    // The heading hook resets scroll when the incoming screen mounts.
+    // The heading hook restores scrolling for the incoming screen.
     window.history.scrollRestoration = "manual";
     const onPop = (event: PopStateEvent) => {
+      awaitingBack.current = false;
       const trail = trailOf(event.state);
       if (!trail) return;
+      beforeNavigate();
       setStage(trail[trail.length - 1] as S);
     };
     window.addEventListener("popstate", onPop);
@@ -67,5 +74,13 @@ export function useStageHistory<S extends number>(stage: S, setStage: (stage: S)
       window.removeEventListener("popstate", onPop);
       window.history.scrollRestoration = scrollRestoration;
     };
-  }, [setStage]);
+  }, [setStage, beforeNavigate]);
+
+  return (next: S) => {
+    // Keep the outgoing screen until the history entry actually changes. A
+    // second tap can then never advance from a screen before Back has settled.
+    if (next === stage) return;
+    beforeNavigate();
+    if (!goBackTo(next)) setStage(next);
+  };
 }

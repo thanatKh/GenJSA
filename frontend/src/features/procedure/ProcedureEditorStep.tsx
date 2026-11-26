@@ -30,7 +30,8 @@ import {
   Reveal,
   UndoToast,
 } from "../../components/ui";
-import { type SaveState, SaveStatus } from "../../components/SaveStatus";
+import type { SaveState } from "../../components/SaveStatus";
+import { EditorActionBar } from "../../components/EditorActionBar";
 import { listItem } from "../../lib/motion";
 import { photoKey, type PhotoMap, type StepPhoto } from "../../lib/pdf/layout";
 import { linkedSubSteps, type JsaDocument, type ProcedureDocument, type SubStep } from "../../lib/schema";
@@ -437,8 +438,9 @@ export function ProcedureEditorStep({
 
       {/* Fixed, matching EditorStep — on a long procedure these actions would
           otherwise only be reachable after scrolling the whole document */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
+      <EditorActionBar
+        saveState={saveState}
+        leading={
           <Button
             type="button"
             variant="ghost"
@@ -456,7 +458,8 @@ export function ProcedureEditorStep({
             <span className="sm:hidden">กลับ</span>
             <span className="hidden sm:inline">กลับไปตรวจทาน JSA</span>
           </Button>
-          <SaveStatus state={saveState} compact />
+        }
+        trailing={
           <Button
             type="button"
             size="lg"
@@ -469,8 +472,8 @@ export function ProcedureEditorStep({
             สร้าง PDF
             <ArrowRight className="size-5" aria-hidden="true" />
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <UndoToast
         open={!!pendingDelete}

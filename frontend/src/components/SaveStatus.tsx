@@ -5,14 +5,13 @@
 
 import type { ReactNode } from "react";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 
 export type SaveState = "idle" | "saving" | "saved" | "failed" | "conflict";
 
 const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: ReactNode; text: string }> = {
   saving: {
     className: "text-muted",
-    icon: <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />,
+    icon: <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />,
     text: "กำลังบันทึก…",
   },
   saved: {
@@ -34,33 +33,17 @@ const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: React
 
 const SHORT_LABELS = { saving: "กำลังบันทึก", saved: "บันทึกแล้ว", failed: "บันทึกไม่ได้", conflict: "งานเปลี่ยนในอีกแท็บ" };
 
-export function SaveStatus({ state, compact = false }: { state: SaveState; compact?: boolean }) {
+export function SaveStatus({ state }: { state: SaveState }) {
   const line = state === "idle" ? null : LINES[state];
   return (
-    <p role="status" aria-live="polite" className={`flex min-h-5 min-w-0 items-center gap-1.5 ${compact ? "flex-1 justify-center text-center text-xs" : "text-sm"}`}>
-      {/* A quick cross-fade between states rather than the text snapping —
-          it changes every time typing pauses, so it stays short and still */}
-      <AnimatePresence mode="wait" initial={false}>
-        {line ? (
-          <motion.span
-            key={state}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            className={`flex items-center gap-1.5 ${line.className}`}
-            title={compact ? line.text : undefined}
-          >
-            {line.icon}
-            {compact && state !== "idle" ? (
-              <>
-                <span className="sr-only sm:not-sr-only">{line.text}</span>
-                <span aria-hidden="true" className="sm:hidden">{SHORT_LABELS[state]}</span>
-              </>
-            ) : line.text}
-          </motion.span>
-        ) : null}
-      </AnimatePresence>
+    <p role="status" aria-atomic="true" className="flex min-h-5 min-w-0 flex-1 items-center justify-center text-center text-xs">
+      {line && state !== "idle" ? (
+        <span className={`flex items-center gap-1.5 ${line.className}`} title={line.text}>
+          {line.icon}
+          <span className="sr-only sm:not-sr-only">{line.text}</span>
+          <span aria-hidden="true" className="sm:hidden">{SHORT_LABELS[state]}</span>
+        </span>
+      ) : null}
     </p>
   );
 }

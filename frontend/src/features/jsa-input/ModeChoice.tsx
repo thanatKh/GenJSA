@@ -26,7 +26,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
     <div
       role="radiogroup"
       aria-label="เอกสารที่ต้องการสร้าง"
-      className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-1 rounded-full border border-line bg-raised p-1 sm:mt-4"
+      className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-line bg-raised p-1 sm:mt-4"
     >
       {OPTIONS.map((option, index) => {
         const checked = option.mode === mode;
@@ -50,7 +50,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
                 select(index - 1);
               }
             }}
-            className={`press relative flex min-h-11 items-center justify-center rounded-full px-1.5 text-sm font-medium
+            className={`press relative flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 py-1 text-sm font-medium
                         transition-colors focus-visible:outline-none focus-visible:ring-2
                         focus-visible:ring-ring/50 ${checked ? "text-navy" : "text-muted hover:text-ink"}`}
           >
@@ -62,9 +62,9 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
                 aria-hidden="true"
               />
             ) : null}
-            <span className="relative flex items-center justify-center gap-1.5 text-center leading-tight">
+            <span className="relative flex min-w-0 items-center justify-center gap-1.5 text-center leading-snug">
               <option.Icon className="size-4 shrink-0 max-sm:hidden" />
-              {option.label}
+              <span className="min-w-0 text-balance">{option.label}</span>
             </span>
           </button>
         );

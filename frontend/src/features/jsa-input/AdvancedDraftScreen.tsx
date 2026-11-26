@@ -284,7 +284,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
                 status={copied ? "success" : undefined}
                 successText="คัดลอกแล้ว"
                 // Green while it says "copied", then back to the brand blue
-                className={`min-h-11 lg:pointer-fine:min-h-10 ${copied ? "bg-[var(--success)] text-white hover:bg-[var(--success)]" : ""}`}
+                className={`min-h-11 min-w-36 lg:pointer-fine:min-h-10 ${copied ? "bg-[var(--success)] text-white hover:bg-[var(--success)]" : ""}`}
               >
                 {/* Button puts its own tick in front while status is success */}
                 {copied ? null : <Copy className="size-4" aria-hidden="true" />}

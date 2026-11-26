@@ -1,6 +1,6 @@
 /* The JSA editor's sub-steps: split, add, move, delete with undo, and the
  * last one gone turning the step back into a plain step. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { field, fillInput, importAnswer, mockApi } from "./helpers";
 
 async function openDraftedJsa(page: Page) {
@@ -15,6 +15,76 @@ const undo = (page: Page) => page.getByRole("button", { name: "เลิกท�
  * for that moment two fields share an id. Wait for the animation to finish. */
 const settled = (page: Page, id: string) => expect(field(page, id)).toHaveCount(1);
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true }).locator("visible=true").first();
+
+test("the mobile editors keep save feedback above the keyboard and fit a wide photo", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "coarse-pointer keyboard layout");
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    const viewport = Object.assign(new EventTarget(), {
+      height: window.innerHeight, width: window.innerWidth, offsetTop: 0, offsetLeft: 0, scale: 1,
+    });
+    Object.defineProperty(window, "visualViewport", { value: viewport });
+  });
+
+  await mockApi(page);
+  await fillInput(page, "JSA + Procedure");
+  await page.getByRole("button", { name: "สร้างเอกสาร" }).click();
+  const bar = page.locator(".editor-action-bar");
+  const updateViewport = (keyboard: boolean, scale = 1) => page.evaluate(({ keyboard, scale }) => {
+    const viewport = window.visualViewport!;
+    Object.assign(viewport, { height: keyboard ? 400 : window.innerHeight, offsetTop: keyboard ? 24 : 0, scale });
+    viewport.dispatchEvent(new Event("resize"));
+  }, { keyboard, scale });
+
+  const typeWithKeyboard = async (input: Locator, action: Locator) => {
+    await expect(action).toBeVisible();
+    await input.focus();
+    await updateViewport(true);
+    await expect(action).toBeHidden();
+    await expect.poll(() => bar.evaluate((node) => Math.round(node.getBoundingClientRect().bottom))).toBe(424);
+    const before = (await input.boundingBox())!.height;
+    await input.fill("ตรวจพื้นที่และบันทึกรายละเอียด\n".repeat(5));
+    await expect(input).toBeFocused();
+    await expect.poll(async () => (await input.boundingBox())!.height).toBeGreaterThan(before);
+    await expect(bar.getByRole("status")).toContainText("กำลังบันทึก");
+    await expect(bar.getByText("บันทึกแล้ว", { exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom)))
+      .toBeGreaterThan(296);
+    await input.evaluate((node) => node.scrollIntoView({ block: "end", behavior: "instant" }));
+    const inputBottom = await input.evaluate((node) => node.getBoundingClientRect().bottom);
+    const barTop = await bar.evaluate((node) => node.getBoundingClientRect().top);
+    expect(inputBottom).toBeLessThanOrEqual(barTop);
+    await updateViewport(false);
+    await expect(action).toBeVisible();
+  };
+
+  const next = page.getByRole("button", { name: "ถัดไป", exact: true });
+  await typeWithKeyboard(field(page, "procedure-0"), next);
+  await updateViewport(true, 1.25);
+  await expect.poll(() => bar.evaluate((node) => Math.round(node.getBoundingClientRect().bottom))).toBe(720);
+  await expect(next).toBeVisible();
+  await updateViewport(false);
+
+  await next.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: /AI ในระบบ/ }).click();
+  await expect(page.getByRole("heading", { name: "ตรวจทานขั้นตอนปฏิบัติงาน" })).toBeVisible();
+  await typeWithKeyboard(page.locator("#purpose"), page.getByRole("button", { name: "สร้าง PDF", exact: true }));
+
+  const photoSlot = page.getByRole("button", { name: "เพิ่มรูปภาพประกอบหัวข้อ 1", exact: true }).locator("..");
+  const wideImage = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 200;
+    const painter = canvas.getContext("2d")!;
+    painter.fillRect(0, 0, 800, 200);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await photoSlot.locator("input[type=file]").setInputFiles({ name: "wide.png", mimeType: "image/png", buffer: Buffer.from(wideImage, "base64") });
+  await expect(page.getByRole("img", { name: "รูปภาพประกอบหัวข้อ 1", exact: true })).toBeVisible();
+  await expect(page.locator("#procedure-step-1").getByRole("button", { name: "ลบรูปภาพ", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+});
 
 test("split a step: its hazards move to x.1 and the title waits to be filled", async ({ page }) => {
   await openDraftedJsa(page);

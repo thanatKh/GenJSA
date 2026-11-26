@@ -9,6 +9,7 @@
 import {
   forwardRef,
   useEffect,
+  useLayoutEffect,
   useId,
   useRef,
   type ReactElement,
@@ -17,9 +18,9 @@ import {
 } from "react";
 import { ChevronDown, TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
-import { collapse, EASE_OUT, FAST } from "../lib/motion";
+import { collapse, instantCollapse, EASE_OUT, FAST } from "../lib/motion";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Label as ShadcnLabel } from "./ui/label";
@@ -115,15 +116,16 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
       const padding =
         parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
       el.style.height = "auto";
+      const contentHeight = el.scrollHeight;
       const next = Math.min(
-        Math.max(el.scrollHeight, minRows * lineHeight + padding),
+        Math.max(contentHeight, minRows * lineHeight + padding),
         maxRows * lineHeight + padding,
       );
       el.style.height = `${next}px`;
-      el.style.overflowY = el.scrollHeight > next ? "auto" : "hidden";
+      el.style.overflowY = contentHeight > next ? "auto" : "hidden";
     };
 
-    useEffect(resize, [value, minRows, maxRows]);
+    useLayoutEffect(resize, [value, minRows, maxRows]);
 
     // Wrapping also changes when the window/container changes width. Observe
     // width only: writing height must not cause a ResizeObserver feedback loop.
@@ -172,7 +174,8 @@ export const AutoGrowTextarea = forwardRef<HTMLTextAreaElement, AutoGrowProps>(
         value={value}
         onChange={(event) => {
           onChange?.(event);
-          resize();
+          // Controlled fields resize once, after React commits their value.
+          if (value === undefined) resize();
         }}
         // cn(), not plain string concat — callers that need to *remove* a
         // base style (e.g. StepCard.tsx's borderless desktop-table cells,
@@ -263,10 +266,11 @@ export function SkeletonCard() {
  * just appears; only changes while you're on the page animate.
  */
 export function Reveal({ show, children, className }: { show: boolean; children: ReactNode; className?: string }) {
+  const reduceMotion = useReducedMotion();
   return (
     <AnimatePresence initial={false}>
       {show ? (
-        <motion.div {...collapse} className={cn("overflow-hidden", className)}>
+        <motion.div {...(reduceMotion ? instantCollapse : collapse)} className={cn("overflow-hidden", className)}>
           {children}
         </motion.div>
       ) : null}
@@ -304,6 +308,11 @@ export function Disclosure({
   onOpened?: () => void;
 }) {
   const panelId = useId();
+  const reduceMotion = useReducedMotion();
+  useLayoutEffect(() => {
+    if (reduceMotion && open) onOpened?.();
+  }, [open, onOpened, reduceMotion]);
+
   return (
     <div className={className}>
       <button
@@ -313,12 +322,14 @@ export function Disclosure({
         onClick={() => onOpenChange(!open)}
         className="press flex min-h-11 cursor-pointer items-center gap-1 rounded-md text-sm text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: FAST, ease: EASE_OUT }} className="flex">
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: reduceMotion ? 0 : FAST, ease: EASE_OUT }} className="flex">
           <ChevronDown className="size-4" aria-hidden="true" />
         </motion.span>
         {label}
       </button>
-      <motion.div
+      {reduceMotion ? (
+        <div id={panelId} hidden={!open} className="overflow-hidden">{children}</div>
+      ) : <motion.div
         id={panelId}
         initial={false}
         inert={!open}
@@ -332,7 +343,7 @@ export function Disclosure({
         className="overflow-hidden"
       >
         {children}
-      </motion.div>
+      </motion.div>}
     </div>
   );
 }

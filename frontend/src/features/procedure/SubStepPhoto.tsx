@@ -19,10 +19,10 @@
 
 import { useState } from "react";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Button, FieldError } from "../../components/ui";
-import { collapse, popIn } from "../../lib/motion";
+import { collapse, instantCollapse, popIn } from "../../lib/motion";
 import type { StepPhoto } from "../../lib/pdf/layout";
 import { usePhotoInput } from "./usePhotoInput";
 
@@ -58,10 +58,11 @@ export function PhotoButton({
       variant="ghost"
       size="icon-lg"
       aria-label={label}
+      aria-busy={busy}
       title={label}
       disabled={busy}
       onClick={onClick}
-      className="mt-1 text-muted hover:text-navy"
+      className="mt-1 text-muted hover:text-navy pointer-coarse:size-11"
     >
       {busy ? (
         <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
@@ -109,9 +110,10 @@ export function StepPhotoSlot({
           type="button"
           variant="ghost"
           size="sm"
+          aria-busy={input.busy}
           disabled={input.busy}
           onClick={input.openPicker}
-          className="-ml-2 text-sm text-muted hover:text-navy"
+          className="-ml-2 text-sm text-muted hover:text-navy pointer-coarse:min-h-11"
         >
           {input.busy ? (
             <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
@@ -137,26 +139,28 @@ export function PhotoPreview({
   label: string;
   onRemove: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     // Height + fade in and out, so removing a photo doesn't make the rows
     // below jump. The -m-1/p-1 pair gives the (clipped-while-animating)
     // wrapper room for the buttons' focus rings without changing the layout.
-    <motion.div {...collapse} className="-m-1 overflow-hidden p-1">
-    <div className="mt-2 flex items-start gap-2">
+    <motion.div {...(reduceMotion ? instantCollapse : collapse)} className="-m-1 overflow-hidden p-1">
+    <div className="mt-2 flex flex-wrap items-start gap-2 sm:flex-nowrap">
       {/* Keyed on the image: scales in when added and again when replaced */}
       <motion.img
         key={photo.data}
-        {...popIn}
+        {...(reduceMotion ? {} : popIn)}
         src={photo.data}
         alt={label}
-        className="max-h-40 w-auto max-w-full rounded-xl border border-line"
+        style={{ aspectRatio: photo.ratio, width: `${photo.ratio * 10}rem` }}
+        className="h-auto max-h-40 min-w-0 max-w-full rounded-xl border border-line object-contain"
       />
       <Button
         type="button"
         variant="ghost"
         size="sm"
         onClick={onRemove}
-        className="text-muted hover:bg-danger-soft hover:text-danger-text"
+        className="text-muted hover:bg-danger-soft hover:text-danger-text pointer-coarse:min-h-11"
       >
         <Trash2 className="size-4" aria-hidden="true" />
         ลบรูปภาพ

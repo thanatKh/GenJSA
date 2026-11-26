@@ -111,4 +111,54 @@ test.describe("JSA + Procedure", () => {
     await expect(page.getByRole("alertdialog").getByRole("button", { name: /AI ในระบบ/ })).toBeVisible();
     expect(calls.procedure).toBe(0);
   });
+
+  test("JSA and WP review restore their own scroll positions on Back and Forward", async ({ page, isMobile }) => {
+    if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
+    await mockApi(page);
+    await page.route("**/api/jsa/generate", (route) => route.fulfill({ json: {
+      header: { work_activity: "งานทดสอบการเลื่อนหน้า", supervisor: "ผู้ทดสอบ", analysis_date: "2026-11-26" },
+      steps: Array.from({ length: 16 }, (_, index) => ({
+        no: index + 1, procedure: `ขั้นตอน ${index + 1}`, details: "ตรวจพื้นที่ก่อนเริ่มงาน",
+        hazards: [{ hazard: "พื้นลื่น", controls: ["ตรวจสภาพพื้น"] }], sub_steps: [],
+      })),
+    } }));
+    await fillInput(page, "JSA + Procedure");
+    await page.getByRole("button", { name: "สร้างเอกสาร" }).click();
+
+    const jsa = page.getByRole("heading", { name: "ตรวจทานและแก้ไข" });
+    const wp = page.getByRole("heading", { name: "ตรวจทานขั้นตอนปฏิบัติงาน" });
+    const position = () => page.evaluate(() => window.scrollY);
+    const scrollTo = async (top: number) => {
+      await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" }), top);
+      await expect.poll(position).toBe(top);
+    };
+    const expectRestoredPosition = async (top: number) => {
+      // Scroll anchoring can shift the offset slightly as the editor mounts.
+      // Returning within one line still keeps the same step in view.
+      await expect.poll(async () => Math.abs((await position()) - top)).toBeLessThanOrEqual(16);
+    };
+
+    await expect(jsa).toBeVisible();
+    await scrollTo(640);
+    await forward(page, "ถัดไป").click();
+    await page.getByRole("alertdialog").getByRole("button", { name: /AI ในระบบ/ }).click();
+    await expect(wp).toBeVisible();
+    await expect(jsa).toHaveCount(0);
+    await expect.poll(position).toBe(0);
+    await scrollTo(420);
+
+    await page.goBack();
+    await expect(jsa).toBeFocused();
+    await expectRestoredPosition(640);
+    await page.goForward();
+    await expect(wp).toBeFocused();
+    await expectRestoredPosition(420);
+
+    await page.getByRole("button", { name: "กลับไปตรวจทาน JSA", exact: true }).click();
+    await expect(jsa).toBeFocused();
+    await expectRestoredPosition(640);
+    await forward(page, "ถัดไป").click();
+    await expect(wp).toBeFocused();
+    await expectRestoredPosition(420);
+  });
 });

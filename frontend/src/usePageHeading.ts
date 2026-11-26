@@ -1,33 +1,32 @@
-import { useEffect, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
-/** Follow the heading that actually mounted, including delayed screen swaps.
- * Edits/save indicators must never pull focus out of the current field. */
-export function usePageHeading(main: RefObject<HTMLElement | null>, appName: string) {
+/** Move focus and restore scroll only on screen changes, before the first paint. */
+export function usePageHeading(main: RefObject<HTMLElement | null>, appName: string, screen: string | null) {
+  const activeScreen = useRef<string | null>(null);
+  const positions = useRef(new Map<string, number>());
+
+  const rememberScroll = useCallback(() => {
+    if (activeScreen.current !== null) positions.current.set(activeScreen.current, window.scrollY);
+  }, []);
   useEffect(() => {
-    const container = main.current;
-    if (!container) return;
-    let previous = container.querySelector("h1");
-    let previousText = previous?.textContent?.trim() ?? "";
-    let frame = 0;
-    const update = (focus: boolean) => {
-      const heading = container.querySelector("h1");
-      const text = heading?.textContent?.trim() ?? "";
-      if (!heading || !text) return;
-      document.title = `${text} · ${appName}`;
-      if (focus && (heading !== previous || text !== previousText)) {
-        heading.tabIndex = -1;
-        heading.focus({ preventScroll: true });
-        window.scrollTo({ top: 0, behavior: "instant" });
-      }
-      previous = heading;
-      previousText = text;
-    };
-    update(false);
-    const observer = new MutationObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => update(true));
-    });
-    observer.observe(container, { childList: true, subtree: true, characterData: true });
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [main, appName]);
+    window.addEventListener("scroll", rememberScroll, { passive: true });
+    return () => window.removeEventListener("scroll", rememberScroll);
+  }, [rememberScroll]);
+
+  useLayoutEffect(() => {
+    const heading = main.current?.querySelector("h1");
+    const text = heading?.textContent?.trim();
+    if (!screen || !heading || !text) return;
+    document.title = `${text} · ${appName}`;
+    if (screen === activeScreen.current) return;
+
+    const previous = activeScreen.current;
+    activeScreen.current = screen;
+    if (previous === null) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    window.scrollTo({ top: positions.current.get(screen) ?? 0, behavior: "instant" });
+  }, [main, appName, screen]);
+
+  return { rememberScroll, clearScrollPositions: () => positions.current.clear() };
 }

@@ -14,8 +14,12 @@ test("home offers two document types and accepts a legacy job backup", async ({ 
   expect(modeBox!.y).toBeGreaterThan(headingBox!.y + headingBox!.height);
   expect(descriptionBox!.y).toBeGreaterThan(modeBox!.y + modeBox!.height);
   await expect(modes.getByRole("radio")).toHaveCount(2);
-  await modes.getByRole("radio", { name: "JSA", exact: true }).press("ArrowRight");
+  const jsaMode = modes.getByRole("radio", { name: "JSA", exact: true });
   const procedureMode = modes.getByRole("radio", { name: "JSA + ขั้นตอนปฏิบัติงาน" });
+  const [jsaBox, procedureBox] = await Promise.all([jsaMode.boundingBox(), procedureMode.boundingBox()]);
+  expect(jsaBox!.width).toBeCloseTo(procedureBox!.width, 1);
+  expect(jsaBox!.height).toBeCloseTo(procedureBox!.height, 1);
+  await jsaMode.press("ArrowRight");
   await expect(procedureMode).toBeChecked();
   await procedureMode.press("Tab");
   await expect(description).toBeFocused();

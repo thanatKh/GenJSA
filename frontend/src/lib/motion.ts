@@ -51,6 +51,12 @@ export const collapse = {
   transition: { duration: FAST, ease: EASE_OUT } satisfies Transition,
 };
 
+export const instantCollapse = {
+  ...collapse,
+  exit: { ...collapse.exit, transition: { duration: 0 } },
+  transition: { duration: 0 },
+};
+
 /** Two things trading places in one slot (logo box <-> logo, form <->
  * progress panel): old fades out, then the new one fades in. Use with
  * AnimatePresence mode="wait". */

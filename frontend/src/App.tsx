@@ -157,8 +157,7 @@ export default function App() {
     };
   }, []);
   const [stage, setStage] = useState<Stage>(0);
-  // Browser Back/Forward (and the phone's Back gesture) follow the screens
-  useStageHistory(stage, setStage);
+  const scrollScope = useRef(0);
   const [doc, setDoc] = useState<JsaDocument | null>(() => docDraft.load());
   const [procedure, setProcedure] = useState<ProcedureDocument | null>(() =>
     procedureDraft.load(),
@@ -331,6 +330,7 @@ export default function App() {
   };
 
   const openNewDraft = (draft: JsaDocument, logo: CompanyLogo | null, source: "builtin" | "outside" = "builtin") => {
+    scrollScope.current += 1;
     jsaSourceDraft.save(source);
     setDoc(draft);
     docDraft.save(draft);
@@ -391,6 +391,7 @@ export default function App() {
   /** Restore both documents from a history entry. `to` is where to land —
    * the two callers differ only in that. */
   const openHistoryEntry = (entry: HistoryEntry, to: Stage) => {
+    scrollScope.current += 1;
     // History doesn't record which AI drafted a JSA; the WP dialog then just
     // suggests the built-in one
     jsaSourceDraft.save("builtin");
@@ -423,6 +424,7 @@ export default function App() {
     openHistoryEntry(entry, 3);
 
   const resetToStart = () => {
+    clearScrollPositions();
     generateController.current?.abort();
     procedureController.current?.abort();
     generateController.current = null;
@@ -438,7 +440,7 @@ export default function App() {
     // Drafts only — past work in historyStore.ts deliberately survives "เริ่มใหม่"
     clearAllDrafts();
     setStage(0);
-    if (stage === 0) window.scrollTo({ top: 0 });
+    if (stage === 0) window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const startOver = async () => {
@@ -559,10 +561,6 @@ export default function App() {
     procedureDraft.save(next);
   };
 
-  const goto = (next: Stage) => {
-    setStage(next);
-  };
-
   // The procedure mirrors the JSA's step list, so edits to those steps leave
   // it describing work that no longer matches — warn rather than silently
   // resync, which would throw away the user's own edits to the procedure
@@ -586,7 +584,11 @@ export default function App() {
   const hasSavedItems = view?.kind === "input" && historyStore.list().length > 0;
   const showHistory = hasSavedItems && !busy;
   const mainRef = useRef<HTMLElement>(null);
-  usePageHeading(mainRef, appName);
+  const screen = !view ? null : view.kind === "input" ? (busy ? "inputLoading" : "input") :
+    view.kind === "advancedInput" ? "advancedInput" : `${scrollScope.current}:${stage}:${view.kind}`;
+  const { rememberScroll, clearScrollPositions } = usePageHeading(mainRef, appName, screen);
+  // Browser Back/Forward (and the phone's Back gesture) follow the screens.
+  const goto = useStageHistory(stage, setStage, rememberScroll);
 
   return (
     <div className="min-h-dvh flex flex-col bg-workspace">
@@ -624,10 +626,9 @@ export default function App() {
             </Alert>
           </div>
         )}
-        {/* Keep the Stepper with the screen it describes. Mounting it above
-            an exiting screen would move the old content mid-fade. */}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={view?.kind === "advancedInput" ? "input" : view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate" exit="exit">
+        {/* Mount the next screen and its Stepper together. The outgoing
+            screen is removed immediately, so its controls never overlap. */}
+          <motion.div key={view?.kind === "advancedInput" ? "input" : view?.kind ?? "none"} variants={screenFade} initial="initial" animate="animate">
             {stage !== 0 && stage !== 5 && view ? (
               <div className={stage === 1 ? undefined : "mx-auto max-w-[45rem]"}>
                 <AnimatePresence mode="wait" initial={false}>
@@ -786,14 +787,13 @@ export default function App() {
               </div>
             ) : null}
           </motion.div>
-        </AnimatePresence>
       </main>
 
       <footer
         className={`mx-auto w-full max-w-[var(--page-max-w)] px-4 text-xs text-muted ${
           view?.kind === "editing" ||
           view?.kind === "procedureEditing"
-            ? "pb-24"
+            ? "pb-(--editor-scroll-clearance)"
             : "pb-3"
         }`}
       >

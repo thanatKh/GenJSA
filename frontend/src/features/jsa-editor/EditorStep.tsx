@@ -23,7 +23,8 @@ import { DuplicateButton } from "../../components/DuplicateButton";
 import { StepNavigator } from "../../components/StepNavigator";
 import { jsaProblems, focusJsaField } from "../../lib/jsaValidation";
 import { ThaiDatePicker } from "../../components/ThaiDatePicker";
-import { type SaveState, SaveStatus } from "../../components/SaveStatus";
+import type { SaveState } from "../../components/SaveStatus";
+import { EditorActionBar } from "../../components/EditorActionBar";
 import type { CompanyLogo } from "../../lib/companyLogo";
 import { saveNames } from "../../lib/rememberedNames";
 import type { JsaDocument, JsaStep, JsaSubStep } from "../../lib/schema";
@@ -599,23 +600,21 @@ export function EditorStep({
           steps) these actions used to only be reachable by scrolling all the
           way down every time; keeping them pinned means "restart" and
           "generate PDF" are always one tap away while reviewing. */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line px-4 py-3 t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
-        {/* max-w-[var(--page-max-w)] — same shared bound as AppBar/<main> (see
-            tokens.css) so these buttons line up with the table's own edges
-            above them; this bar is `fixed`, so it sits outside <main>'s own
-            width entirely and needs the token again rather than inheriting it. */}
-        <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
+      <EditorActionBar
+        saveState={saveState}
+        leading={
           <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={() => setConfirmRestart(true)}>
             <RotateCcw className="size-4" aria-hidden="true" />
             เริ่มใหม่
           </Button>
-          <SaveStatus state={saveState} compact />
+        }
+        trailing={
           <Button size="lg" onClick={() => continueReviewed(onContinue)} className="max-sm:px-3">
             {continueLabel ?? "สร้าง PDF"}
             <ArrowRight className="size-5" aria-hidden="true" />
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <ConfirmDialog
         open={confirmRestart}
