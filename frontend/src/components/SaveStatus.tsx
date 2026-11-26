@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
-export type SaveState = "idle" | "saving" | "saved" | "failed";
+export type SaveState = "idle" | "saving" | "saved" | "failed" | "conflict";
 
 const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: ReactNode; text: string }> = {
   saving: {
@@ -23,11 +23,16 @@ const LINES: Record<Exclude<SaveState, "idle">, { className: string; icon: React
   failed: {
     className: "text-danger-text",
     icon: <TriangleAlert className="size-3.5" aria-hidden="true" />,
-    text: "บันทึกไม่สำเร็จ พื้นที่จัดเก็บในเครื่องเต็ม — กรุณาบันทึกเป็นไฟล์ PDF",
+    text: "บันทึกในเบราว์เซอร์ไม่ได้",
+  },
+  conflict: {
+    className: "text-danger-text",
+    icon: <TriangleAlert className="size-3.5" aria-hidden="true" />,
+    text: "งานนี้เปลี่ยนในอีกแท็บ",
   },
 };
 
-const SHORT_LABELS = { saving: "กำลังบันทึก", saved: "บันทึกแล้ว", failed: "บันทึกไม่ได้" };
+const SHORT_LABELS = { saving: "กำลังบันทึก", saved: "บันทึกแล้ว", failed: "บันทึกไม่ได้", conflict: "งานเปลี่ยนในอีกแท็บ" };
 
 export function SaveStatus({ state, compact = false }: { state: SaveState; compact?: boolean }) {
   const line = state === "idle" ? null : LINES[state];

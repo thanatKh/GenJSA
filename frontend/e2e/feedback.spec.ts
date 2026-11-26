@@ -44,23 +44,46 @@ test("the prompt fold-out opens, closes and is out of reach while closed", async
   await expect(prompt).toBeHidden(); // once the close animation has ended
 });
 
-test("the file button says it worked, and the checked answer eases in and out", async ({ page }) => {
+test("answer files show their names and the result of reading and checking", async ({ page }) => {
   await mockApi(page);
   await fillInput(page);
   await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
 
   const pick = page.getByRole("button", { name: "เลือกไฟล์คำตอบ" });
-  await page.getByLabel("เลือกไฟล์คำตอบจาก AI").setInputFiles(fixture("jsa-answer.json"));
-  await expect(page.getByRole("button", { name: "นำเข้าแล้ว" })).toBeVisible();
-  await expect(pick).toBeVisible({ timeout: 4000 }); // back to normal by itself
+  const fileInput = page.getByLabel("เลือกไฟล์คำตอบจาก AI");
+  await fileInput.setInputFiles(fixture("jsa-answer.json"));
+  await expect(page.getByText("jsa-answer.json", { exact: true })).toBeVisible();
+  await expect(page.getByText("ตรวจรูปแบบผ่าน", { exact: true })).toBeVisible();
+  await expect(pick).toBeEnabled();
 
   // The checked answer shows its card in place of the check button …
   const open = page.getByRole("button", { name: "เปิดร่างเพื่อตรวจทาน" });
   await expect(open).toBeVisible();
   await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeHidden();
-  // … and editing the answer takes it away again, check button back
-  await page.locator("#personal-answer").fill('{"x":1}');
+  await fileInput.setInputFiles({
+    name: "broken-answer.json", mimeType: "application/json", buffer: Buffer.from('{"x":1}'),
+  });
+  await expect(page.getByText("broken-answer.json", { exact: true })).toBeVisible();
+  await expect(page.getByText("ตรวจรูปแบบไม่ผ่าน", { exact: true })).toBeVisible();
   await expect(open).toBeHidden();
+
+  await fileInput.setInputFiles({
+    name: "large-answer.txt", mimeType: "text/plain", buffer: Buffer.alloc(2 * 1024 * 1024 + 1, "x"),
+  });
+  await expect(page.getByText("อ่านไฟล์ไม่ได้", { exact: true })).toBeVisible();
+  await expect(page.getByText("เลือกไฟล์ไม่เกิน 2 MB หรือวางคำตอบเป็นข้อความ")).toBeVisible();
+  await expect(page.locator("#personal-answer")).toHaveValue("");
+  await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeDisabled();
+  await page.reload();
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
+  await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeDisabled();
+  await page.getByRole("button", { name: "ใช้คำตอบเดิม" }).click();
+  await expect(page.locator("#personal-answer")).toHaveValue('{"x":1}');
+  await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeEnabled();
+
+  // Editing the answer clears the status associated with the selected file.
+  await page.locator("#personal-answer").fill('{"x":2}');
+  await expect(page.getByText("large-answer.txt", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "ตรวจคำตอบ" })).toBeVisible();
 });
 

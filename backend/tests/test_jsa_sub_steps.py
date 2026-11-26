@@ -115,7 +115,11 @@ def test_a_full_step_of_sub_steps_fits_the_wp_too():
 def test_ppe_is_its_own_list_and_old_procedures_load(jsa):
     from app.models.procedure import ProcedureDocument
 
-    payload = AiProcedurePayload(tools=["ประแจ"], ppe=[" หมวกนิรภัย ", "", "แว่นตานิรภัย"], steps=[])
+    payload = AiProcedurePayload(
+        tools=["ประแจ"],
+        ppe=[" หมวกนิรภัย ", "", "แว่นตานิรภัย"],
+        steps=[AiProcedureStep(no=step.no) for step in jsa.steps],
+    )
     doc = _assemble(jsa, payload, get_settings())
     assert doc.ppe == ["หมวกนิรภัย", "แว่นตานิรภัย"]
     assert doc.tools == ["ประแจ"]

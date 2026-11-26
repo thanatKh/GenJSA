@@ -33,9 +33,10 @@ import { loadNames, saveNames } from "../../lib/rememberedNames";
 import { inputFormSchema, type InputForm, type JsaDocument } from "../../lib/schema";
 import { todayIso } from "../../lib/thaidate";
 import { FADE_IN_CLASS, screenFade } from "../../lib/motion";
-import { advancedDraft, inputDraft } from "../../store";
+import { advancedDraft, inputDraft, type Mode } from "../../store";
 import { GeneratingPanel } from "./GeneratingPanel";
 import { AdvancedDraftScreen } from "./AdvancedDraftScreen";
+import { ModeChoice } from "./ModeChoice";
 import { parsePersonalDraft } from "../../lib/personalAi";
 import type { JsaPromptRules } from "../../lib/api";
 
@@ -144,6 +145,8 @@ const PLACEHOLDERS = [
 ] as const;
 
 export function InputStep({
+  mode,
+  onModeChange,
   onGenerate,
   onImportDraft,
   advanced,
@@ -156,6 +159,8 @@ export function InputStep({
   error,
   jsaRules,
 }: {
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
   onGenerate: (values: InputForm, companyLogo: CompanyLogo | null) => void;
   onImportDraft: (doc: JsaDocument, companyLogo: CompanyLogo | null) => void;
   advanced: boolean;
@@ -321,6 +326,8 @@ export function InputStep({
         {busy ? "กำลังสร้าง JSA" : "วิเคราะห์ความเสี่ยงเพื่อความปลอดภัยในการทำงาน"}
         </span>
       </h1>
+
+      {!busy ? <ModeChoice mode={mode} onChange={onModeChange} /> : null}
 
       {/* Form and progress panel trade places with a fade (mode="wait": the
           old one leaves first, so the two are never on screen together) */}

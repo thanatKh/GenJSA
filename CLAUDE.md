@@ -46,14 +46,14 @@ against them before adding anything:
   endpoint that wants a whole document back needs the same justification.
 - **Browser-local history is the one deliberate storage exception** — finished
   documents (never PDFs) are kept in `localStorage` by
-  `frontend/src/history.ts`: this browser on this PC, no expiry (capped at
-  the newest `MAX_ENTRIES`), deletable per-entry or all at once, never
+  `frontend/src/history.ts`: this browser on this PC, no expiry (up to
+  `MAX_ENTRIES` jobs), deletable per-entry or all at once, never
   uploaded. It exists so a user can
   reopen yesterday's JSA instead of regenerating it. One entry holds the JSA
-  and, when one was generated, its work procedure — written by two different
-  pages, so `upsertDoc`/`upsertProcedure` merge rather than replace (writing a
-  fresh entry object there silently erases the other document; that was a real
-  bug). In-progress drafts stay tab-scoped in `sessionStorage`
+  and, when one was generated, its work procedure. `saveJob` checks the tab's
+  saved revision under the shared history lock before writing both documents.
+  A conflict offers a copy, and a storage failure leaves history intact.
+  In-progress drafts stay tab-scoped in `sessionStorage`
   (`frontend/src/store.ts`), and `clearAllDrafts()` must never touch history.
   If this looks like a bug, it isn't — read `history.ts`'s header comment
   before "fixing" it.
@@ -209,10 +209,9 @@ Two rules are enforced **structurally, not by the prompt**, because a model
 will drift from either one. Keep it that way when editing:
 
 - **The AI cannot restructure the steps.** `AiProcedurePayload` has no field
-  for step titles — they're copied from the source JSA — and sub-steps are
-  zipped onto the JSA's list *by index, not by the model's own numbering*. A
-  short or renumbered response loses detail instead of corrupting the shape.
-  The same goes one level down: under a JSA step that has sub-steps, the WP
+  for step titles, which are copied from the source JSA. Main steps are matched
+  by number and shown in the JSA's order. Missing, duplicate, or unexpected
+  numbers use the existing retry budget. Under a JSA step that has sub-steps, the WP
   gets exactly one sub-step per JSA sub-step, in order (`_sub_steps`; a
   missing one falls back to the JSA sub-step's title, extras are dropped), so
   WP 1.1 is always JSA 1.1. The advanced mode's `parsePersonalProcedure`

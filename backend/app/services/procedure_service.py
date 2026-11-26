@@ -77,28 +77,18 @@ def _assemble(
 ) -> ProcedureDocument:
     """Fit the AI's sub-steps onto the JSA's own step list.
 
-    Zipped by index, not by the payload's `no`: models renumber, skip, and
-    occasionally return fewer steps than asked. The JSA's step list is the
-    source of truth for how many steps exist and what they're called, so a
-    short or misnumbered response loses detail rather than corrupting the
-    structure.
+    The payload has already been checked for a complete set of main step
+    numbers. Match by number so an out-of-order response still aligns with
+    the JSA, which supplies the titles and order.
     """
-    by_index = {index: ai_step for index, ai_step in enumerate(payload.steps)}
-    if len(payload.steps) != len(jsa.steps):
-        # Count only — never the content, per the no-content-logging principle
-        logger.warning(
-            "procedure step count mismatch: model returned %d for %d JSA steps",
-            len(payload.steps),
-            len(jsa.steps),
-        )
-
+    by_number = {step.no: step for step in payload.steps}
     steps = [
         ProcedureStep(
             no=step.no,
             procedure=step.procedure,
-            sub_steps=_sub_steps(step, by_index[index].sub_steps if index in by_index else []),
+            sub_steps=_sub_steps(step, by_number[step.no].sub_steps),
         )
-        for index, step in enumerate(jsa.steps)
+        for step in jsa.steps
     ]
 
     # Built here, not by the AI: a model asked for "references" produces
@@ -128,6 +118,12 @@ async def generate_procedure(
     # Writing usable how-to detail is a more demanding task than drafting the
     # JSA itself, so this always uses the thorough model when one is configured
     model = settings.ai.detailed_model or settings.ai.model
+    expected_steps = {step.no for step in request.jsa.steps}
+
+    def validate_step_numbers(payload: AiProcedurePayload) -> None:
+        numbers = [step.no for step in payload.steps]
+        if len(numbers) != len(expected_steps) or set(numbers) != expected_steps:
+            raise ValueError("WP main step numbers must match the JSA without duplicates")
 
     payload = await generate_validated(
         system_prompt=render_prompt("procedure-generate.md", **procedure_prompt_context(settings)),
@@ -137,6 +133,7 @@ async def generate_procedure(
         provider=provider,
         settings=settings,
         fallback_models=settings.ai.detailed_fallback_models,
+        validate_payload=validate_step_numbers,
     )
 
     return _assemble(request.jsa, payload, settings)

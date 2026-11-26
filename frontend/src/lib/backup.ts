@@ -39,27 +39,24 @@ export function parseBackup(text: string): Backup {
 /** Merge as new copies. Validate capacity first and roll back storage changes
  * on failure; importing never overwrites an existing job or its photos. */
 export async function restoreBackup(data: Backup): Promise<Map<string, string>> {
-  const existing = history.list();
-  if (existing.length + data.entries.length > history.MAX_ENTRIES) {
-    throw new Error("จำนวนงานจะเกินพื้นที่ประวัติ กรุณาสำรองและลบรายการที่ไม่ใช้ก่อนนำเข้า");
-  }
   const ids = new Map(data.entries.map((e) => [e.id, history.newId()]));
   const entries = data.entries.map((e) => ({ ...e, id: ids.get(e.id)! }));
   const assets = data.assets.map((a) => ({ ...a, historyId: ids.get(a.historyId)! }));
   const key = "genjsa.history.v1";
-  const previous = localStorage.getItem(key);
-  let wroteDocuments = false;
   try {
     await importAssets(assets);
-    if (localStorage.getItem(key) !== previous) {
-      throw new Error("ประวัติเปลี่ยนระหว่างนำเข้า กรุณาลองใหม่อีกครั้ง");
-    }
-    wroteDocuments = true;
-    localStorage.setItem(key, JSON.stringify({ v: 1, entries: [...entries, ...existing].sort((a, b) => b.savedAt - a.savedAt) }));
+    await history.withHistoryLock(() => {
+      const existing = history.list();
+      if (existing.length + entries.length > history.MAX_ENTRIES) {
+        throw new Error("ประวัติจะเกิน 100 งาน กรุณาสำรองและลบรายการที่ไม่ใช้แล้วลองอีกครั้ง");
+      }
+      try {
+        localStorage.setItem(key, JSON.stringify({ v: 1, entries: [...entries, ...existing].sort((a, b) => b.savedAt - a.savedAt) }));
+      } catch {
+        throw new Error("พื้นที่จัดเก็บไม่เพียงพอ กรุณาเพิ่มพื้นที่แล้วลองอีกครั้ง");
+      }
+    });
   } catch (error) {
-    if (wroteDocuments) {
-      try { if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous); } catch { /* best-effort rollback */ }
-    }
     await clearForHistoryIds([...ids.values()]);
     throw error instanceof Error ? error : new Error("นำเข้าไม่สำเร็จ พื้นที่อาจไม่เพียงพอ");
   }
@@ -67,11 +64,14 @@ export async function restoreBackup(data: Backup): Promise<Map<string, string>> 
   return ids;
 }
 
-export async function duplicateJob(entry: history.HistoryEntry): Promise<history.HistoryEntry> {
+export async function duplicateJob(entry: history.HistoryEntry, preserveDocument = false): Promise<history.HistoryEntry> {
   const copy = structuredClone(entry);
   copy.id = history.newId(); copy.savedAt = Date.now();
-  copy.doc.header.work_activity = `${copy.doc.header.work_activity} (สำเนา)`.slice(0, 500);
-  if (copy.procedure) { copy.procedure.header = { ...copy.doc.header }; delete copy.procedure.sourceFingerprint; }
+  delete copy.revision;
+  if (!preserveDocument) {
+    copy.doc.header.work_activity = `${copy.doc.header.work_activity} (สำเนา)`.slice(0, 500);
+    if (copy.procedure) { copy.procedure.header = { ...copy.doc.header }; delete copy.procedure.sourceFingerprint; }
+  }
   const assets = await exportAssets([entry.id]);
   const remapped = await restoreBackup({
     kind: "genjsa-backup", version: 1, createdAt: new Date().toISOString(),

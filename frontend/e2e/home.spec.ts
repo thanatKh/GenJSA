@@ -6,9 +6,19 @@ test("home offers two document types and accepts a legacy job backup", async ({ 
   if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/");
   const modes = page.getByRole("radiogroup", { name: "เอกสารที่ต้องการสร้าง" });
+  const heading = page.getByRole("heading", { level: 1 });
+  const description = page.getByRole("textbox", { name: "รายละเอียดงาน" });
+  const [headingBox, modeBox, descriptionBox] = await Promise.all([
+    heading.boundingBox(), modes.boundingBox(), description.boundingBox(),
+  ]);
+  expect(modeBox!.y).toBeGreaterThan(headingBox!.y + headingBox!.height);
+  expect(descriptionBox!.y).toBeGreaterThan(modeBox!.y + modeBox!.height);
   await expect(modes.getByRole("radio")).toHaveCount(2);
   await modes.getByRole("radio", { name: "JSA", exact: true }).press("ArrowRight");
-  await expect(modes.getByRole("radio", { name: "JSA + ขั้นตอนปฏิบัติงาน" })).toBeChecked();
+  const procedureMode = modes.getByRole("radio", { name: "JSA + ขั้นตอนปฏิบัติงาน" });
+  await expect(procedureMode).toBeChecked();
+  await procedureMode.press("Tab");
+  await expect(description).toBeFocused();
   await expect(page.getByRole("button", { name: "โครงการ", exact: true })).toHaveCount(0);
 
   const doc = {

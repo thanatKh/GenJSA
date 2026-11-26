@@ -294,12 +294,14 @@ export function Disclosure({
   label,
   children,
   className,
+  onOpened,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   label: ReactNode;
   children: ReactNode;
   className?: string;
+  onOpened?: () => void;
 }) {
   const panelId = useId();
   return (
@@ -326,6 +328,7 @@ export function Disclosure({
             : { height: 0, opacity: 0, transitionEnd: { visibility: "hidden" } }
         }
         transition={{ duration: FAST, ease: EASE_OUT }}
+        onAnimationComplete={() => { if (open) onOpened?.(); }}
         className="overflow-hidden"
       >
         {children}

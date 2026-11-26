@@ -1,5 +1,5 @@
 import { BackupControls } from "./features/jsa-input/BackupControls";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePageHeading } from "./usePageHeading";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -7,7 +7,7 @@ import { AppBar } from "./components/AppBar";
 import type { SaveState } from "./components/SaveStatus";
 import { Stepper } from "./components/Stepper";
 import { ExternalLink, Sparkles } from "lucide-react";
-import { ChoiceDialog, Toaster } from "./components/ui";
+import { Alert, Button, ChoiceDialog, ConfirmDialog, Toaster } from "./components/ui";
 import { loadCloudflareAnalytics } from "./lib/analytics";
 import { EditorStep } from "./features/jsa-editor/EditorStep";
 import { GeneratingPanel } from "./features/jsa-input/GeneratingPanel";
@@ -15,7 +15,6 @@ import { PROCEDURE_STAGES } from "./features/jsa-input/generatingStages";
 import { HistoryList } from "./features/jsa-input/HistoryList";
 import { InputStep } from "./features/jsa-input/InputStep";
 import { AdvancedDraftScreen } from "./features/jsa-input/AdvancedDraftScreen";
-import { ModeChoice } from "./features/jsa-input/ModeChoice";
 import { PdfStep } from "./features/pdf-view/PdfStep";
 import { ProcedureEditorStep } from "./features/procedure/ProcedureEditorStep";
 import { ProcedurePdfStep } from "./features/procedure/ProcedurePdfStep";
@@ -47,6 +46,7 @@ import {
   clearAllDrafts,
   currentHistoryId,
   docDraft,
+  historyRevisionDraft,
   jsaSourceDraft,
   modeDraft,
   procedureDraft,
@@ -185,6 +185,22 @@ export default function App() {
   const [historyId, setHistoryId] = useState<string | null>(() =>
     currentHistoryId.load(),
   );
+  const [initialHistoryRevision] = useState(historyRevisionDraft.load);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [copyingConflict, setCopyingConflict] = useState(false);
+  const [copyError, setCopyError] = useState("");
+  const [confirmLeaveUnsaved, setConfirmLeaveUnsaved] = useState(false);
+  const activeHistory = useRef<{ id: string; revision: string | null | undefined } | null>(
+    historyId ? { id: historyId, revision: initialHistoryRevision?.id === historyId ? initialHistoryRevision.revision : undefined } : null,
+  );
+  const selectHistory = (id: string, revision: string | null) => {
+    activeHistory.current = { id, revision };
+    historyRevisionDraft.save(id, revision);
+    currentHistoryId.save(id);
+    setHistoryId(id);
+    setSaveState("idle");
+    setCopyError("");
+  };
   // Owns the photos map AND keeping it synced with lib/photoStore.ts
   // (IndexedDB) — see usePhotos.ts's own header for why this used to be 4
   // separate hand-synced call sites in this file. Re-keys to whatever job
@@ -222,6 +238,7 @@ export default function App() {
   // Guard against a blank screen: if the draft disappears (cleared elsewhere), never stay stuck on step 2/3
   useEffect(() => {
     if (stage >= 1 && stage <= 4 && !doc) {
+      activeHistory.current = null;
       setHistoryId(null);
       clearAllDrafts();
       setStage(0);
@@ -237,38 +254,55 @@ export default function App() {
 
   // Keep the history entry in step with the document being edited. The
   // save states feed the editors' "บันทึกแล้ว" indicator (SaveStatus.tsx).
-  const [docSave, setDocSave] = useState<SaveState>("idle");
-  const [procedureSave, setProcedureSave] = useState<SaveState>("idle");
-  useEffect(() => {
-    if (!doc || !historyId) return;
-    // Don't leave an empty row behind for a manual entry the user abandons
-    const worthKeeping =
-      doc.header.work_activity.trim() || doc.steps.some((s) => s.procedure.trim());
-    if (!worthKeeping) {
-      setDocSave("idle");
-      return;
+  const worthKeeping = !!doc && (historyId && activeHistory.current?.revision != null ||
+    !!doc.header.work_activity.trim() || doc.steps.some((step) => step.procedure.trim()));
+
+  const persistHistory = useCallback(async (): Promise<SaveState> => {
+    const selected = activeHistory.current;
+    if (!selected || !doc || !worthKeeping) return "idle";
+    try {
+      return await historyStore.withHistoryLock(() => {
+        if (activeHistory.current !== selected) return "idle";
+        const result = historyStore.saveJob(selected.id, doc, procedure, selected.revision);
+        if (result.state === "saved") {
+          selected.revision = result.revision;
+          historyRevisionDraft.save(selected.id, result.revision);
+        }
+        return result.state;
+      });
+    } catch {
+      return "failed";
     }
+  }, [doc, procedure, worthKeeping]);
 
-    setDocSave("saving");
-    const timer = setTimeout(
-      () => setDocSave(historyStore.upsertDoc(historyId, doc) ? "saved" : "failed"),
-      HISTORY_SAVE_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [doc, historyId]);
-
-  // Same for the procedure. Separate from the effect above because the two
-  // documents are edited on different pages and change independently —
-  // upsertProcedure merges rather than replacing, so neither erases the other.
   useEffect(() => {
-    if (!procedure || !historyId) return;
-    setProcedureSave("saving");
-    const timer = setTimeout(
-      () => setProcedureSave(historyStore.upsertProcedure(historyId, procedure) ? "saved" : "failed"),
-      HISTORY_SAVE_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [procedure, historyId]);
+    if (!worthKeeping) { setSaveState("idle"); return; }
+    setSaveState((state) => state === "conflict" ? state : "saving");
+    let current = true;
+    const timer = setTimeout(() => {
+      void persistHistory().then((state) => { if (current) setSaveState(state); });
+    }, HISTORY_SAVE_DEBOUNCE_MS);
+    return () => { current = false; clearTimeout(timer); };
+  }, [historyId, persistHistory, worthKeeping]);
+
+  const saveConflictCopy = async () => {
+    const selected = activeHistory.current;
+    if (!selected || !doc || copyingConflict) return;
+    setCopyingConflict(true);
+    setCopyError("");
+    try {
+      const { duplicateJob } = await import("./lib/backup");
+      const copy = await duplicateJob({ id: selected.id, savedAt: Date.now(), doc, ...(procedure ? { procedure } : {}) }, true);
+      if (activeHistory.current === selected) {
+        selectHistory(copy.id, historyStore.entryRevision(copy));
+        setSaveState("saved");
+      }
+    } catch (caught) {
+      if (activeHistory.current === selected) setCopyError(caught instanceof Error ? caught.message : "บันทึกสำเนาไม่ได้ กรุณาลองอีกครั้ง");
+    } finally {
+      setCopyingConflict(false);
+    }
+  };
 
   useEffect(() => {
     // One config powers both the app name display and PDF drawing (layout values from config/pdf.yaml)
@@ -282,8 +316,7 @@ export default function App() {
 
   const startHistoryEntry = (): string => {
     const id = historyStore.newId();
-    setHistoryId(id);
-    currentHistoryId.save(id);
+    selectHistory(id, null);
     return id;
   };
 
@@ -373,8 +406,7 @@ export default function App() {
     } else {
       discardProcedure();
     }
-    setHistoryId(entry.id);
-    currentHistoryId.save(entry.id);
+    selectHistory(entry.id, historyStore.entryRevision(entry));
     setError(null);
     // A job with a procedure is a JSA + Procedure job, whichever option the
     // switch was on (see the track note on Stage)
@@ -390,15 +422,15 @@ export default function App() {
   const handleOpenHistoryProcedure = (entry: HistoryEntry) =>
     openHistoryEntry(entry, 3);
 
-  const startOver = () => {
+  const resetToStart = () => {
     generateController.current?.abort();
     procedureController.current?.abort();
     generateController.current = null;
     procedureController.current = null;
     setBusy(false);
     setProcedureBusy(false);
-    if (historyId && doc?.header.work_activity.trim()) historyStore.upsertDoc(historyId, doc);
-    if (historyId && procedure) historyStore.upsertProcedure(historyId, procedure);
+    activeHistory.current = null;
+    setCopyError("");
     setDoc(null);
     discardProcedure();
     setError(null);
@@ -407,6 +439,16 @@ export default function App() {
     clearAllDrafts();
     setStage(0);
     if (stage === 0) window.scrollTo({ top: 0 });
+  };
+
+  const startOver = async () => {
+    const selected = activeHistory.current;
+    if (!worthKeeping) { resetToStart(); return; }
+    const state = await persistHistory();
+    if (activeHistory.current !== selected) return;
+    setSaveState(state);
+    if (state === "saved") resetToStart();
+    else setConfirmLeaveUnsaved(true);
   };
 
   /** On to the procedure from the current JSA: the JSA editor's ถัดไป on
@@ -565,6 +607,23 @@ export default function App() {
           history on desktop; EditorStep/PdfStep pin themselves back to
           their previous, narrower widths below so they're unaffected. */}
       <main ref={mainRef} className="mx-auto w-full max-w-[var(--page-max-w)] flex-1 px-4 py-4 sm:py-6">
+        {(saveState === "conflict" || saveState === "failed") && doc && (
+          <div className="mb-4">
+            <Alert>
+              <p>{saveState === "conflict"
+                ? "งานนี้ถูกแก้ไขหรือลบในอีกแท็บ การแก้ไขของคุณยังอยู่ในแท็บนี้ บันทึกเป็นสำเนาเพื่อเก็บทั้งสองฉบับ"
+                : "บันทึกงานในเบราว์เซอร์ไม่ได้ งานเดิมยังอยู่ คุณสามารถส่งออก PDF หรือ Word แล้วลองบันทึกอีกครั้งเมื่อมีพื้นที่ว่าง"}</p>
+              {copyError && <p>{copyError}</p>}
+              <Button type="button" variant="outline" size="sm" className="mt-2" loading={copyingConflict}
+                onClick={() => {
+                  if (saveState === "conflict") void saveConflictCopy();
+                  else void persistHistory().then(setSaveState);
+                }}>
+                {saveState === "conflict" ? "บันทึกเป็นสำเนา" : "ลองบันทึกอีกครั้ง"}
+              </Button>
+            </Alert>
+          </div>
+        )}
         {/* Keep the Stepper with the screen it describes. Mounting it above
             an exiting screen would move the old content mid-fade. */}
         <AnimatePresence mode="wait" initial={false}>
@@ -592,8 +651,9 @@ export default function App() {
               // give job titles and their two document buttons a little more room.
               <div className={`mx-auto grid items-start gap-4 sm:gap-6 ${view.kind === "advancedInput" ? "max-w-none" : "max-w-[45rem]"} ${showHistory ? "xl:max-w-none xl:grid-cols-[minmax(0,48fr)_minmax(0,52fr)]" : ""}`}>
                 <div className={view.kind === "input" ? "work-panel min-w-0 p-3 sm:p-4" : "min-w-0"}>
-                  {busy || view.kind === "advancedInput" ? null : <ModeChoice mode={mode} onChange={setMode} />}
                   <InputStep
+                    mode={mode}
+                    onModeChange={setMode}
                     jsaRules={config?.jsaRules}
                     onGenerate={handleGenerate}
                     onImportDraft={(draft, logo) => openNewDraft(draft, logo, "outside")}
@@ -647,7 +707,7 @@ export default function App() {
                 onChange={setDoc}
                 companyLogo={companyLogo}
                 onCompanyLogoChange={setCompanyLogo}
-                saveState={docSave}
+                saveState={saveState}
                 // JSA + Procedure: on to the procedure, drafted now from the
                 // JSA as reviewed (or reopened if there is one already)
                 onContinue={withProcedure ? () => handleCreateProcedure() : () => goto(2)}
@@ -702,7 +762,7 @@ export default function App() {
                   photos={photos}
                   onPhotoChange={updatePhoto}
                   onStepPhotosReplace={replaceStepPhotos}
-                  saveState={procedureSave}
+                  saveState={saveState}
                   onContinue={() => goto(4)}
                   onBack={() => goto(1)}
                   onRegenerate={() => handleCreateProcedure({ force: true })}
@@ -763,6 +823,11 @@ export default function App() {
         ]}
         onCancel={() => setWpChoiceFor(null)}
       />
+      <ConfirmDialog open={confirmLeaveUnsaved} title="เริ่มใหม่โดยไม่เก็บการแก้ไข?"
+        description="การแก้ไขในแท็บนี้ยังไม่ได้บันทึก ย้อนกลับเพื่อบันทึกสำเนาหรือส่งออกก่อนออกจากงานได้"
+        confirmLabel="เริ่มใหม่โดยไม่เก็บการแก้ไข"
+        onCancel={() => setConfirmLeaveUnsaved(false)}
+        onConfirm={() => { setConfirmLeaveUnsaved(false); resetToStart(); }} />
       <Toaster />
     </div>
   );

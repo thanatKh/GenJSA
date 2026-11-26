@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.core.config import get_settings
-from app.core.errors import Errors
+from app.core.errors import AppError, Errors
 from app.models.jsa import Hazard, JsaDocument, JsaHeader, JsaStep
 from app.models.procedure import AiProcedurePayload, AiProcedureStep, SubStep, GenerateProcedureRequest
 from app.providers.llm.base import LLMProvider
@@ -21,7 +21,9 @@ from app.services.procedure_service import _assemble, _build_user_prompt, genera
 
 @pytest.fixture
 def settings():
-    return get_settings().model_copy(deep=True)
+    settings = get_settings().model_copy(deep=True)
+    settings.ai.retry.backoff_seconds = 0
+    return settings
 
 
 @pytest.fixture
@@ -94,41 +96,41 @@ async def test_procedure_failover_preserves_reviewed_jsa(jsa, settings):
     assert doc.references == _assemble(jsa, _payload(), settings).references
 
 
-def test_extra_ai_steps_cannot_grow_the_step_list(jsa, settings):
-    """A model that invents a third step must not add it to the document."""
-    payload = _payload(
-        steps=[
-            AiProcedureStep(no=1, sub_steps=[SubStep(no=1, action="ก")]),
-            AiProcedureStep(no=2, sub_steps=[SubStep(no=1, action="ข")]),
-            AiProcedureStep(no=3, sub_steps=[SubStep(no=1, action="ขั้นตอนที่แต่งขึ้นเอง")]),
-        ]
-    )
-    doc = _assemble(jsa, payload, settings)
-    assert len(doc.steps) == 2
+async def test_out_of_order_main_steps_are_matched_by_number(jsa, settings):
+    provider = AsyncMock(spec=LLMProvider)
+    expected = _payload()
+    provider.complete.return_value = _payload(steps=expected.steps[::-1]).model_dump_json()
 
+    doc = await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
 
-def test_missing_ai_steps_leave_the_step_present_but_empty(jsa, settings):
-    """A short response loses detail; it must not drop a step from the document."""
-    payload = _payload(steps=[AiProcedureStep(no=1, sub_steps=[SubStep(no=1, action="ก")])])
-    doc = _assemble(jsa, payload, settings)
-    assert len(doc.steps) == 2
-    assert doc.steps[1].procedure == "ระบายความดันและ drain product"
-    assert doc.steps[1].sub_steps == []
-
-
-def test_steps_zip_by_index_not_by_model_numbering(jsa, settings):
-    """Models renumber. Position in the list is what counts, not `no`."""
-    payload = _payload(
-        steps=[
-            AiProcedureStep(no=7, sub_steps=[SubStep(no=1, action="ของขั้นตอนแรก")]),
-            AiProcedureStep(no=9, sub_steps=[SubStep(no=1, action="ของขั้นตอนที่สอง")]),
-        ]
-    )
-    doc = _assemble(jsa, payload, settings)
-    assert doc.steps[0].sub_steps[0].action == "ของขั้นตอนแรก"
-    assert doc.steps[1].sub_steps[0].action == "ของขั้นตอนที่สอง"
-    # ...and the document's own numbering is renormalised to 1..n
     assert [s.no for s in doc.steps] == [1, 2]
+    assert [s.sub_steps for s in doc.steps] == [s.sub_steps for s in expected.steps]
+    assert provider.complete.await_count == 1
+
+
+@pytest.mark.parametrize("numbers", [[2], [1, 1], [1, 3], [1, 2, 3]])
+async def test_invalid_main_step_numbers_retry_before_assembly(jsa, settings, numbers):
+    provider = AsyncMock(spec=LLMProvider)
+    expected = _payload()
+    invalid = _payload(steps=[AiProcedureStep(no=no, sub_steps=[SubStep(no=1, action="คำตอบที่ต้องทิ้ง")]) for no in numbers])
+    provider.complete.side_effect = [invalid.model_dump_json(), expected.model_dump_json()]
+
+    doc = await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
+
+    assert [step.sub_steps for step in doc.steps] == [step.sub_steps for step in expected.steps]
+    assert provider.complete.await_count == 2
+
+
+async def test_repeated_invalid_main_step_numbers_use_only_the_configured_retry_budget(jsa, settings):
+    settings.ai.retry.max_attempts = 2
+    provider = AsyncMock(spec=LLMProvider)
+    provider.complete.return_value = _payload(steps=[]).model_dump_json()
+
+    with pytest.raises(AppError) as exc:
+        await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
+
+    assert exc.value.code == Errors.AI_BAD_RESPONSE.code
+    assert provider.complete.await_count == 2
 
 
 def test_references_are_built_from_the_jsa(jsa, settings):

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { ArrowLeft, Copy, FileUp } from "lucide-react";
 import { Button, Disclosure, FieldError, Input, Label, Reveal } from "../../components/ui";
 import { useFlash } from "../../lib/useFlash";
@@ -10,6 +9,13 @@ import type { JsaPromptRules } from "../../lib/api";
 const textAreaClass = "block w-full min-w-0 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-navy";
 const panelClass = "work-panel grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 p-3.5 sm:p-4";
 const DEFAULT_DETAIL: DetailLevel = "ละเอียด";
+const fileMessages = {
+  reading: "กำลังอ่านไฟล์",
+  valid: "ตรวจรูปแบบผ่าน",
+  invalid: "ตรวจรูปแบบไม่ผ่าน",
+  unreadable: "อ่านไฟล์ไม่ได้",
+};
+type AnswerFile = { name: string; state: keyof typeof fileMessages; detail?: string };
 
 type PreviewStep = { no: number; procedure: string; hazards?: unknown[]; sub_steps?: { hazards?: unknown[]; action?: string }[] };
 type PreviewDraft = { steps: PreviewStep[]; work_activity?: string; header?: { work_activity: string } };
@@ -56,7 +62,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [saved] = useState(() => {
     const value = advancedDraft.load(kind, scope);
     if (!value) return null;
-    const hasEdits = value.work !== value.source || value.answer.trim() || value.instructions.trim() ||
+    const hasEdits = value.work !== value.source || value.answer.trim() || value.previousAnswer?.trim() || value.instructions.trim() ||
       value.level !== DEFAULT_DETAIL || value.split !== defaultSplit || value.target;
     return value.source === description || hasEdits ? value : null;
   });
@@ -68,10 +74,11 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [split, setSplit] = useState(saved?.split ?? defaultSplit);
   const [target, setTarget] = useState(saved?.target ?? "");
   const [answer, setAnswer] = useState(saved?.answer ?? "");
+  const [previousAnswer, setPreviousAnswer] = useState(saved?.previousAnswer ?? "");
   const [draft, setDraft] = useState<T | null>(null);
   useEffect(() => {
-    advancedDraft.save(kind, { source, work, level, instructions, answer, split, target }, scope);
-  }, [kind, source, work, level, instructions, answer, split, target, scope]);
+    advancedDraft.save(kind, { source, work, level, instructions, answer, previousAnswer, split, target }, scope);
+  }, [kind, source, work, level, instructions, answer, previousAnswer, split, target, scope]);
   const [error, setError] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   // The copy button itself confirms: its icon turns into a tick and its label
@@ -79,12 +86,12 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const [copied, flashCopied, clearCopied] = useFlash();
   /** The prompt changed (or the copy was only a selection): forget the last copy */
   const clearCopy = () => {
+    selectWhenPromptOpens.current = false;
     setCopyStatus("");
     clearCopied();
   };
-  // Same beat on the file button once an answer file has been read
-  const [imported, flashImported] = useFlash();
   const [promptOpen, setPromptOpen] = useState(false);
+  const selectWhenPromptOpens = useRef(false);
   // Blocks that leave (an error, the checked-answer card) keep their last
   // content while they animate out, instead of emptying first
   const lastError = useRef("");
@@ -95,7 +102,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
   const answerHeading = useRef<HTMLHeadingElement>(null);
   const answerField = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const [fileStatus, setFileStatus] = useState("");
+  const [answerFile, setAnswerFile] = useState<AnswerFile | null>(null);
+  const fileReadVersion = useRef(0);
+  const displayedAnswerVersion = fileReadVersion.current;
   const [dragging, setDragging] = useState(false);
   // The rough sub-step total (only with split). Main steps the user listed
   // as "1." / "2)" — not "1.1" — cap it: each takes at most MAX_SUB_STEPS
@@ -108,39 +117,68 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
     ? buildPersonalProcedurePrompt(work, level, instructions, jsaRules)
     : buildPersonalPrompt(work, level, instructions, jsaRules, split, split ? subStepTarget : undefined);
   const sourceChanged = source !== description;
+  useEffect(() => {
+    if (sourceChanged) setAnswerFile(null);
+    return () => { fileReadVersion.current += 1; };
+  }, [sourceChanged]);
   const subCount = lastDraft.current?.steps.reduce((n, step) => n + (step.sub_steps?.length ?? 0), 0) ?? 0;
 
   const check = (text: string) => {
-    if (sourceChanged) return;
+    if (sourceChanged) return false;
     try {
       setDraft(parse(text));
       setError("");
+      return true;
     } catch (caught) {
       setDraft(null);
       setError(caught instanceof Error ? caught.message : "อ่านคำตอบไม่ได้");
       answerField.current?.focus();
+      return false;
     }
   };
 
   /* A file lands in the same answer box as pasted text, so there is one
    * answer to check, keep in the session draft, and edit if it's slightly off. */
   const readFile = async (file: File) => {
-    setFileStatus("");
+    const version = ++fileReadVersion.current;
+    const name = file.name;
+    setDraft(null);
+    setError("");
+    const unreadable = (detail: string) => {
+      setPreviousAnswer(answer || previousAnswer);
+      setAnswer("");
+      setAnswerFile({ name, state: "unreadable", detail });
+    };
     if (file.size > MAX_ANSWER_FILE_BYTES) {
-      setError("ไฟล์ใหญ่เกิน 2 MB กรุณาตรวจว่าเลือกไฟล์คำตอบที่ถูกต้อง");
+      unreadable("เลือกไฟล์ไม่เกิน 2 MB หรือวางคำตอบเป็นข้อความ");
       return;
     }
+    setAnswerFile({ name, state: "reading" });
     let text: string;
     try {
       text = await file.text();
     } catch {
-      setError("เปิดไฟล์ไม่ได้ กรุณาดาวน์โหลดไฟล์จาก AI ใหม่แล้วลองอีกครั้ง");
+      if (version === fileReadVersion.current) {
+        unreadable("ดาวน์โหลดไฟล์จากแชตใหม่ หรือวางคำตอบเป็นข้อความ");
+      }
       return;
     }
+    // A newer selection or a manual edit supersedes a pending read.
+    if (version !== fileReadVersion.current) return;
     setAnswer(text);
-    setFileStatus(`นำเข้าไฟล์ ${file.name} แล้ว`);
-    flashImported();
-    check(text);
+    setPreviousAnswer("");
+    setAnswerFile({ name, state: check(text) ? "valid" : "invalid" });
+  };
+
+  const selectPrompt = () => {
+    const field = promptField.current;
+    field?.focus();
+    field?.select();
+    const selected = field && document.activeElement === field && field.selectionStart === 0 && field.selectionEnd === field.value.length;
+    if (selected) {
+      setCopyStatus("เลือกข้อความแล้ว กรุณาคัดลอกด้วยเมนูของอุปกรณ์");
+      selectWhenPromptOpens.current = false;
+    }
   };
 
   const copy = async () => {
@@ -149,13 +187,11 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
       clearCopy();
       flashCopied();
     } catch {
-      // No clipboard access (some iOS cases): open the prompt and select it
-      // so the device's own copy menu works on it
-      // flushSync: the field has to be open and laid out before it can be selected
-      flushSync(() => setPromptOpen(true));
-      promptField.current?.focus();
-      promptField.current?.select();
-      setCopyStatus("เลือกข้อความแล้ว กรุณาคัดลอกด้วยเมนูของอุปกรณ์");
+      clearCopied();
+      setCopyStatus("คัดลอกอัตโนมัติไม่ได้ เลือกข้อความในช่องคำสั่งแล้วคัดลอกด้วยเมนูของอุปกรณ์");
+      selectWhenPromptOpens.current = true;
+      if (promptOpen) selectPrompt();
+      else setPromptOpen(true);
     }
   };
 
@@ -178,6 +214,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
               setSource(description);
               setWork(description);
               setAnswer("");
+              setPreviousAnswer("");
               setDraft(null);
               setError("");
               clearCopy();
@@ -268,7 +305,13 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             {/* The prompt itself, closed by default: the copy button is what most
                 people need, but the text stays one tap away so anyone can check
                 what is about to leave for an outside AI. */}
-            <Disclosure open={promptOpen} onOpenChange={setPromptOpen} label="ดูคำสั่งที่จะคัดลอก">
+            <Disclosure open={promptOpen} onOpenChange={(open) => {
+              if (!open) selectWhenPromptOpens.current = false;
+              setPromptOpen(open);
+            }} onOpened={() => {
+              if (selectWhenPromptOpens.current) selectPrompt();
+              selectWhenPromptOpens.current = false;
+            }} label="ดูคำสั่งที่จะคัดลอก">
               <label htmlFor="personal-prompt" className="sr-only">คำสั่งที่จะคัดลอก</label>
               <textarea id="personal-prompt" ref={promptField} rows={8} readOnly className={`${textAreaClass} mt-1`} value={prompt} />
             </Disclosure>
@@ -276,7 +319,10 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
         </section>
         <form aria-labelledby="personal-import-heading"
           className={`${panelClass} ${dragging ? "border-navy! bg-navy-soft" : ""}`}
-          onSubmit={(event) => { event.preventDefault(); check(answer); }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (answer.trim() && answerFile?.state !== "reading") check(answer);
+          }}
           onDragOver={(event) => {
             if (!event.dataTransfer.types.includes("Files")) return;
             event.preventDefault();
@@ -297,31 +343,46 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             <Label htmlFor="personal-answer">วางคำตอบจาก AI</Label>
             <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
               aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
-              onChange={(e) => { setAnswer(e.target.value); setDraft(null); setError(""); setFileStatus(""); }} />
+              onChange={(e) => {
+                fileReadVersion.current += 1;
+                setAnswer(e.target.value);
+                setPreviousAnswer("");
+                setDraft(null);
+                setError("");
+                setAnswerFile(null);
+              }} />
             <Reveal show={!!error}>
               <FieldError id="personal-answer-error">{error || lastError.current}</FieldError>
             </Reveal>
           </div>
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-dashed border-line px-2.5 py-2">
+          <div className={`flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-dashed px-2.5 py-2 ${dragging ? "border-navy bg-surface" : "border-line"}`}>
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={sourceChanged}
               onClick={() => fileInput.current?.click()}
-              status={imported ? "success" : undefined}
-              successText="นำเข้าแล้ว"
-              className={`min-h-11 lg:pointer-fine:min-h-8 ${imported ? "border-[var(--success)] text-[var(--success)]" : ""}`}
+              className="min-h-11 lg:pointer-fine:min-h-8"
             >
-              {/* Button puts its own tick in front while status is success */}
-              {imported ? null : <FileUp className="size-4" aria-hidden="true" />}
-              {imported ? null : " "}เลือกไฟล์คำตอบ
+              <FileUp className="size-4" aria-hidden="true" />
+              เลือกไฟล์คำตอบ
             </Button>
             <p className="text-xs text-muted">
-              .json หรือ .txt<span className="hidden sm:pointer-fine:inline"> · ลากไฟล์คำตอบมาวางในส่วนนี้ได้</span>
+              .json หรือ .txt<span className="hidden sm:pointer-fine:inline"> · {dragging ? "วางไฟล์คำตอบที่นี่" : "ลากไฟล์คำตอบมาวางในส่วนนี้ได้"}</span>
             </p>
-            {/* Which file, for screen readers — the button itself shows that it worked */}
-            <span role="status" className="sr-only">{fileStatus}</span>
+            <div role="status" aria-atomic="true" className={answerFile ? "min-w-0 basis-full border-t border-line pt-1.5 text-sm" : "sr-only"}>
+              {answerFile ? (
+                <>
+                  <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                    <span className="line-clamp-2 min-w-0 font-medium [overflow-wrap:anywhere]" title={answerFile.name}>{answerFile.name}</span>
+                    <span className={answerFile.state === "invalid" || answerFile.state === "unreadable" ? "text-danger-text" : "text-muted"}>
+                      {fileMessages[answerFile.state]}
+                    </span>
+                  </div>
+                  {answerFile.detail ? <p className="mt-0.5 text-sm text-danger-text">{answerFile.detail}</p> : null}
+                </>
+              ) : null}
+            </div>
             <input ref={fileInput} type="file" accept=".json,.txt,application/json,text/plain" className="hidden"
               aria-label="เลือกไฟล์คำตอบจาก AI"
               onChange={(event) => {
@@ -330,10 +391,21 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
                 if (file) void readFile(file);
               }} />
           </div>
+          {previousAnswer && !answer && !sourceChanged && answerFile?.state !== "reading" ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+              <span>คำตอบก่อนหน้ายังเก็บอยู่</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => {
+                setAnswer(previousAnswer);
+                setPreviousAnswer("");
+                setAnswerFile(null);
+                answerField.current?.focus();
+              }}>ใช้คำตอบเดิม</Button>
+            </div>
+          ) : null}
           {/* The way forward, so it's the primary button — until the answer
               checks out, when "เปิดร่างเพื่อตรวจทาน" below takes its place */}
           <Reveal show={!(draft && !sourceChanged)} className="-m-1 p-1">
-            <Button type="submit" disabled={sourceChanged || !answer.trim()} className="min-h-11 lg:pointer-fine:min-h-10">ตรวจคำตอบ</Button>
+            <Button type="submit" disabled={sourceChanged || !answer.trim() || answerFile?.state === "reading"} className="min-h-11 lg:pointer-fine:min-h-10">ตรวจคำตอบ</Button>
           </Reveal>
           <Reveal show={!!draft && !sourceChanged} className="-m-1 p-1">
             {lastDraft.current ? (
@@ -350,7 +422,9 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
                   </li>
                 ))}
               </ol>
-              <Button type="button" className="justify-self-start" onClick={() => { if (draft) onImport(draft); }}>เปิดร่างเพื่อตรวจทาน</Button>
+              <Button type="button" className="justify-self-start" onClick={() => {
+                if (draft && displayedAnswerVersion === fileReadVersion.current) onImport(draft);
+              }}>เปิดร่างเพื่อตรวจทาน</Button>
             </div>
             ) : null}
           </Reveal>

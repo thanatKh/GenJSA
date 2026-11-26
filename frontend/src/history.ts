@@ -16,9 +16,8 @@
  * App.tsx, which resets the wizard without discarding past work.
  *
  * Also the lifecycle owner for lib/photoStore.ts (IndexedDB, step photos):
- * every path below that drops an entry — remove(), clear(), readRaw()'s
- * corrupt-record pruning and the MAX_ENTRIES cap — also deletes that entry's
- * photos, so a photo never outlives the history row it illustrates. photoStore.ts itself
+ * explicit deletion and successful writes that prune corrupt records also
+ * remove their photos. photoStore.ts itself
  * has no expiry logic of its own; it only reacts to what happens here.
  */
 
@@ -33,17 +32,15 @@ import { deferPhotoCleanup, cancelPhotoCleanup } from "./lib/deferredPhotoCleanu
 
 const KEY = "genjsa.history.v1";
 
-// No age limit: entries are kept until the user deletes them (there used to
-// be a 365-day expiry). This cap is the only automatic removal — a quota
-// guard, since localStorage throws when full rather than evicting anything.
-// Past it, saving a job drops the OLDEST entry (and its photos). Shown in
-// the UI, so the "kept forever" note never overpromises.
+// A full history rejects new jobs until space is available.
 export const MAX_ENTRIES = 100;
 
 export type HistoryEntry = {
   id: string;
   /** Epoch ms of the last time this entry was written */
   savedAt: number;
+  /** Absent on old history entries and backups. */
+  revision?: string;
   doc: JsaDocument;
   /** The work procedure generated from `doc`, once one exists. Most entries
    * never have one, so it stays optional rather than a second entry type. */
@@ -52,17 +49,19 @@ export type HistoryEntry = {
 
 type HistoryFile = { v: 1; entries: HistoryEntry[] };
 
-/** Reads and validates, newest first. `pruned` = something was dropped on the
- * way — droppedIds names exactly which entries so the caller can clean up
- * their photos in photoStore.ts too (corrupt records are silently dropped
- * here, which had no caller-visible hook before photoStore.ts existed —
- * this is that hook). */
-function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: string[] } {
+export const entryRevision = (entry: HistoryEntry) => entry.revision ?? `legacy:${entry.savedAt}`;
+
+export async function withHistoryLock<T>(action: () => T): Promise<T> {
+  return navigator.locks ? navigator.locks.request(KEY, () => action()) : action();
+}
+
+/** Reads and validates, newest first. A write can clean up assets for invalid rows. */
+function readRaw(): { entries: HistoryEntry[]; droppedIds: string[] } {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { entries: [], pruned: false, droppedIds: [] };
+    if (!raw) return { entries: [], droppedIds: [] };
     const parsed = JSON.parse(raw) as Partial<HistoryFile>;
-    if (!Array.isArray(parsed?.entries)) return { entries: [], pruned: true, droppedIds: [] };
+    if (!Array.isArray(parsed?.entries)) return { entries: [], droppedIds: [] };
 
     // Validate rather than cast: these records outlive schema changes, and one
     // corrupt entry must not blank the whole list
@@ -87,6 +86,7 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: stri
         {
           id: entry.id,
           savedAt: entry.savedAt,
+          ...(typeof entry.revision === "string" ? { revision: entry.revision } : {}),
           doc: doc.data,
           ...(procedure?.success ? { procedure: procedure.data } : {}),
         },
@@ -94,10 +94,10 @@ function readRaw(): { entries: HistoryEntry[]; pruned: boolean; droppedIds: stri
     });
 
     entries.sort((a, b) => b.savedAt - a.savedAt);
-    return { entries, pruned: entries.length !== parsed.entries.length, droppedIds };
+    return { entries, droppedIds };
   } catch {
     // Private-mode browsers block storage entirely — keep working without history
-    return { entries: [], pruned: false, droppedIds: [] };
+    return { entries: [], droppedIds: [] };
   }
 }
 
@@ -109,114 +109,82 @@ function writeRaw(entries: HistoryEntry[]): boolean {
     localStorage.setItem(KEY, JSON.stringify(file));
     return true;
   } catch {
-    // Out of quota (or blocked). Drop the oldest entry and try once more —
-    // losing the least recent JSA beats failing to save the current one.
-    if (entries.length > 1) {
-      const evicted = entries[entries.length - 1];
-      try {
-        localStorage.setItem(
-          KEY,
-          JSON.stringify({ v: 1, entries: entries.slice(0, -1) } satisfies HistoryFile),
-        );
-        void clearForHistoryIds([evicted.id]);
-        return true;
-      } catch {
-        /* still no room — history is a convenience, never fail loudly */
-      }
-    }
     return false;
   }
 }
 
-/** Newest first. Prunes corrupt records, writing back if anything changed. */
+/** Newest first. Invalid entries are excluded from the returned list. */
 export function list(): HistoryEntry[] {
-  const { entries, pruned, droppedIds } = readRaw();
-  if (pruned) {
-    writeRaw(entries);
-    // Fire-and-forget, same posture as the rest of photoStore.ts — a photo
-    // cleanup that fails leaves orphaned rows in IndexedDB, never a broken UI.
-    if (droppedIds.length) void clearForHistoryIds(droppedIds);
-  }
-  return entries;
+  return readRaw().entries;
 }
 
-/** Create or update the entry for `id`, moving it to the top of the list.
- *
- * Merges rather than replaces: an entry holds two documents written by two
- * different flows (the JSA editor autosaves `doc`; the procedure editor
- * autosaves `procedure`), so building a fresh object here would silently erase
- * whichever one this call isn't carrying. The merge lives inside this module
- * on purpose — a caller that has only one of the two must not be able to get
- * this wrong.
- */
-function upsertEntry(id: string, patch: Partial<Pick<HistoryEntry, "doc" | "procedure">>): boolean {
-  const all = readRaw().entries;
-  const existing = all.find((entry) => entry.id === id);
-  const doc = patch.doc ?? existing?.doc;
-  // A procedure is meaningless without the JSA it was generated from, and an
-  // entry with no doc would be dropped by readRaw's validation on the next
-  // read anyway — so skip rather than write a record that can't survive
-  if (!doc) return false;
+export type HistorySaveResult = { state: "saved"; revision: string } | { state: "failed" | "conflict" };
 
-  const procedure = patch.procedure ?? existing?.procedure;
+/** Save both documents as one job revision. A missing draft WP leaves the saved WP in place.
+ * Call within withHistoryLock to make the check and write one operation. */
+export function saveJob(
+  id: string,
+  doc: JsaDocument,
+  procedure: ProcedureDocument | null,
+  expected: string | null | undefined,
+): HistorySaveResult {
+  const { entries: all, droppedIds } = readRaw();
+  const existing = all.find((entry) => entry.id === id);
+  const nextProcedure = procedure ?? existing?.procedure;
+  // Older tab drafts predate revision tracking. An identical saved document
+  // can adopt its revision, but a divergent draft must be saved as a copy.
+  if (existing && JSON.stringify(existing.doc) === JSON.stringify(jsaDocumentSchema.parse(doc)) &&
+    JSON.stringify(existing.procedure) === JSON.stringify(procedure ? procedureDocumentSchema.parse(procedure) : undefined)) {
+    return { state: "saved", revision: entryRevision(existing) };
+  }
+  if (expected !== (existing ? entryRevision(existing) : null)) return { state: "conflict" };
+  if (!existing && all.length >= MAX_ENTRIES) return { state: "failed" };
   const others = all.filter((entry) => entry.id !== id);
-  // savedAt is "now", so the updated entry is always the newest — no re-sort needed
+  const revision = newId();
   const next: HistoryEntry = {
     id,
     savedAt: Date.now(),
+    revision,
     doc,
-    ...(procedure ? { procedure } : {}),
+    ...(nextProcedure ? { procedure: nextProcedure } : {}),
   };
-  return writeCapped([next, ...others]);
-}
-
-/** Write newest-first `entries`, dropping whatever falls past MAX_ENTRIES —
- * and those entries' photos with them. Without the photo cleanup, every job
- * that aged out of the cap would leave its images in IndexedDB forever, with
- * no history row left to show or delete them from. */
-function writeCapped(entries: HistoryEntry[]): boolean {
-  const stored = writeRaw(entries.slice(0, MAX_ENTRIES));
-  const overflow = entries.slice(MAX_ENTRIES).map((entry) => entry.id);
-  if (overflow.length) void clearForHistoryIds(overflow);
-  return stored;
-}
-
-/** Save the JSA for `id`, keeping any procedure already stored alongside it. */
-export function upsertDoc(id: string, doc: JsaDocument): boolean {
-  return upsertEntry(id, { doc });
-}
-
-/** Save the work procedure for `id`, keeping its JSA. */
-export function upsertProcedure(id: string, procedure: ProcedureDocument): boolean {
-  return upsertEntry(id, { procedure });
+  if (!writeRaw([next, ...others])) return { state: "failed" };
+  if (droppedIds.length) void clearForHistoryIds(droppedIds.filter((droppedId) => droppedId !== id));
+  return { state: "saved", revision };
 }
 
 /** Remove the document immediately; defer photo deletion beyond Undo. */
-export function remove(id: string): void {
-  if (writeRaw(readRaw().entries.filter((entry) => entry.id !== id))) {
-    deferPhotoCleanup(id);
-    window.dispatchEvent(new Event("genjsa-library-count"));
-  }
+export function remove(id: string): boolean {
+  if (!writeRaw(readRaw().entries.filter((entry) => entry.id !== id))) return false;
+  deferPhotoCleanup(id);
+  window.dispatchEvent(new Event("genjsa-library-count"));
+  return true;
 }
 
 /** Put a removed entry back with its original savedAt, so undo doesn't reorder the list. */
-export function restore(entry: HistoryEntry): void {
+export function restore(entry: HistoryEntry): boolean {
+  const entries = readRaw().entries;
+  if (entries.some((other) => other.id === entry.id)) {
+    cancelPhotoCleanup(entry.id);
+    return true;
+  }
+  const next = [entry, ...entries].sort((a, b) => b.savedAt - a.savedAt);
+  if (next.length > MAX_ENTRIES || !writeRaw(next)) return false;
   cancelPhotoCleanup(entry.id);
-  const others = readRaw().entries.filter((other) => other.id !== entry.id);
-  const next = [entry, ...others].sort((a, b) => b.savedAt - a.savedAt);
-  void writeCapped(next);
   window.dispatchEvent(new Event("genjsa-library-count"));
+  return true;
 }
 
-export function clear(): void {
+export function clear(): boolean {
   const ids = readRaw().entries.map((entry) => entry.id);
   try {
     localStorage.removeItem(KEY);
   } catch {
-    /* fail silently */
+    return false;
   }
   if (ids.length) void clearForHistoryIds(ids);
   window.dispatchEvent(new Event("genjsa-library-count"));
+  return true;
 }
 
 export function newId(): string {

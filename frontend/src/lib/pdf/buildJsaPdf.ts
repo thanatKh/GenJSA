@@ -281,6 +281,7 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
   };
 
   let y = drawHeader();
+  const freshRowY = L.table.repeat_header_each_page ? y : mT;
 
   // A hazard's sub-row ends in one blank spacer line, with the divider through
   // its middle. A full blank line made the gap either side of the divider
@@ -298,11 +299,15 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
     return off;
   };
 
-  const drawRowSlice = (row: Row, from: number, count: number, top: number) => {
+  const rowSliceHeight = (row: Row, from: number, count: number) => {
     const procedureLines = Math.min(count, Math.max(0, row.cells[0].length - from));
     // Hazard dividers shorten only the two right columns. The merged
     // procedure cell keeps its normal line spacing even across a divider.
-    const height = Math.max(procedureLines * lineH, offsetTo(row, from, from + count)) + pad * 2;
+    return Math.max(procedureLines * lineH, offsetTo(row, from, from + count)) + pad * 2;
+  };
+
+  const drawRowSlice = (row: Row, from: number, count: number, top: number) => {
+    const height = rowSliceHeight(row, from, count);
     doc.setLineWidth(L.table.border_width_pt);
     doc.setDrawColor(...border);
     colW.forEach((w, i) => {
@@ -348,19 +353,8 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
 
   rows.forEach((row, rowIndex) => {
     const totalLines = Math.max(...row.cells.map((c) => c.length), 1);
+    const signAfterRow = signatureH > 0 && rowIndex === rows.length - 1;
     let drawn = 0;
-
-    // Last row: carry it to a new page with the analyst line when the two
-    // don't fit together here but do fit together on a fresh page
-    if (signatureH && rowIndex === rows.length - 1 && !freshPage) {
-      const rowH = totalLines * lineH + pad * 2;
-      const fitsHere = y + rowH + signatureH <= bodyBottom;
-      const fitsFresh = rowH + signatureH <= bodyBottom - (mT + mmToPt(60));
-      if (!fitsHere && y + rowH <= bodyBottom && fitsFresh) {
-        y = startNewPage();
-        freshPage = true;
-      }
-    }
 
     // Keep a heading with the start of its first sub-step: if the heading
     // plus a couple of that row's lines won't fit here, start a new page
@@ -377,6 +371,31 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
       const remaining = totalLines - drawn;
       const available = bodyBottom - y;
       let fits = Math.floor((available - pad * 2) / lineH);
+
+      if (signAfterRow) {
+        const remainingHeight = rowSliceHeight(row, drawn, remaining);
+        if (remainingHeight + signatureH <= available) {
+          fits = remaining;
+        } else if (y !== freshRowY && remainingHeight + signatureH <= bodyBottom - freshRowY) {
+          y = startNewPage();
+          freshPage = true;
+          continue;
+        } else if (remaining > 1) {
+          // Keep the final hazard and its controls together with the analyst
+          // when that group fits. Otherwise hold back a short continuation.
+          const lastHazardStart = Math.floor(row.dividers.at(-1) ?? -1) + 1;
+          const finalGroupFits = lastHazardStart > drawn && totalLines - lastHazardStart >= MIN_SPLIT_LINES &&
+            rowSliceHeight(row, lastHazardStart, totalLines - lastHazardStart) + signatureH <= bodyBottom - freshRowY;
+          const keepFrom = finalGroupFits ? lastHazardStart : totalLines - Math.min(MIN_SPLIT_LINES, remaining - 1);
+          fits = Math.min(fits, keepFrom - drawn);
+        } else if (!freshPage) {
+          y = startNewPage();
+          freshPage = true;
+          continue;
+        } else {
+          throw new Error("PDF layout error: the final table line and analyst signature cannot fit together.");
+        }
+      }
 
       if (fits < 1) {
         // If a page we just started fresh still can't fit a single line, no
@@ -396,9 +415,10 @@ function drawJsa(E: Engine, jsa: JsaDocument, L: PdfLayout, D: DocumentMeta): vo
       // Don't split a row if a fresh page could fit it whole — avoids splitting a row unnecessarily
       if (
         L.table.avoid_row_split &&
+        !freshPage &&
         drawn === 0 &&
         fits < remaining &&
-        remaining * lineH + pad * 2 <= bodyBottom - (mT + mmToPt(60))
+        rowSliceHeight(row, drawn, remaining) + (signAfterRow ? signatureH : 0) <= bodyBottom - freshRowY
       ) {
         y = startNewPage();
         freshPage = true;

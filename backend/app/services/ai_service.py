@@ -7,7 +7,7 @@ JSON only.
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pydantic import BaseModel, ValidationError
@@ -80,6 +80,7 @@ async def generate_validated[T: BaseModel](
     provider: LLMProvider,
     settings: Settings,
     fallback_models: Sequence[str] = (),
+    validate_payload: Callable[[T], None] | None = None,
 ) -> T:
     """Call the LLM until it returns something that validates as `payload_model`.
 
@@ -126,7 +127,10 @@ async def generate_validated[T: BaseModel](
             continue
 
         try:
-            return payload_model.model_validate(repair_and_parse(raw))
+            payload = payload_model.model_validate(repair_and_parse(raw))
+            if validate_payload is not None:
+                validate_payload(payload)
+            return payload
         except (ValueError, ValidationError):
             # Log only the attempt number — never the response itself, since it contains work content
             logger.warning("AI response invalid on attempt %d/%d", attempt, attempts)

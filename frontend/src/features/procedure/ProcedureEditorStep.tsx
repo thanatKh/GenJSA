@@ -238,6 +238,9 @@ export function ProcedureEditorStep({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="text-2xl font-semibold sm:text-[1.75rem] text-navy">ตรวจทานขั้นตอนปฏิบัติงาน</h1>
       </div>
+      <p className="mt-1.5 text-muted">
+        เทียบแต่ละขั้นตอนกับ JSA ที่ตรวจทานแล้ว เช็กว่ามาตรการควบคุมและจุดตรวจสำคัญระบุไว้ครบก่อนสร้างเอกสาร
+      </p>
 
       <UnassignedPhotos photos={photos} onChange={onPhotoChange}
         targets={procedure.steps.flatMap((step) => [

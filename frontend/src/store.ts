@@ -26,6 +26,7 @@ const INPUT_KEY = "genjsa.draft.input";
 const DOC_KEY = "genjsa.draft.doc";
 const PROCEDURE_KEY = "genjsa.draft.procedure";
 const HISTORY_ID_KEY = "genjsa.draft.historyId";
+const HISTORY_REVISION_KEY = "genjsa.draft.historyRevision";
 const MODE_KEY = "genjsa.draft.mode";
 const JSA_SOURCE_KEY = "genjsa.draft.jsaSource";
 
@@ -75,6 +76,7 @@ export const inputDraft = {
 export type AdvancedKind = "jsa" | "wp";
 type AdvancedDraft = {
   source: string; work: string; instructions: string; answer: string; level: DetailLevel;
+  previousAnswer?: string;
   /** JSA only: ask the AI to split every main step into sub-steps. Optional
    * so drafts saved before it existed still load. */
   split?: boolean;
@@ -111,6 +113,11 @@ export const currentHistoryId = {
   clear: () => remove(HISTORY_ID_KEY),
 };
 
+export const historyRevisionDraft = {
+  load: () => read<{ id: string; revision: string | null }>(HISTORY_REVISION_KEY),
+  save: (id: string, revision: string | null) => write(HISTORY_REVISION_KEY, { id, revision }),
+};
+
 /** What the first screen is set to make: a JSA or a JSA with its work
  * procedure (ModeChoice.tsx). Remembered for the tab's session;
  * a fresh visit starts on "jsa", so nobody gets the doubled wait of
@@ -145,4 +152,5 @@ export function clearAllDrafts(): void {
   docDraft.clear();
   procedureDraft.clear();
   currentHistoryId.clear();
+  remove(HISTORY_REVISION_KEY);
 }

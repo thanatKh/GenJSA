@@ -26,7 +26,7 @@ export function ModeChoice({ mode, onChange }: { mode: Mode; onChange: (mode: Mo
     <div
       role="radiogroup"
       aria-label="เอกสารที่ต้องการสร้าง"
-      className="mb-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-1 rounded-full border border-line bg-raised p-1"
+      className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-1 rounded-full border border-line bg-raised p-1 sm:mt-4"
     >
       {OPTIONS.map((option, index) => {
         const checked = option.mode === mode;

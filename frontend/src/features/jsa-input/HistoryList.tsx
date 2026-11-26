@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
 import {
   FileText,
   History,
@@ -88,24 +89,33 @@ export function HistoryList({
   const searching = query.trim().length > 0;
   const scrollable = matches.length > SCROLL_THRESHOLD;
 
-  const deleteEntry = (entry: HistoryEntry) => {
-    historyStore.remove(entry.id);
+  const deleteEntry = async (entry: HistoryEntry) => {
+    if (!await historyStore.withHistoryLock(() => historyStore.remove(entry.id)).catch(() => false)) {
+      toast.error("ลบงานไม่ได้ กรุณาลองอีกครั้ง");
+      return;
+    }
     setEntries(historyStore.list());
     setUndoEntry(entry);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndoEntry(null), UNDO_TIMEOUT_MS);
   };
 
-  const undoDelete = () => {
+  const undoDelete = async () => {
     if (!undoEntry) return;
-    historyStore.restore(undoEntry);
+    if (!await historyStore.withHistoryLock(() => historyStore.restore(undoEntry)).catch(() => false)) {
+      toast.error("กู้คืนงานไม่ได้ กรุณาตรวจพื้นที่จัดเก็บในเบราว์เซอร์");
+      return;
+    }
     setEntries(historyStore.list());
     setUndoEntry(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
   };
 
-  const applyClear = () => {
-    historyStore.clear();
+  const applyClear = async () => {
+    if (!await historyStore.withHistoryLock(historyStore.clear).catch(() => false)) {
+      toast.error("ล้างประวัติไม่ได้ กรุณาลองอีกครั้ง");
+      return;
+    }
     setEntries([]);
     setQuery("");
     setConfirmClear(false);
@@ -289,7 +299,7 @@ export function HistoryList({
       )}
 
       <p className="mt-3 border-t border-line pt-3 text-sm text-muted">
-        บันทึกไว้ในเครื่องนี้เท่านั้น (สูงสุด {historyStore.MAX_ENTRIES} งานล่าสุด)
+        บันทึกไว้ในเครื่องนี้เท่านั้น (สูงสุด {historyStore.MAX_ENTRIES} งาน)
       </p>
 
       {undoToast}

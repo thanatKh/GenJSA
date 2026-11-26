@@ -5,6 +5,23 @@ import { expect, test } from "@playwright/test";
 import { fillInput, fixture, mockApi } from "./helpers";
 import { readFileSync } from "node:fs";
 
+test("denied clipboard access selects the prompt after it opens", async ({ page, isMobile }) => {
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: () => Promise.reject(new Error("Clipboard denied")) },
+  }));
+  await mockApi(page);
+  await fillInput(page);
+  await page.getByRole("button", { name: "ใช้โมเดลภายนอก" }).click();
+  await page.getByRole("button", { name: "คัดลอกคำสั่ง" }).click();
+  const prompt = page.locator("#personal-prompt");
+  await expect(page.getByRole("status").filter({ hasText: "เลือกข้อความแล้ว" })).toBeVisible();
+  await expect(prompt).toBeFocused();
+  expect(await prompt.evaluate((field: HTMLTextAreaElement) => field.value.slice(field.selectionStart, field.selectionEnd)))
+    .toBe(await prompt.inputValue());
+});
+
 test("the copy button confirms on itself, then goes back", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await mockApi(page);
@@ -85,10 +102,11 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
       data.items.add(new File([content], "genjsa-jsa.json", { type: "application/json" }));
       return data;
     }, text);
-    const zone = page.getByText(/ลากไฟล์คำตอบมาวางในส่วนนี้/);
-    await zone.dispatchEvent("dragover", { dataTransfer });
-    await zone.dispatchEvent("drop", { dataTransfer });
-    await expect(page.getByText("นำเข้าไฟล์ genjsa-jsa.json แล้ว")).toBeVisible();
+    await receive.dispatchEvent("dragover", { dataTransfer });
+    await expect(page.getByText(/วางไฟล์คำตอบที่นี่/)).toBeVisible();
+    await receive.dispatchEvent("drop", { dataTransfer });
+    await expect(page.getByText("genjsa-jsa.json", { exact: true })).toBeVisible();
+    await expect(page.getByText("ตรวจรูปแบบผ่าน", { exact: true })).toBeVisible();
   } else {
     await page.getByLabel("เลือกไฟล์คำตอบจาก AI").setInputFiles(fixture("jsa-answer.json"));
   }

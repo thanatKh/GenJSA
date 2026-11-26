@@ -1,6 +1,7 @@
 /* The PDF and Word builders, run in the browser exactly as the app runs
  * them, on a JSA with sub-steps and its WP. */
 import { expect, test } from "@playwright/test";
+import { inflateSync } from "node:zlib";
 import { readFixture } from "./helpers";
 
 type Answer = { work_activity: string; steps: { procedure: string; details: string; hazards: unknown[]; sub_steps: object[] }[] };
@@ -39,4 +40,41 @@ test("JSA with sub-steps and its WP build as PDF and Word", async ({ page }, inf
   expect(built.jsaDocx.head.slice(0, 2)).toBe("PK"); // a .docx is a zip
   expect(built.wpDocx.head.slice(0, 2)).toBe("PK");
   for (const file of Object.values(built)) expect(file.size).toBeGreaterThan(10_000);
+});
+
+test("the final JSA page includes table content alongside the analyst line", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "builds don't depend on screen size");
+  await page.route("**/api/config/public", (route) => route.fulfill({ status: 503, body: "" }));
+  await page.goto("/");
+
+  const bytes = await page.evaluate(async () => {
+    const { buildJsaPdf } = await import("/src/lib/pdf/buildJsaPdf.ts");
+    const content = "ตรวจสภาพพื้นที่และสื่อสารกับผู้ควบคุมงานก่อนเริ่มดำเนินการ ";
+    const blob = await buildJsaPdf({
+      header: {
+        work_activity: "ตรวจงานตัวอย่าง " + "ภาษาไทยและเครื่องจักร ".repeat(11),
+        supervisor: "Audit supervisor", analysis_date: "2026-11-26", analyst: "", company: "",
+      },
+      assumptions: [],
+      steps: Array.from({ length: 12 }, (_, i) => ({
+        no: i + 1,
+        procedure: "ขั้นตอนตรวจสอบภาษาไทย  ".repeat(i % 3 + 1) + "LONG_EQUIPMENT_IDENTIFIER_ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789",
+        details: content.repeat(i % 5 + 1),
+        hazards: Array.from({ length: 3 }, (_, j) => ({ hazard: `รายการอันตราย ${j + 1} ${content}`, controls: [content.repeat(2), content, content] })),
+        sub_steps: [],
+      })),
+    });
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+
+  const pdf = Buffer.from(bytes).toString("latin1");
+  const pages = [...pdf.matchAll(/\/Type \/Page\b[\s\S]*?\/Contents (\d+) 0 R/g)];
+  expect(pages.length).toBeGreaterThan(1);
+  const streamObject = pdf.indexOf(`\n${pages.at(-1)![1]} 0 obj\n`);
+  expect(streamObject).toBeGreaterThan(0);
+  const streamMarker = pdf.indexOf("\nstream\n", streamObject);
+  const streamLength = Number(/\/Length (\d+)/.exec(pdf.slice(streamObject, streamMarker))?.[1]);
+  const lastPage = inflateSync(Buffer.from(pdf.slice(streamMarker + 8, streamMarker + 8 + streamLength), "latin1")).toString("latin1");
+  // The signature and footer are only text. A table slice draws rectangles.
+  expect(lastPage).toMatch(/\bre\s+S\b/);
 });
