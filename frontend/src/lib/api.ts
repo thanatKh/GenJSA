@@ -26,9 +26,12 @@ const NETWORK_ERROR =
 const GENERATE_TIMEOUT_MS = 6 * 60 * 1000;
 
 export class ApiError extends Error {
-  constructor(message: string) {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = "ApiError";
+    this.code = code;
   }
 }
 
@@ -89,7 +92,7 @@ async function postGenerate(
   }
 
   if (!response.ok) {
-    throw new ApiError(await extractMessage(response));
+    throw await extractError(response);
   }
   return response;
 }
@@ -167,13 +170,16 @@ export async function fetchPublicConfig(): Promise<PublicConfig | null> {
   }
 }
 
-async function extractMessage(response: Response): Promise<string> {
+async function extractError(response: Response): Promise<ApiError> {
   try {
     const body = await response.json();
-    const message = body?.error?.message;
-    if (typeof message === "string" && message.trim()) return message;
+    const { message, code } = body?.error ?? {};
+    return new ApiError(
+      typeof message === "string" && message.trim() ? message : FALLBACK_ERROR,
+      typeof code === "string" ? code : undefined,
+    );
   } catch {
     // Response wasn't JSON — use the fallback message
   }
-  return FALLBACK_ERROR;
+  return new ApiError(FALLBACK_ERROR);
 }

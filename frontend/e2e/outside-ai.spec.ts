@@ -65,10 +65,17 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
   const receive = page.getByRole("form", { name: "2. นำคำตอบกลับมา" });
   await expect(prepare).toBeVisible();
   await expect(receive).toBeVisible();
-  await expect(receive.getByLabel("วางคำตอบจาก AI")).toBeVisible();
-  await expect(receive.getByRole("button", { name: "เลือกไฟล์คำตอบ" })).toBeVisible();
+  const answer = receive.getByLabel("วางคำตอบจาก AI");
+  const upload = receive.getByRole("button", { name: "เลือกไฟล์คำตอบ" });
+  await expect(answer).toBeVisible();
+  await expect(upload).toBeVisible();
   const left = (await prepare.boundingBox())!;
   const right = (await receive.boundingBox())!;
+  const uploadBox = (await upload.boundingBox())!;
+  const answerBox = (await answer.boundingBox())!;
+  expect(uploadBox.height).toBeGreaterThanOrEqual(112);
+  expect(uploadBox.width).toBeCloseTo(answerBox.width);
+  expect(uploadBox.y + uploadBox.height).toBeLessThan(answerBox.y);
   if (info.project.name === "desktop") {
     expect(right.x).toBeGreaterThan(left.x + left.width);
     expect(Math.abs(right.y - left.y)).toBeLessThan(2);
@@ -104,13 +111,14 @@ test("prompt folded, drop a file, check button leads", async ({ page }, info) =>
       data.items.add(new File([content], "genjsa-jsa.json", { type: "application/json" }));
       return data;
     }, text);
-    await receive.dispatchEvent("dragover", { dataTransfer });
+    await upload.dispatchEvent("dragover", { dataTransfer });
     await expect(page.getByText(/วางไฟล์คำตอบที่นี่/)).toBeVisible();
-    await receive.dispatchEvent("drop", { dataTransfer });
+    await upload.dispatchEvent("drop", { dataTransfer });
     await expect(page.getByText("genjsa-jsa.json", { exact: true })).toBeVisible();
     await expect(page.getByText("ตรวจรูปแบบผ่าน", { exact: true })).toBeVisible();
   } else {
-    await page.getByLabel("เลือกไฟล์คำตอบจาก AI").setInputFiles(fixture("jsa-answer.json"));
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), upload.tap()]);
+    await chooser.setFiles(fixture("jsa-answer.json"));
   }
 
   // A good answer is checked straight away: the check button gives way to the next step

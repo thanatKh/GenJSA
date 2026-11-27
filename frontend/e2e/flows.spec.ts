@@ -64,6 +64,30 @@ test.describe("JSA + Procedure", () => {
     expect(calls).toEqual({ jsa: 1, procedure: 1 });
   });
 
+  test("a failed WP draft stays visible by ถัดไป and leaves the reviewed JSA available", async ({ page }) => {
+    await mockApi(page);
+    await page.route("**/api/procedure/generate", (route) => route.fulfill({
+      status: 502,
+      json: { error: { code: "ai_bad_response", message: "ร่างเอกสารไม่สำเร็จ" } },
+    }), { times: 1 });
+    await fillInput(page, "JSA + Procedure");
+    await page.getByRole("button", { name: "สร้างเอกสาร" }).click();
+    await expect(field(page, "procedure-0")).toHaveValue("ขั้นตอนหลัก 1");
+    await forward(page, "ถัดไป").click();
+    await page.getByRole("alertdialog").getByRole("button", { name: /AI ในระบบ/ }).click();
+
+    const next = forward(page, "ถัดไป");
+    const alert = page.locator(".editor-action-bar").getByRole("alert");
+    await expect(alert).toContainText("ร่างขั้นตอนปฏิบัติงานไม่สำเร็จ ข้อมูล JSA ยังอยู่");
+    await expect(alert).toBeInViewport({ ratio: 1 });
+    await expect(next).toBeInViewport({ ratio: 1 });
+    await expect(field(page, "procedure-0")).toHaveValue("ขั้นตอนหลัก 1");
+
+    await next.click();
+    await page.getByRole("alertdialog").getByRole("button", { name: /ใช้โมเดลภายนอก/ }).click();
+    await expect(page.getByRole("heading", { name: "ใช้โมเดลภายนอก", exact: true })).toBeVisible();
+  });
+
   test("outside AI for both: never calls the built-in AI, WP locked to JSA sub-steps", async ({ page }) => {
     const calls = await mockApi(page);
     await fillInput(page, "JSA + Procedure");

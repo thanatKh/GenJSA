@@ -1,12 +1,14 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { SaveStatus, type SaveState } from "./SaveStatus";
+import { Alert } from "./ui";
 
 const KEYBOARD_MIN_HEIGHT = 120;
 
-export function EditorActionBar({ leading, trailing, saveState }: {
+export function EditorActionBar({ leading, trailing, saveState, error }: {
   leading: ReactNode;
   trailing: ReactNode;
   saveState: SaveState;
+  error?: string | null;
 }) {
   const bar = useRef<HTMLDivElement>(null);
 
@@ -59,6 +61,11 @@ export function EditorActionBar({ leading, trailing, saveState }: {
 
   return (
     <div ref={bar} className="editor-action-bar fixed inset-x-0 z-10 border-t border-line t-glass bg-surface/95 supports-backdrop-filter:bg-surface/80 supports-backdrop-filter:backdrop-blur-md">
+      {error ? (
+        <div className="mx-auto mb-2 w-full max-w-[var(--page-max-w)]">
+          <Alert>{error}</Alert>
+        </div>
+      ) : null}
       <div className="mx-auto flex w-full max-w-[var(--page-max-w)] items-center gap-2 sm:justify-between">
         <div className="editor-action">{leading}</div>
         <SaveStatus state={saveState} />

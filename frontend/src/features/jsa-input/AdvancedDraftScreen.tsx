@@ -318,7 +318,7 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
           </div>
         </section>
         <form aria-labelledby="personal-import-heading"
-          className={`${panelClass} ${dragging ? "border-navy! bg-navy-soft" : ""}`}
+          className={panelClass}
           onSubmit={(event) => {
             event.preventDefault();
             if (answer.trim() && answerFile?.state !== "reading") check(answer);
@@ -339,38 +339,22 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
             if (!sourceChanged) void readFile(file);
           }}>
           <h2 id="personal-import-heading" ref={answerHeading} tabIndex={-1} className="text-lg font-semibold text-ink">2. นำคำตอบกลับมา</h2>
-          <div>
-            <Label htmlFor="personal-answer">วางคำตอบจาก AI</Label>
-            <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
-              aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
-              onChange={(e) => {
-                fileReadVersion.current += 1;
-                setAnswer(e.target.value);
-                setPreviousAnswer("");
-                setDraft(null);
-                setError("");
-                setAnswerFile(null);
-              }} />
-            <Reveal show={!!error}>
-              <FieldError id="personal-answer-error">{error || lastError.current}</FieldError>
-            </Reveal>
-          </div>
-          <div className={`flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-dashed px-2.5 py-2 ${dragging ? "border-navy bg-surface" : "border-line"}`}>
-            <Button
+          <div className="grid min-w-0 gap-2">
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               disabled={sourceChanged}
+              aria-labelledby="personal-file-label"
+              aria-describedby="personal-file-hint"
               onClick={() => fileInput.current?.click()}
-              className="min-h-11 lg:pointer-fine:min-h-8"
+              className={`grid min-h-28 w-full content-center justify-items-center gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-center text-navy focus-visible:ring-2 focus-visible:ring-navy focus-visible:ring-offset-2 disabled:opacity-50 ${dragging ? "border-navy bg-navy-soft" : "border-navy/45 bg-navy-soft/50 enabled:cursor-pointer enabled:hover:border-navy enabled:hover:bg-navy-soft"}`}
             >
-              <FileUp className="size-4" aria-hidden="true" />
-              เลือกไฟล์คำตอบ
-            </Button>
-            <p className="text-xs text-muted">
-              .json หรือ .txt<span className="hidden sm:pointer-fine:inline"> · {dragging ? "วางไฟล์คำตอบที่นี่" : "ลากไฟล์คำตอบมาวางในส่วนนี้ได้"}</span>
-            </p>
-            <div role="status" aria-atomic="true" className={answerFile ? "min-w-0 basis-full border-t border-line pt-1.5 text-sm" : "sr-only"}>
+              <FileUp className="size-6" aria-hidden="true" />
+              <span id="personal-file-label" className="text-sm font-semibold">เลือกไฟล์คำตอบ</span>
+              <span id="personal-file-hint" className="text-xs text-muted">
+                .json หรือ .txt<span className="hidden pointer-fine:inline"> · {dragging ? "วางไฟล์คำตอบที่นี่" : "ลากไฟล์มาวางที่นี่"}</span>
+              </span>
+            </button>
+            <div role="status" aria-atomic="true" className={answerFile ? "min-w-0 rounded-lg border border-line px-3 py-2 text-sm" : "sr-only"}>
               {answerFile ? (
                 <>
                   <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
@@ -390,6 +374,22 @@ export function AdvancedDraftScreen<T extends PreviewDraft>({ kind, description,
                 event.target.value = "";
                 if (file) void readFile(file);
               }} />
+          </div>
+          <div>
+            <Label htmlFor="personal-answer">วางคำตอบจาก AI</Label>
+            <textarea id="personal-answer" name="answer" ref={answerField} rows={4} className={textAreaClass} value={answer}
+              aria-invalid={!!error} aria-describedby={error ? "personal-answer-error" : undefined}
+              onChange={(e) => {
+                fileReadVersion.current += 1;
+                setAnswer(e.target.value);
+                setPreviousAnswer("");
+                setDraft(null);
+                setError("");
+                setAnswerFile(null);
+              }} />
+            <Reveal show={!!error}>
+              <FieldError id="personal-answer-error">{error || lastError.current}</FieldError>
+            </Reveal>
           </div>
           {previousAnswer && !answer && !sourceChanged && answerFile?.state !== "reading" ? (
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted">

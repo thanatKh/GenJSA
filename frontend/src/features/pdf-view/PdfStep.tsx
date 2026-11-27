@@ -139,6 +139,11 @@ export function PdfStep({
         </div>
 
         <div className="mt-4 border-t border-line pt-4">
+          {procedureError ? (
+            <div className="mb-3">
+              <Alert>{procedureError}</Alert>
+            </div>
+          ) : null}
           {/* Always outline, even when the procedure already exists: as a
               full-width solid button it outweighed the half-width "เปิดเอกสาร
               PDF" above — the one action this page exists for. The JSA PDF
@@ -153,12 +158,6 @@ export function PdfStep({
             {hasProcedure ? "เปิดขั้นตอนปฏิบัติงาน" : "สร้างขั้นตอนปฏิบัติงาน"}
           </Button>
         </div>
-
-        {procedureError ? (
-          <div className="mt-3">
-            <Alert>{procedureError}</Alert>
-          </div>
-        ) : null}
       </Card>
 
       {/* Text links, not buttons — these leave the page rather than act on

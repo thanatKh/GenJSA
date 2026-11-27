@@ -61,7 +61,9 @@ class ThaiLLMProvider(LLMProvider):
             # Some providers don't recognize response_format and answer with 400
             # Surface this as bad_response so ai_service retries with json_mode off
             raise Errors.AI_BAD_RESPONSE
-        if response.status_code >= 500:
+        # ThaiLLM also returns 404 when a configured model is no longer available.
+        # Treat that like an unavailable worker so generation can try its backup.
+        if response.status_code == 404 or response.status_code >= 500:
             raise Errors.AI_UNAVAILABLE
         if response.status_code >= 400:
             raise Errors.AI_BAD_RESPONSE

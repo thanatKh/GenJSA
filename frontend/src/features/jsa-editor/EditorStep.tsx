@@ -10,13 +10,11 @@ import { AnimatePresence } from "motion/react";
 import { ArrowRight, Info, Plus, RotateCcw } from "lucide-react";
 
 import {
-  Alert,
   AutoGrowTextarea,
   Button,
   Card,
   ConfirmDialog,
   Input,
-  Reveal,
   UndoToast,
 } from "../../components/ui";
 import { DuplicateButton } from "../../components/DuplicateButton";
@@ -587,12 +585,6 @@ export function EditorStep({
         </div>
       ) : null}
 
-      <Reveal show={!!error}>
-        <div className="pt-4">
-          <Alert>{error}</Alert>
-        </div>
-      </Reveal>
-
       {/* Spacer so the fixed bar below doesn't cover the last bit of content */}
       <div className="h-20" aria-hidden="true" />
 
@@ -602,6 +594,7 @@ export function EditorStep({
           "generate PDF" are always one tap away while reviewing. */}
       <EditorActionBar
         saveState={saveState}
+        error={error}
         leading={
           <Button variant="ghost" size="lg" className="max-sm:px-2" onClick={() => setConfirmRestart(true)}>
             <RotateCcw className="size-4" aria-hidden="true" />

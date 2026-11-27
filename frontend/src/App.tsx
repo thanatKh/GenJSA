@@ -535,7 +535,12 @@ export default function App() {
       // during a first-time draft leaves the caller back on PdfStep exactly
       // as it was, and a cancel during a regenerate leaves the existing
       // procedure on screen untouched.
-      if (!(caught instanceof CancelledError)) {
+      if (caught instanceof CancelledError) return;
+      if (caught instanceof ApiError && caught.code === "ai_bad_response") {
+        setProcedureError(procedure
+          ? "ร่างขั้นตอนปฏิบัติงานใหม่ไม่สำเร็จ ร่างเดิมยังอยู่ ลองกด “ร่างใหม่” อีกครั้ง"
+          : "ร่างขั้นตอนปฏิบัติงานไม่สำเร็จ ข้อมูล JSA ยังอยู่ กดปุ่มด้านล่างเพื่อลองอีกครั้งหรือเลือกใช้โมเดลภายนอก");
+      } else {
         setProcedureError(
           caught instanceof ApiError
             ? caught.message

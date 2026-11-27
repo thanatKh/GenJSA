@@ -9,6 +9,7 @@ the model's own step list or lets `references` into the AI contract, these fail.
 from datetime import date
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from app.core.config import get_settings
@@ -16,6 +17,7 @@ from app.core.errors import AppError, Errors
 from app.models.jsa import Hazard, JsaDocument, JsaHeader, JsaStep
 from app.models.procedure import AiProcedurePayload, AiProcedureStep, SubStep, GenerateProcedureRequest
 from app.providers.llm.base import LLMProvider
+from app.providers.llm.thaillm import ThaiLLMProvider
 from app.services.procedure_service import _assemble, _build_user_prompt, generate_procedure
 
 
@@ -81,15 +83,20 @@ def test_header_is_inherited_unchanged(jsa, settings):
     assert doc.header == jsa.header
 
 
-async def test_procedure_failover_preserves_reviewed_jsa(jsa, settings):
+async def test_procedure_failover_after_model_404_preserves_reviewed_jsa(jsa, settings, monkeypatch):
     settings.ai.detailed_model = "primary"
     settings.ai.detailed_fallback_models = ["backup"]
-    provider = AsyncMock(spec=LLMProvider)
-    provider.complete.side_effect = [Errors.AI_UNAVAILABLE, _payload().model_dump_json()]
-
-    doc = await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
-
-    assert [c.kwargs["model"] for c in provider.complete.await_args_list] == ["primary", "backup"]
+    provider = ThaiLLMProvider(settings.ai, "test-key")
+    post = AsyncMock(side_effect=[
+        httpx.Response(404),
+        httpx.Response(200, json={"choices": [{"message": {"content": _payload().model_dump_json()}}]}),
+    ])
+    monkeypatch.setattr(provider._client, "post", post)
+    try:
+        doc = await generate_procedure(GenerateProcedureRequest(jsa=jsa), provider, settings)
+    finally:
+        await provider.aclose()
+    assert [c.kwargs["json"]["model"] for c in post.await_args_list] == ["primary", "backup"]
     assert doc.header == jsa.header
     assert [s.procedure for s in doc.steps] == [s.procedure for s in jsa.steps]
     assert all(s.sub_steps for s in doc.steps)

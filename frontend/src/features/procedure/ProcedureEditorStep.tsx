@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 
 import {
-  Alert,
   AutoGrowTextarea,
   Button,
   Card,
@@ -427,12 +426,6 @@ export function ProcedureEditorStep({
         </div>
       ) : null}
 
-      <Reveal show={!!error}>
-        <div className="pt-4">
-          <Alert>{error}</Alert>
-        </div>
-      </Reveal>
-
       {/* Spacer so the fixed bar below doesn't cover the last bit of content */}
       <div className="h-20" aria-hidden="true" />
 
@@ -440,6 +433,7 @@ export function ProcedureEditorStep({
           otherwise only be reachable after scrolling the whole document */}
       <EditorActionBar
         saveState={saveState}
+        error={error}
         leading={
           <Button
             type="button"
